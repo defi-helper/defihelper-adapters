@@ -3,6 +3,24 @@ const ERC20ABI = require("./abi/erc20.json");
 const UniswapPairABI = require("./abi/uniswap/pair.json");
 const bn = require("bignumber.js");
 
+const tokens = (...tokens) =>
+  tokens.reduce((prev, { token, data }) => {
+    if (prev[token]) {
+      return {
+        ...prev,
+        [token]: Object.entries(data).reduce(
+          (prev, [k, v]) => ({
+            ...prev,
+            [k]: prev[k] ? new bn(prev[k]).plus(v).toString(10) : v,
+          }),
+          prev[token]
+        ),
+      };
+    } else {
+      return { ...prev, [token]: data };
+    }
+  }, {});
+
 const coingecko = {
   simple: {
     tokenPrice: async (id, contractAddresses, vsCurrencies) => {
@@ -70,10 +88,10 @@ const ethereum = {
       token1Decimals = token1Decimals.toString();
       reserve0 = new bn(reserves[0].toString())
         .div(new bn(10).pow(token0Decimals))
-        .toString();
+        .toString(10);
       reserve1 = new bn(reserves[1].toString())
         .div(new bn(10).pow(token1Decimals))
-        .toString();
+        .toString(10);
       const prices = await coingecko.simple.tokenPrice(
         "ethereum",
         [token0, token1],
@@ -103,16 +121,9 @@ const ethereum = {
   },
 };
 
-function Type(t) {
-  return (v) => ({
-    t,
-    v,
-  });
-}
-
 module.exports = {
-  USDollar: Type("USDollar"),
-  Percent: Type("Percent"),
+  toFloat: (n, decimals) => new bn(n.toString()).div(new bn(10).pow(decimals)),
+  tokens,
   ethereum,
   coingecko,
 };
