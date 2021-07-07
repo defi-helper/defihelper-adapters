@@ -18,6 +18,7 @@
   "dependencies": {
     "axios": "^0.21.1",
     "bignumber.js": "^9.0.1",
+    "dayjs": "^1.10.5",
     "ethers": "^5.4.0",
     "glob": "^7.1.7"
   }

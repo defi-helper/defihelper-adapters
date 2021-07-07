@@ -1,7 +1,9 @@
+axios = axios === undefined ? require("axios") : axios;
 const ethers = require("ethers");
 const ERC20ABI = require("./abi/erc20.json");
 const UniswapPairABI = require("./abi/uniswap/pair.json");
 const bn = require("bignumber.js");
+const dayjs = require("dayjs");
 
 const tokens = (...tokens) =>
   tokens.reduce((prev, { token, data }) => {
@@ -22,17 +24,110 @@ const tokens = (...tokens) =>
   }, {});
 
 const coingecko = {
+  apiUrl: "https://api.coingecko.com/api/v3",
+  getPriceUSD: async (isCurrent, block, tokenId) => {
+    let priceUSD = "0";
+    if (isCurrent) {
+      const currentPrice = await coingecko.simple.price(tokenId, "usd");
+      if (currentPrice[tokenId].usd === undefined) return priceUSD;
+
+      priceUSD = currentPrice[tokenId].usd;
+    } else {
+      const historyPrice = await coingecko.coins.history(
+        tokenId,
+        dayjs.unix(block.timestamp)
+      );
+      if (
+        historyPrice.market_data === undefined ||
+        historyPrice.market_data.current_price === undefined
+      )
+        return priceUSD;
+
+      priceUSD = historyPrice.market_data.current_price.usd;
+    }
+
+    return priceUSD;
+  },
+  getPriceUSDByContract: async (platform, isCurrent, block, tokenAddress) => {
+    let priceUSD = "0";
+    if (isCurrent) {
+      const currentPrice = await coingecko.simple.tokenPrice(
+        platform,
+        tokenAddress,
+        "usd"
+      );
+      if (currentPrice[tokenAddress].usd === undefined) return priceUSD;
+
+      priceUSD = currentPrice[tokenAddress].usd;
+    } else {
+      const coingeckoContractInfo = await coingecko.coins.contract(
+        platform,
+        tokenAddress
+      );
+      const historyPrice = await coingecko.coins.history(
+        coingeckoContractInfo.id,
+        dayjs.unix(block.timestamp)
+      );
+      if (
+        historyPrice.market_data === undefined ||
+        historyPrice.market_data.current_price === undefined
+      )
+        return priceUSD;
+
+      priceUSD = historyPrice.market_data.current_price.usd;
+    }
+
+    return priceUSD;
+  },
   simple: {
-    tokenPrice: async (id, contractAddresses, vsCurrencies) => {
-      const normalizeContractAddresses = Array.isArray(contractAddresses)
-        ? contractAddresses.join(",")
-        : contractAddresses;
-      const normalizeVsCurrencies = Array.isArray(vsCurrencies)
-        ? vsCurrencies.join(",")
-        : vsCurrencies;
+    price: async (ids, vsCurrencies) => {
+      const normalizeIds = (Array.isArray(ids) ? ids : [ids]).join(",");
+      const normalizeVsCurrencies = (Array.isArray(vsCurrencies)
+        ? vsCurrencies
+        : [vsCurrencies]
+      ).join(",");
 
       const resp = await axios.get(
-        `https://api.coingecko.com/api/v3/simple/token_price/${id}?contract_addresses=${normalizeContractAddresses}&vs_currencies=${normalizeVsCurrencies}`
+        `${coingecko.apiUrl}/simple/price?ids=${normalizeIds}&vs_currencies=${normalizeVsCurrencies}`
+      );
+
+      return resp.data;
+    },
+    tokenPrice: async (id, contractAddresses, vsCurrencies) => {
+      const normalizeContractAddresses = (Array.isArray(contractAddresses)
+        ? contractAddresses
+        : [contractAddresses]
+      ).join(",");
+      const normalizeVsCurrencies = (Array.isArray(vsCurrencies)
+        ? vsCurrencies
+        : [vsCurrencies]
+      ).join(",");
+
+      const resp = await axios.get(
+        `${coingecko.apiUrl}/simple/token_price/${id}?contract_addresses=${normalizeContractAddresses}&vs_currencies=${normalizeVsCurrencies}`
+      );
+
+      return resp.data;
+    },
+  },
+  coins: {
+    contract: async (id, contractAddress) => {
+      const resp = await axios.get(
+        `${coingecko.apiUrl}/coins/${id}/contract/${contractAddress}`
+      );
+
+      return resp.data;
+    },
+    history: async (id, date) => {
+      const normalizeDate =
+        typeof date === "string"
+          ? date
+          : dayjs.isDayjs(date)
+          ? date.format("DD-MM-YYYY")
+          : dayjs(date).format("DD-MM-YYYY");
+
+      const resp = await axios.get(
+        `${coingecko.apiUrl}/coins/${id}/history?date=${normalizeDate}`
       );
 
       return resp.data;
@@ -41,15 +136,26 @@ const coingecko = {
 };
 
 const ethereum = {
+  defaultOptions: () => ({
+    blockNumber: "latest",
+  }),
   erc20: (provider, address) =>
     new ethers.Contract(address, ERC20ABI, provider),
-  erc20Info: async (provider, address) => {
+  erc20Info: async (provider, address, options = ethereum.defaultOptions()) => {
     const token = ethereum.erc20(provider, address);
     const [name, symbol, decimals, totalSupply] = await Promise.all([
-      token.name(),
-      token.symbol(),
-      token.decimals(),
-      token.totalSupply(),
+      token.name({
+        blockTag: options.blockNumber,
+      }),
+      token.symbol({
+        blockTag: options.blockNumber,
+      }),
+      token.decimals({
+        blockTag: options.blockNumber,
+      }),
+      token.totalSupply({
+        blockTag: options.blockNumber,
+      }),
     ]);
 
     return {
@@ -63,13 +169,25 @@ const ethereum = {
     pairDecimals: 18,
     pair: (provider, address) =>
       new ethers.Contract(address, UniswapPairABI, provider),
-    pairInfo: async (provider, address) => {
+    pairInfo: async (
+      provider,
+      address,
+      options = ethereum.defaultOptions()
+    ) => {
       const pair = ethereum.uniswap.pair(provider, address);
       let [token0, token1, reserves, totalSupply] = await Promise.all([
-        pair.token0(),
-        pair.token1(),
-        pair.getReserves(),
-        pair.totalSupply(),
+        pair.token0({
+          blockTag: options.blockNumber,
+        }),
+        pair.token1({
+          blockTag: options.blockNumber,
+        }),
+        pair.getReserves({
+          blockTag: options.blockNumber,
+        }),
+        pair.totalSupply({
+          blockTag: options.blockNumber,
+        }),
       ]);
       token0 = token0.toLowerCase();
       token1 = token1.toLowerCase();
@@ -81,8 +199,8 @@ const ethereum = {
         { decimals: token0Decimals },
         { decimals: token1Decimals },
       ] = await Promise.all([
-        ethereum.erc20Info(provider, token0),
-        ethereum.erc20Info(provider, token1),
+        ethereum.erc20Info(provider, token0, options),
+        ethereum.erc20Info(provider, token1, options),
       ]);
       token0Decimals = token0Decimals.toString();
       token1Decimals = token1Decimals.toString();
@@ -92,38 +210,29 @@ const ethereum = {
       reserve1 = new bn(reserves[1].toString())
         .div(new bn(10).pow(token1Decimals))
         .toString(10);
-      const prices = await coingecko.simple.tokenPrice(
-        "ethereum",
-        [token0, token1],
-        "usd"
-      );
-      const token0Usd = prices[token0.toLowerCase()].usd;
-      const token1Usd = prices[token1.toLowerCase()].usd;
 
       return {
         token0,
         token0Decimals,
         reserve0,
-        token0Usd,
         token1,
         token1Decimals,
         reserve1,
-        token1Usd,
         blockTimestampLast,
         totalSupply,
-        priceUSD: new bn(reserve0)
-          .multipliedBy(token0Usd)
-          .plus(new bn(reserve1).multipliedBy(token1Usd))
-          .div(totalSupply)
-          .toString(10),
       };
     },
   },
+};
+
+const waves = {
+  defaultOptions: () => ({}),
 };
 
 module.exports = {
   toFloat: (n, decimals) => new bn(n.toString()).div(new bn(10).pow(decimals)),
   tokens,
   ethereum,
+  waves,
   coingecko,
 };
