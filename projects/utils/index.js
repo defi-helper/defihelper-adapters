@@ -138,6 +138,7 @@ const coingecko = {
 const ethereum = {
   defaultOptions: () => ({
     blockNumber: "latest",
+    signer: null,
   }),
   erc20: (provider, address) =>
     new ethers.Contract(address, ERC20ABI, provider),

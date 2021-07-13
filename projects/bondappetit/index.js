@@ -160,10 +160,69 @@ module.exports = {
         };
       },
 
-      stake: async () => {},
-      unstake: async () => {},
-      claim: async () => {},
-      exit: async () => {},
+      actions: async (walletAddress) => {
+        if (options.signer === null) {
+          throw new Error(
+            "Signer not found, use options.signer for use actions"
+          );
+        }
+        const stakingTokenContract = ethereum.erc20(provider, stakingToken);
+        const { signer } = options;
+        contract.connect(signer);
+        stakingTokenContract.connect(signer);
+
+        return {
+          stake: {
+            can: async (amount) => {
+              const balance = await stakingTokenContract.balanceOf(
+                walletAddress
+              );
+              if (bn(amount).isGreaterThan(balance.toString())) {
+                return Error("Amount exceeds balance");
+              }
+
+              return true;
+            },
+            send: async (amount) => {
+              await stakingTokenContract.approve(contractAddress, amount);
+              await contract.stake(amount);
+            },
+          },
+          unstake: {
+            can: async (amount) => {
+              const balance = await contract.balanceOf(walletAddress);
+              if (bn(amount).isGreaterThan(balance.toString())) {
+                return Error("Amount exceeds balance");
+              }
+
+              return true;
+            },
+            send: async (amount) => {
+              await contract.withdraw(amount);
+            },
+          },
+          claim: {
+            can: async () => {
+              const earned = await contract.earned(walletAddress);
+              if (bn(earned).isLessThanOrEqualTo(0)) {
+                return Error("No earnings");
+              }
+              return true;
+            },
+            send: async () => {
+              await contract.getReward();
+            },
+          },
+          exit: {
+            can: async () => {
+              return true;
+            },
+            send: async () => {
+              await contract.exit();
+            },
+          },
+        };
+      },
     };
   },
   swopfiStaking: async (
