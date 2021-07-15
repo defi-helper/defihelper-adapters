@@ -26,6 +26,7 @@ module.exports = {
         : parseInt(options.blockNumber, 10);
     const contract = new ethers.Contract(contractAddress, stakingABI, provider);
     const rewardsTokenDecimals = 18;
+    const stakingTokenDecimals = 18;
     const block = await provider.getBlock(blockTag);
     const blockNumber = block.number;
     let [
@@ -85,6 +86,14 @@ module.exports = {
     const aprYear = aprBlock.multipliedBy(blocksPerDay.multipliedBy(365));
 
     return {
+      staking: {
+        token: stakingToken,
+        decimals: stakingTokenDecimals,
+      },
+      reward: {
+        token: rewardsToken,
+        decimals: rewardsTokenDecimals,
+      },
       metrics: {
         tvl: tvl.toString(10),
         aprDay: aprDay.toString(10),
@@ -166,10 +175,11 @@ module.exports = {
             "Signer not found, use options.signer for use actions"
           );
         }
-        const stakingTokenContract = ethereum.erc20(provider, stakingToken);
         const { signer } = options;
-        contract.connect(signer);
-        stakingTokenContract.connect(signer);
+        const stakingTokenContract = ethereum
+          .erc20(provider, stakingToken)
+          .connect(signer);
+        const stakingContract = contract.connect(signer);
 
         return {
           stake: {
@@ -185,7 +195,7 @@ module.exports = {
             },
             send: async (amount) => {
               await stakingTokenContract.approve(contractAddress, amount);
-              await contract.stake(amount);
+              await stakingContract.stake(amount);
             },
           },
           unstake: {
@@ -198,7 +208,7 @@ module.exports = {
               return true;
             },
             send: async (amount) => {
-              await contract.withdraw(amount);
+              await stakingContract.withdraw(amount);
             },
           },
           claim: {
@@ -210,7 +220,7 @@ module.exports = {
               return true;
             },
             send: async () => {
-              await contract.getReward();
+              await stakingContract.getReward();
             },
           },
           exit: {
@@ -218,7 +228,7 @@ module.exports = {
               return true;
             },
             send: async () => {
-              await contract.exit();
+              await stakingContract.exit();
             },
           },
         };
