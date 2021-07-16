@@ -6,7 +6,7 @@ import { PortisConnector } from '@web3-react/portis-connector'
 import { TrezorConnector } from '@web3-react/trezor-connector'
 import { BscConnector } from '@binance-chain/bsc-connector'
 
-import { config } from '../../config'
+import { config } from '~/config'
 import { WalletLinkConnector } from './wallet-link'
 
 export const injected = new InjectedConnector({

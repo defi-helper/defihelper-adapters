@@ -4,7 +4,7 @@ import Snackbar from '@material-ui/core/Snackbar'
 import Alert from '@material-ui/lab/Alert'
 import { makeStyles, Theme } from '@material-ui/core/styles'
 
-import { Portal } from '../common/portal'
+import { Portal } from '~/common/portal'
 import { $notifications, removeNotification } from './notifications.model'
 
 export type NotificationsProviderProps = {

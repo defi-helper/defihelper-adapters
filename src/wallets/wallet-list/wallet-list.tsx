@@ -6,9 +6,9 @@ import ListItemIcon from '@material-ui/core/ListItemIcon'
 import ListItemText from '@material-ui/core/ListItemText'
 import { AbstractConnector } from '@web3-react/abstract-connector'
 
-import { Dialog } from '../../common/dialog'
-import { connectorsByName } from '../common'
-import { activateWalletFx } from '../networks/network.model'
+import { Dialog } from '~/common/dialog'
+import { connectorsByName } from '~/wallets/common'
+import { networkModel } from '~/wallets/wallet-networks'
 
 export type WalletListProps = {
   onClick: () => void
@@ -25,7 +25,7 @@ export const WalletList: React.VFC<WalletListProps> = (props) => {
   const classes = useStyles()
 
   const handleActivate = (connector: AbstractConnector) => {
-    activateWalletFx({ connector }).then(props.onClick)
+    networkModel.activateWalletFx({ connector }).then(props.onClick)
   }
 
   return (
