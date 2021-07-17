@@ -1,4 +1,11 @@
-axios = axios === undefined ? require("axios") : axios;
+const getaxios = () => {
+  try {
+    return axios = axios === undefined ? require("axios") : axios;
+  } catch {
+    return require("axios");
+  }
+}
+axios = getaxios();
 const ethers = require("ethers");
 const ERC20ABI = require("./abi/erc20.json");
 const UniswapPairABI = require("./abi/uniswap/pair.json");

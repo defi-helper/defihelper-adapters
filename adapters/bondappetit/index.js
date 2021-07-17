@@ -18,8 +18,12 @@ module.exports = {
   staking: async (
     provider,
     contractAddress,
-    options = ethereum.defaultOptions()
+    initOptions = ethereum.defaultOptions()
   ) => {
+    const options = {
+      ...ethereum.defaultOptions(),
+      ...initOptions,
+    }
     const blockTag =
       options.blockNumber === "latest"
         ? "latest"
@@ -238,8 +242,12 @@ module.exports = {
   swopfiStaking: async (
     provider,
     contractAddress,
-    options = waves.defaultOptions()
+    initOptions = waves.defaultOptions()
   ) => {
+    const options = {
+      ...waves.defaultOptions(),
+      ...initOptions,
+    }
     const lpRes = await axios.get(
       `https://backend.swop.fi/exchangers/${contractAddress}`
     );
