@@ -8,7 +8,7 @@ const coingeckoTokenMap = {
   "0x9a1997c130f4b2997166975d9aff92797d5134c2": "bond-appetite-usd",
   "0xdac17f958d2ee523a2206206994597c13d831ec7": "tether",
   "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48": "usd-coin",
-  "0x674c6ad92fd080e4004b2312b45f796a192d27a0": "neutrino-usd",
+  "0x674c6ad92fd080e4004b2312b45f796a192d27a0": "neutrino",
   "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c": "wbnb",
   "0x1ad0132d8b5ef3cebda1a9692f36ac30be871b6b": "bondappetit-gov-token",
 };

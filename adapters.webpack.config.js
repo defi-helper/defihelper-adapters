@@ -3,7 +3,7 @@ const glob = require("glob");
 
 module.exports = {
   mode: "development",
-  entry: glob.sync(path.resolve(__dirname, "./adapters/**/index.js")).reduce(
+  entry: glob.sync(path.resolve(__dirname, "./adapters/*/index.js")).reduce(
     (entry, file) => ({
       ...entry,
       [path.parse(path.parse(file).dir).name]: file,
