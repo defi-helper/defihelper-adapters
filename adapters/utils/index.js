@@ -12,6 +12,14 @@ const UniswapPairABI = require("./abi/uniswap/pair.json");
 const bn = require("bignumber.js");
 const dayjs = require("dayjs");
 
+const ethereumNetworkCoingeckoPlatformsMap = {
+  "1": "ethereum",
+  "56": "binance-smart-chain",
+  "128": "huobi-token",
+  "137": "polygon-pos",
+  "250": "fantom",
+};
+
 const tokens = (...tokens) =>
   tokens.reduce((prev, { token, data }) => {
     if (prev[token]) {
@@ -140,13 +148,27 @@ const coingecko = {
       return resp.data;
     },
   },
+  platformByEthereumNetwork(network) {
+    return ethereumNetworkCoingeckoPlatformsMap[network.toString()];
+  },
 };
 
 const ethereum = {
+
   defaultOptions: () => ({
     blockNumber: "latest",
     signer: null,
   }),
+  getAvgBlockTime: async (provider, blockNumber) => {
+    const interval = 30000
+    const currentBlockNumber = blockNumber || await provider.getBlockNumber();
+    const [fiftyBlockEarlier, currentBlock] = await Promise.all([
+        provider.getBlock(currentBlockNumber - interval),
+        provider.getBlock(currentBlockNumber),
+      ]);
+
+    return 1000 * (currentBlock.timestamp - fiftyBlockEarlier.timestamp) / (currentBlock.number - fiftyBlockEarlier.number);
+  },
   erc20: (provider, address) =>
     new ethers.Contract(address, ERC20ABI, provider),
   erc20Info: async (provider, address, options = ethereum.defaultOptions()) => {
