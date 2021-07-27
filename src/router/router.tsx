@@ -1,9 +1,5 @@
 import React from 'react'
-import {
-  Route,
-  Router as BrowserRouter,
-  Switch,
-} from 'react-router-dom'
+import { Route, Router as BrowserRouter, Switch } from 'react-router-dom'
 
 import { paths } from '~/paths'
 import { history } from '~/common/history'
