@@ -1,15 +1,16 @@
 const ethers = require("ethers");
 const { coingecko, ethereum, toFloat, tokens } = require("../utils");
-const masterChefV1 = require("./masterChefV1ABI.json");
-const masterChefV1Pools = require("./masterChiefV1Pools.json");
+const masterChef = require("./masterChefABI.json");
+const cakeVault = require("./cakeVaultABI.json");
 const bn = require("bignumber.js");
 
-const masterChiefV1Address = "0xc2EdaD668740f1aA35E4D8f227fB8E17dcA888Cd";
+const masterChefAddress = "0x73feaa1ee314f8c655e354234017be2193c9e24e";
+const valutAddress = "0xa80240Eb5d7E05d3F250cF000eEc0891d00b51CC";
 
 module.exports = {
-    masterChefV1: async (
+    cakeStaking: async (
         provider,
-        contractAddress, //For instance: '0x06da0fd433C1A5d7a4faa01111c044910A184553'
+        contractAddress, //For instance: '0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82'
         initOptions = ethereum.defaultOptions()
     ) => {
         const options = {
@@ -25,59 +26,40 @@ module.exports = {
         const blockNumber = block.number;
         const avgBlockTime = await ethereum.getAvgBlockTime(provider, blockNumber);
 
-        const masterChiefContract = new ethers.Contract(masterChiefV1Address, masterChefV1, provider);
+        const masterChiefContract = new ethers.Contract(masterChefAddress, masterChef, provider);
 
-        const poolIndex = (masterChefV1Pools.find(p => p.lpToken.toLowerCase() === contractAddress.toLowerCase())).index;
-        const pool = await masterChiefContract.poolInfo(poolIndex);
+        const pool = await masterChiefContract.poolInfo(0);
 
         const rewardsTokenDecimals = 18;
         const stakingTokenDecimals = 18;
-        const stakingToken = contractAddress.toLowerCase();
-        const rewardsToken = (await masterChiefContract.sushi()).toLowerCase();
+        const stakingToken = (await masterChiefContract.cake()).toLowerCase();
+        const rewardsToken = stakingToken;
 
-        const [sushiPerBlock, totalAllocPoint] = await Promise.all([
-            await masterChiefContract.sushiPerBlock(),
+        const [cakePerBlock, totalAllocPoint] = await Promise.all([
+            await masterChiefContract.cakePerBlock(),
             await masterChiefContract.totalAllocPoint(),
         ]);
 
-        const rewardPerBlock = toFloat((new bn(pool.allocPoint.toString())).multipliedBy(sushiPerBlock.toString()).dividedBy(totalAllocPoint.toString()), rewardsTokenDecimals);
+        const rewardPerBlock = toFloat((new bn(pool.allocPoint.toString())).multipliedBy(cakePerBlock.toString()).dividedBy(totalAllocPoint.toString()), rewardsTokenDecimals);
 
-        const rewardTokenUSD = await coingecko.getPriceUSDByContract(
+        const totalRawLocked = toFloat(await ethereum.erc20(provider, contractAddress).balanceOf(masterChefAddress), stakingTokenDecimals);
+        const totalValutLocked = toFloat((await masterChiefContract.userInfo(0, valutAddress)).amount, stakingTokenDecimals);
+        const totalLocked = totalRawLocked.minus(totalValutLocked);
+
+        let tokenUSD = new bn(await coingecko.getPriceUSDByContract(
             coingecko.platformByEthereumNetwork(network),
             blockTag === "latest",
             block,
-            rewardsToken
-        );
+            stakingToken
+        ));
 
-        const totalLocked = toFloat(await ethereum.erc20(provider, contractAddress).balanceOf(masterChiefV1Address), stakingTokenDecimals);
-        const {
-            token0,
-            reserve0,
-            token1,
-            reserve1,
-            totalSupply: lpTotalSupply,
-        } = await ethereum.uniswap.pairInfo(provider, stakingToken);
-        const token0Usd = await coingecko.getPriceUSDByContract(
-            coingecko.platformByEthereumNetwork(network),
-            blockTag === "latest",
-            block,
-            token0
-        );
-        const token1Usd = await coingecko.getPriceUSDByContract(
-            coingecko.platformByEthereumNetwork(network),
-            blockTag === "latest",
-            block,
-            token1
-        );
-        let stakingTokenUSD = new bn(reserve0)
-            .multipliedBy(token0Usd)
-            .plus(new bn(reserve1).multipliedBy(token1Usd))
-            .div(lpTotalSupply);
-        if (!stakingTokenUSD.isFinite()) stakingTokenUSD = new bn(0);
+        if (!tokenUSD.isFinite()) tokenUSD = new bn(0);
 
-        const tvl = new bn(totalLocked).multipliedBy(stakingTokenUSD);
-        let aprBlock = rewardPerBlock.multipliedBy(rewardTokenUSD).div(tvl);
+        const tvl = new bn(totalLocked).multipliedBy(tokenUSD);
+
+        let aprBlock = rewardPerBlock.multipliedBy(tokenUSD).div(tvl);
         if (!aprBlock.isFinite()) aprBlock = new bn(0);
+
         const blocksPerDay = new bn(1000 * 60 * 60 * 24 / avgBlockTime);
         const aprDay = aprBlock.multipliedBy(blocksPerDay);
         const aprWeek = aprBlock.multipliedBy(blocksPerDay.multipliedBy(7));
@@ -99,29 +81,21 @@ module.exports = {
                 aprWeek: aprWeek.toString(10),
                 aprMonth: aprMonth.toString(10),
                 aprYear: aprYear.toString(10),
+                tokenPerBlock: rewardPerBlock.toString(),
                 rewardPerDay: rewardPerBlock.multipliedBy(blocksPerDay).toString(),
             },
             wallet: async (walletAddress) => {
-                let { amount, rewardDebt } = await masterChiefContract.userInfo(poolIndex, walletAddress);
-                const balance = toFloat(amount, ethereum.uniswap.pairDecimals);
+                let { amount, rewardDebt } = await masterChiefContract.userInfo(0, walletAddress);
+                const balance = toFloat(amount, stakingTokenDecimals);
                 const earned = toFloat(rewardDebt, rewardsTokenDecimals);
-                let token0Balance = balance.multipliedBy(reserve0).div(lpTotalSupply);
-                if (!token0Balance.isFinite()) token0Balance = new bn(0);
-                const token0BalanceUSD = token0Balance.multipliedBy(token0Usd);
-                let token1Balance = balance.multipliedBy(reserve1).div(lpTotalSupply);
-                if (!token1Balance.isFinite()) token1Balance = new bn(0);
-                const token1BalanceUSD = token1Balance.multipliedBy(token1Usd);
-                const earnedUSD = earned.multipliedBy(rewardTokenUSD);
+                const balanceUsd = balance.multipliedBy(tokenUSD);
+                const earnedUSD = earned.multipliedBy(tokenUSD);
 
                 return {
                     staked: {
-                        [token0]: {
-                            balance: token0Balance.toString(10),
-                            usd: token0BalanceUSD.toString(10),
-                        },
-                        [token1]: {
-                            balance: token1Balance.toString(10),
-                            usd: token1BalanceUSD.toString(10),
+                        [stakingToken]: {
+                            balance: balance.toString(10),
+                            usd: balanceUsd.toString(10),
                         },
                     },
                     earned: {
@@ -132,30 +106,16 @@ module.exports = {
                     },
                     metrics: {
                         staking: balance.toString(10),
-                        stakingUSD: balance.multipliedBy(stakingTokenUSD).toString(10),
+                        stakingUSD: balanceUsd.toString(10),
                         earned: earned.toString(10),
                         earnedUSD: earnedUSD.toString(10),
                     },
                     tokens: tokens(
                         {
-                            token: token0,
-                            data: {
-                                balance: token0Balance.toString(10),
-                                usd: token0BalanceUSD.toString(10),
-                            },
-                        },
-                        {
-                            token: token1,
-                            data: {
-                                balance: token1Balance.toString(10),
-                                usd: token1BalanceUSD.toString(10),
-                            },
-                        },
-                        {
                             token: rewardsToken,
                             data: {
-                                balance: earned.toString(10),
-                                usd: earnedUSD.toString(10),
+                                balance: earned.plus(balance).toString(10),
+                                usd: earnedUSD.plus(balanceUsd).toString(10),
                             },
                         }
                     ),
@@ -187,8 +147,8 @@ module.exports = {
                             return true;
                         },
                         send: async (amount) => {
-                            await stakingTokenContract.approve(masterChiefV1Address, amount);
-                            await stakingContract.deposit(poolIndex, amount);
+                            await stakingTokenContract.approve(masterChefAddress, amount);
+                            await stakingContract.enterStaking(amount);
                         },
                     },
                     unstake: {
@@ -201,20 +161,19 @@ module.exports = {
                             return true;
                         },
                         send: async (amount) => {
-                            await stakingContract.withdraw(poolIndex, amount);
+                            await stakingContract.leaveStaking(amount);
                         },
                     },
                     claim: {
                         can: async () => {
-                            const earned = await masterChiefContract.pendingSushi(poolIndex, walletAddress);
+                            const earned = await masterChiefContract.pendingCake(poolIndex, walletAddress);
                             if ((new bn(earned.toString())).isLessThanOrEqualTo(0)) {
                                 return Error("No earnings");
                             }
                             return true;
                         },
                         send: async () => {
-                            // https://github.com/sushiswap/sushiswap-interface/blob/05324660917f44e3c360dc7e2892b2f58e21647e/src/features/farm/useMasterChef.ts#L64
-                            await stakingContract.deposit(poolIndex, 0);
+                            await stakingContract.leaveStaking(0);
                         },
                     },
                     exit: {
@@ -228,7 +187,7 @@ module.exports = {
                         },
                         send: async () => {
                             const userInfo = await stakingContract.userInfo(poolIndex, walletAddress);
-                            await stakingContract.withdraw(poolIndex, userInfo.amount.toString());
+                            await stakingContract.leaveStaking(userInfo.amount.toString());
                         },
                     },
                 };
