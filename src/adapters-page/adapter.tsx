@@ -133,8 +133,6 @@ export const Adapter: React.VFC = () => {
       <Paper className={classes.card}>
         <div className={classes.formControl}>
           <Select
-            labelId="demo-simple-select-filled-label"
-            id="demo-simple-select-filled"
             value={adapter}
             onChange={handleChangeAdapter}
             className={classes.fullWidth}
@@ -145,8 +143,6 @@ export const Adapter: React.VFC = () => {
           </Select>
           <FormHelperText>Adapter</FormHelperText>
           <Select
-            labelId="demo-simple-select-filled-label"
-            id="demo-simple-select-filled"
             value={implementation}
             onChange={handleChangeImplementation}
             className={classes.fullWidth}

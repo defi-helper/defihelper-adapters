@@ -124,8 +124,6 @@ export const AdapterStep: React.VFC<Params> = ({ resultObject }: Params) => {
       <Paper className={classes.card}>
         <div className={classes.formControl}>
           <Select
-            labelId="demo-simple-select-filled-label"
-            id="demo-simple-select-filled"
             value={selectedMethodPath}
             onChange={handleChangeMethodPath}
             className={classes.fullWidth}
