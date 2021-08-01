@@ -129,7 +129,9 @@ export const AdapterStep: React.VFC<Params> = ({ resultObject }: Params) => {
             className={classes.fullWidth}
           >
             {methods.map((name) => (
-              <MenuItem value={name.path}>{name.path}</MenuItem>
+              <MenuItem key={name.path} value={name.path}>
+                {name.path}
+              </MenuItem>
             ))}
           </Select>
           <FormHelperText>Methods</FormHelperText>

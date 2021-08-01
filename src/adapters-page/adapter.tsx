@@ -138,7 +138,9 @@ export const Adapter: React.VFC = () => {
             className={classes.fullWidth}
           >
             {adaptersNames.map((adapterId) => (
-              <MenuItem value={adapterId}>{adapterId}</MenuItem>
+              <MenuItem key={adapterId} value={adapterId}>
+                {adapterId}
+              </MenuItem>
             ))}
           </Select>
           <FormHelperText>Adapter</FormHelperText>
@@ -148,7 +150,7 @@ export const Adapter: React.VFC = () => {
             className={classes.fullWidth}
           >
             {implementations.map((implementationName) => (
-              <MenuItem value={implementationName}>
+              <MenuItem key={implementationName} value={implementationName}>
                 {implementationName}
               </MenuItem>
             ))}
