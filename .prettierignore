@@ -1,0 +1,9 @@
+node_modules
+adapters-public
+public/dist
+package-lock.json
+.cache
+.github
+.husky
+.gitignore
+.prettierignore

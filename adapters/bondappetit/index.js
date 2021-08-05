@@ -1,45 +1,31 @@
-const ethers = require("ethers");
-const { coingecko, ethereum, waves, toFloat, tokens } = require("../utils");
-const stakingABI = require("./stakingAbi.json");
-const bn = require("bignumber.js");
+const { ethers, axios, bn } = require('../lib');
+const { coingecko, ethereum, waves, toFloat, tokens } = require('../utils');
+const stakingABI = require('./abi/stakingAbi.json');
 
 const coingeckoTokenMap = {
-  "0x28a06c02287e657ec3f8e151a13c36a1d43814b0": "bondappetit-gov-token",
-  "0x9a1997c130f4b2997166975d9aff92797d5134c2": "bond-appetite-usd",
-  "0xdac17f958d2ee523a2206206994597c13d831ec7": "tether",
-  "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48": "usd-coin",
-  "0x674c6ad92fd080e4004b2312b45f796a192d27a0": "neutrino",
-  "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c": "wbnb",
-  "0x1ad0132d8b5ef3cebda1a9692f36ac30be871b6b": "bondappetit-gov-token",
+  '0x28a06c02287e657ec3f8e151a13c36a1d43814b0': 'bondappetit-gov-token',
+  '0x9a1997c130f4b2997166975d9aff92797d5134c2': 'bond-appetite-usd',
+  '0xdac17f958d2ee523a2206206994597c13d831ec7': 'tether',
+  '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48': 'usd-coin',
+  '0x674c6ad92fd080e4004b2312b45f796a192d27a0': 'neutrino',
+  '0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c': 'wbnb',
+  '0x1ad0132d8b5ef3cebda1a9692f36ac30be871b6b': 'bondappetit-gov-token',
 };
-const swopTokenId = "Ehie5xYpeN8op1Cctc6aGUrqx8jq3jtf1DSjXDbfm7aT";
+const swopTokenId = 'Ehie5xYpeN8op1Cctc6aGUrqx8jq3jtf1DSjXDbfm7aT';
 
 module.exports = {
-  staking: async (
-    provider,
-    contractAddress,
-    initOptions = ethereum.defaultOptions()
-  ) => {
+  staking: async (provider, contractAddress, initOptions = ethereum.defaultOptions()) => {
     const options = {
       ...ethereum.defaultOptions(),
       ...initOptions,
-    }
-    const blockTag =
-      options.blockNumber === "latest"
-        ? "latest"
-        : parseInt(options.blockNumber, 10);
+    };
+    const blockTag = options.blockNumber === 'latest' ? 'latest' : parseInt(options.blockNumber, 10);
     const contract = new ethers.Contract(contractAddress, stakingABI, provider);
     const rewardsTokenDecimals = 18;
     const stakingTokenDecimals = 18;
     const block = await provider.getBlock(blockTag);
     const blockNumber = block.number;
-    let [
-      periodFinish,
-      rewardRate,
-      totalSupply,
-      stakingToken,
-      rewardsToken,
-    ] = await Promise.all([
+    let [periodFinish, rewardRate, totalSupply, stakingToken, rewardsToken] = await Promise.all([
       contract.periodFinish({ blockTag }),
       contract.rewardRate({ blockTag }),
       contract.totalSupply({ blockTag }),
@@ -48,15 +34,11 @@ module.exports = {
     ]);
     periodFinish = periodFinish.toString();
     rewardRate = toFloat(rewardRate, rewardsTokenDecimals);
-    if (new bn(periodFinish).lt(blockNumber)) rewardRate = new bn("0");
+    if (new bn(periodFinish).lt(blockNumber)) rewardRate = new bn('0');
     totalSupply = toFloat(totalSupply, ethereum.uniswap.pairDecimals);
     stakingToken = stakingToken.toLowerCase();
     rewardsToken = rewardsToken.toLowerCase();
-    const rewardTokenUSD = await coingecko.getPriceUSD(
-      blockTag === "latest",
-      block,
-      coingeckoTokenMap[rewardsToken]
-    );
+    const rewardTokenUSD = await coingecko.getPriceUSD(blockTag === 'latest', block, coingeckoTokenMap[rewardsToken]);
     const {
       token0,
       reserve0,
@@ -64,16 +46,8 @@ module.exports = {
       reserve1,
       totalSupply: lpTotalSupply,
     } = await ethereum.uniswap.pairInfo(provider, stakingToken);
-    const token0Usd = await coingecko.getPriceUSD(
-      blockTag === "latest",
-      block,
-      coingeckoTokenMap[token0]
-    );
-    const token1Usd = await coingecko.getPriceUSD(
-      blockTag === "latest",
-      block,
-      coingeckoTokenMap[token1]
-    );
+    const token0Usd = await coingecko.getPriceUSD(blockTag === 'latest', block, coingeckoTokenMap[token0]);
+    const token1Usd = await coingecko.getPriceUSD(blockTag === 'latest', block, coingeckoTokenMap[token1]);
     let stakingTokenUSD = new bn(reserve0)
       .multipliedBy(token0Usd)
       .plus(new bn(reserve1).multipliedBy(token1Usd))
@@ -175,24 +149,18 @@ module.exports = {
 
       actions: async (walletAddress) => {
         if (options.signer === null) {
-          throw new Error(
-            "Signer not found, use options.signer for use actions"
-          );
+          throw new Error('Signer not found, use options.signer for use actions');
         }
         const { signer } = options;
-        const stakingTokenContract = ethereum
-          .erc20(provider, stakingToken)
-          .connect(signer);
+        const stakingTokenContract = ethereum.erc20(provider, stakingToken).connect(signer);
         const stakingContract = contract.connect(signer);
 
         return {
           stake: {
             can: async (amount) => {
-              const balance = await stakingTokenContract.balanceOf(
-                walletAddress
-              );
+              const balance = await stakingTokenContract.balanceOf(walletAddress);
               if (bn(amount).isGreaterThan(balance.toString())) {
-                return Error("Amount exceeds balance");
+                return Error('Amount exceeds balance');
               }
 
               return true;
@@ -206,7 +174,7 @@ module.exports = {
             can: async (amount) => {
               const balance = await contract.balanceOf(walletAddress);
               if (bn(amount).isGreaterThan(balance.toString())) {
-                return Error("Amount exceeds balance");
+                return Error('Amount exceeds balance');
               }
 
               return true;
@@ -219,7 +187,7 @@ module.exports = {
             can: async () => {
               const earned = await contract.earned(walletAddress);
               if (bn(earned).isLessThanOrEqualTo(0)) {
-                return Error("No earnings");
+                return Error('No earnings');
               }
               return true;
             },
@@ -239,57 +207,47 @@ module.exports = {
       },
     };
   },
-  swopfiStaking: async (
-    provider,
-    contractAddress,
-    initOptions = waves.defaultOptions()
-  ) => {
+  swopfiStaking: async (provider, contractAddress, initOptions = waves.defaultOptions()) => {
     const options = {
       ...waves.defaultOptions(),
       ...initOptions,
-    }
-    const lpRes = await axios.get(
-      `https://backend.swop.fi/exchangers/${contractAddress}`
-    );
+    };
+    const lpRes = await axios.get(`https://backend.swop.fi/exchangers/${contractAddress}`);
     const { stakingIncome, lpFees24, totalLiquidity } = lpRes.data.data;
 
-    const farmingRes = await axios.get("https://backend.swop.fi/farming/info");
-    let { shareToken, totalShareTokensLoked } = farmingRes.data.data.find(
-      ({ pool }) => pool === contractAddress
-    ) || { pool: contractAddress, shareToken: "", totalShareTokensLoked: "0" };
+    const farmingRes = await axios.get('https://backend.swop.fi/farming/info');
+    let { shareToken, totalShareTokensLoked } = farmingRes.data.data.find(({ pool }) => pool === contractAddress) || {
+      pool: contractAddress,
+      shareToken: '',
+      totalShareTokensLoked: '0',
+    };
     totalShareTokensLoked = toFloat(totalShareTokensLoked, 6);
 
-    const shareTokenInfoRes = await axios.get(
-      `https://nodes.wavesnodes.com/assets/details/${shareToken}`
-    );
+    const shareTokenInfoRes = await axios.get(`https://nodes.wavesnodes.com/assets/details/${shareToken}`);
     const { decimals: shareTokenDecimals } = shareTokenInfoRes.data || {
       decimals: 6,
     };
 
-    const ratesRes = await axios.get("https://backend.swop.fi/assets/rates");
-    let { rate: swopRate } = ratesRes.data.data[swopTokenId] || { rate: "0" };
+    const ratesRes = await axios.get('https://backend.swop.fi/assets/rates');
+    let { rate: swopRate } = ratesRes.data.data[swopTokenId] || { rate: '0' };
     swopRate = toFloat(swopRate, 6);
-    let { rate: shareRate } = ratesRes.data.data[shareToken] || { rate: "" };
+    let { rate: shareRate } = ratesRes.data.data[shareToken] || { rate: '' };
     shareRate = toFloat(shareRate, shareTokenDecimals);
 
-    const governanceRes = await axios.get("https://backend.swop.fi/governance");
+    const governanceRes = await axios.get('https://backend.swop.fi/governance');
     let { value: poolWeight } = governanceRes.data.data.find(
       ({ key }) => key === `${contractAddress}_current_pool_fraction_reward`
     ) || {
       key: `${contractAddress}_current_pool_fraction_reward`,
-      type: "int",
-      value: "0",
+      type: 'int',
+      value: '0',
     };
     poolWeight = toFloat(poolWeight, 10);
 
     const swopAPY =
-      totalShareTokensLoked !== "0" && shareRate !== "0"
-        ? new bn(1000000)
-            .multipliedBy(poolWeight)
-            .multipliedBy(swopRate)
-            .div(totalShareTokensLoked)
-            .div(shareRate)
-        : new bn("0");
+      totalShareTokensLoked !== '0' && shareRate !== '0'
+        ? new bn(1000000).multipliedBy(poolWeight).multipliedBy(swopRate).div(totalShareTokensLoked).div(shareRate)
+        : new bn('0');
     const aprDay = new bn(stakingIncome).plus(lpFees24).div(totalLiquidity);
     const aprWeek = aprDay.multipliedBy(7);
     const aprMonth = aprDay.multipliedBy(30);

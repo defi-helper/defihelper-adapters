@@ -1,5 +1,7 @@
 # defihelper-adapters
+
 ### Interfaces
+
 ```typescript
 interface AdapterInfo {
   staking: {
@@ -16,50 +18,48 @@ interface AdapterInfo {
     aprWeek: string;
     aprMonth: string;
     aprYear: string;
-  }
+  };
 }
 
-
 enum ProtocolTokens {
-  token1='token1',
-  token2='token2',
+  token1 = 'token1',
+  token2 = 'token2',
 }
 
 enum RewardTokens {
-  rewardToken='rewardToken'
+  rewardToken = 'rewardToken',
 }
 
 interface Wallet {
-      staked: {
-          [key in ProtocolTokens]: {
-            balance: string;
-            usd: string;
-          }
-      },
-      earned: {
-        [key in RewardTokens]: {
-          balance: string;
-          usd: string;
-        };
-      };
-      metrics: {
-        staking: string;
-        stakingUSD: string;
-        earned: string;
-        earnedUSD: string;
-      };
-      tokens: {
-        [address: string]: {
-          balance: string;
-          usd: string;
-        };
-      }
+  staked: {
+    [key in ProtocolTokens]: {
+      balance: string;
+      usd: string;
+    };
+  };
+  earned: {
+    [key in RewardTokens]: {
+      balance: string;
+      usd: string;
+    };
+  };
+  metrics: {
+    staking: string;
+    stakingUSD: string;
+    earned: string;
+    earnedUSD: string;
+  };
+  tokens: {
+    [address: string]: {
+      balance: string;
+      usd: string;
+    };
+  };
 }
 
 interface InitWallet {
-  (walletAddress: string): Promise<Wallet>
+  (walletAddress: string): Promise<Wallet>;
 }
-
 
 interface Actions {
   stake: {
@@ -77,11 +77,11 @@ interface Actions {
   exit: {
     can: () => Promise<boolean>;
     send: () => Promise<void>;
-  }
+  };
 }
 
 interface InitActions {
-  (walletAddress: string): Promise<Actions>
+  (walletAddress: string): Promise<Actions>;
 }
 
 interface Adapter extends AdapterInfo {
@@ -90,28 +90,30 @@ interface Adapter extends AdapterInfo {
 }
 
 interface InitAdapter {
-  (provider: any, contractAddress: string, initOptions: any): Promise<Adapter>
+  (provider: any, contractAddress: string, initOptions: any): Promise<Adapter>;
 }
 
 interface ProtocolAdapter {
-    [key: string]: InitAdapter
+  [key: string]: InitAdapter;
 }
 ```
 
 ### Structure:
- - `adapters` - directory with directories with protocol's adapters
-    - `index.js` - protocol's adapter entrypoint
-    
+
+- `adapters` - directory with directories with protocol's adapters
+  - `index.js` - protocol's adapter entrypoint
 
 ### Guide
+
 You can use `bondappetit` adapter as example.
 For adding new adapter you have to:
+
 1. Create new directory in `adapters` folder with `index.js` (only if you want to create
    new protocol's adapter)
 2. Implement `ProtocolAdapter` interface:
+
 ```
 module.exports: ProtocolAdapter
 ```
-3. Test your implementation with frontend: `npm run start-website`
 
-
+3. Test your implementation with frontend (on localhost:9001): `npm run dev`
