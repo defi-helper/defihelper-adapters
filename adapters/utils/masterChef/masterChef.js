@@ -1,8 +1,8 @@
-const { ethers, bn } = require('../lib');
-const { coingecko } = require('./coingecko');
-const { ethereum } = require('./ethereum');
-const { toFloat } = require('./toFloat');
-const { tokens } = require('./tokens');
+const { ethers, bn } = require('../../lib');
+const { coingecko } = require('../coingecko');
+const { ethereum } = require('../ethereum');
+const { toFloat } = require('../toFloat');
+const { tokens } = require('../tokens');
 const { getMasterChefStakingToken } = require('./masterChefStakingToken');
 
 module.exports = {
