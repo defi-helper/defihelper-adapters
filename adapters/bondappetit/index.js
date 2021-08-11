@@ -1,4 +1,4 @@
-const { ethers, axios, bn } = require('../lib');
+const { ethers, axios, bn, ethersMulticall } = require('../lib');
 const { coingecko, ethereum, waves, toFloat, tokens } = require('../utils');
 const stakingABI = require('./abi/stakingAbi.json');
 
@@ -25,13 +25,19 @@ module.exports = {
     const stakingTokenDecimals = 18;
     const block = await provider.getBlock(blockTag);
     const blockNumber = block.number;
-    let [periodFinish, rewardRate, totalSupply, stakingToken, rewardsToken] = await Promise.all([
-      contract.periodFinish({ blockTag }),
-      contract.rewardRate({ blockTag }),
-      contract.totalSupply({ blockTag }),
-      contract.stakingToken({ blockTag }),
-      contract.rewardsToken({ blockTag }),
-    ]);
+    const multicall = new ethersMulticall.Provider(provider);
+    await multicall.init();
+    const multicallContract = new ethersMulticall.Contract(contractAddress, stakingABI);
+    let [periodFinish, rewardRate, totalSupply, stakingToken, rewardsToken] = await multicall.all(
+      [
+        multicallContract.periodFinish(),
+        multicallContract.rewardRate(),
+        multicallContract.totalSupply(),
+        multicallContract.stakingToken(),
+        multicallContract.rewardsToken(),
+      ],
+      { blockTag }
+    );
     periodFinish = periodFinish.toString();
     rewardRate = toFloat(rewardRate, rewardsTokenDecimals);
     if (new bn(periodFinish).lt(blockNumber)) rewardRate = new bn('0');
@@ -80,14 +86,10 @@ module.exports = {
         aprYear: aprYear.toString(10),
       },
       wallet: async (walletAddress) => {
-        let [balance, earned] = await Promise.all([
-          contract.balanceOf(walletAddress, {
-            blockTag,
-          }),
-          contract.earned(walletAddress, {
-            blockTag,
-          }),
-        ]);
+        let [balance, earned] = await multicall.all(
+          [multicallContract.balanceOf(walletAddress), multicallContract.earned(walletAddress)],
+          { blockTag }
+        );
         balance = toFloat(balance, ethereum.uniswap.pairDecimals);
         earned = toFloat(earned, rewardsTokenDecimals);
         let token0Balance = balance.multipliedBy(reserve0).div(lpTotalSupply);

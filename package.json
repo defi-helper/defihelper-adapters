@@ -31,6 +31,7 @@
     "tiny-glob": "^0.2.9"
   },
   "dependencies": {
+    "@defihelper/ethers-multicall": "^0.3.0",
     "axios": "^0.21.1",
     "bignumber.js": "^8.1.1",
     "dayjs": "^1.10.5",
