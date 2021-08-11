@@ -30,16 +30,13 @@ module.exports = {
       };
       const blockTag = options.blockNumber === 'latest' ? 'latest' : parseInt(options.blockNumber, 10);
       const contract = new ethers.Contract(contractAddress, stakingABI, provider);
-
       const network = (await provider.detectNetwork()).chainId;
-
       const block = await provider.getBlock(blockTag);
       const blockNumber = block.number;
       const avgBlockTime = await ethereum.getAvgBlockTime(provider, blockNumber);
       const blocksPerDay = new bn((1000 * 60 * 60 * 24) / avgBlockTime);
 
-      const multicall = new ethersMulticall.Provider(provider);
-      await multicall.init();
+      const multicall = new ethersMulticall.Provider(provider, network);
       const multicallContract = new ethersMulticall.Contract(contractAddress, stakingABI);
       let [periodFinish, rewardRate, totalSupply, stakingToken, rewardsToken] = await multicall.all(
         [
@@ -51,17 +48,12 @@ module.exports = {
         ],
         { blockTag }
       );
-
-      const [stakingTokenDecimals, rewardsTokenDecimals] = await Promise.all([
-        ethereum
-          .erc20(provider, stakingToken)
-          .decimals()
-          .then((res) => Number(res.toString())),
-        ethereum
-          .erc20(provider, rewardsToken)
-          .decimals()
-          .then((res) => Number(res.toString())),
+      let [stakingTokenDecimals, rewardsTokenDecimals] = await multicall.all([
+        new ethersMulticall.Contract(stakingToken, ethereum.abi.ERC20ABI).decimals(),
+        new ethersMulticall.Contract(rewardsToken, ethereum.abi.ERC20ABI).decimals(),
       ]);
+      stakingTokenDecimals = parseInt(stakingTokenDecimals, 10);
+      rewardsTokenDecimals = parseInt(rewardsTokenDecimals, 10);
 
       periodFinish = periodFinish.toString();
       rewardRate = toFloat(rewardRate, rewardsTokenDecimals);

@@ -1,8 +1,12 @@
-const { ethers, bn } = require('../lib');
+const { ethers, bn, ethersMulticall } = require('../lib');
 const ERC20ABI = require('./abi/erc20.json');
 const UniswapPairABI = require('./abi/uniswap/pair.json');
 
 const ethereum = {
+  abi: {
+    ERC20ABI,
+    UniswapPairABI,
+  },
   defaultOptions: () => ({
     blockNumber: 'latest',
     signer: null,
@@ -21,21 +25,13 @@ const ethereum = {
   },
   erc20: (provider, address) => new ethers.Contract(address, ERC20ABI, provider),
   erc20Info: async (provider, address, options = ethereum.defaultOptions()) => {
-    const token = ethereum.erc20(provider, address);
-    const [name, symbol, decimals, totalSupply] = await Promise.all([
-      token.name({
-        blockTag: options.blockNumber,
-      }),
-      token.symbol({
-        blockTag: options.blockNumber,
-      }),
-      token.decimals({
-        blockTag: options.blockNumber,
-      }),
-      token.totalSupply({
-        blockTag: options.blockNumber,
-      }),
-    ]);
+    const multicall = new ethersMulticall.Provider(provider);
+    await multicall.init();
+    const multicallToken = new ethersMulticall.Contract(address, ERC20ABI);
+    const [name, symbol, decimals, totalSupply] = await multicall.all(
+      [multicallToken.name(), multicallToken.symbol(), multicallToken.decimals(), multicallToken.totalSupply()],
+      { blockTag: options.blockNumber }
+    );
 
     return {
       name,
@@ -48,21 +44,13 @@ const ethereum = {
     pairDecimals: 18,
     pair: (provider, address) => new ethers.Contract(address, UniswapPairABI, provider),
     pairInfo: async (provider, address, options = ethereum.defaultOptions()) => {
-      const pair = ethereum.uniswap.pair(provider, address);
-      let [token0, token1, reserves, totalSupply] = await Promise.all([
-        pair.token0({
-          blockTag: options.blockNumber,
-        }),
-        pair.token1({
-          blockTag: options.blockNumber,
-        }),
-        pair.getReserves({
-          blockTag: options.blockNumber,
-        }),
-        pair.totalSupply({
-          blockTag: options.blockNumber,
-        }),
-      ]);
+      const multicall = new ethersMulticall.Provider(provider);
+      await multicall.init();
+      const multicallPair = new ethersMulticall.Contract(address, UniswapPairABI);
+      let [token0, token1, reserves, totalSupply] = await multicall.all(
+        [multicallPair.token0(), multicallPair.token1(), multicallPair.getReserves(), multicallPair.totalSupply()],
+        { blockTag: options.blockNumber }
+      );
       token0 = token0.toLowerCase();
       token1 = token1.toLowerCase();
       const blockTimestampLast = reserves[2];

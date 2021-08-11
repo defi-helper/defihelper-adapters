@@ -1,6 +1,4 @@
 const { axios, bn } = require('../lib');
-const { waves, toFloat } = require('../utils');
-const { axios, bn } = require('../lib');
 const { waves, toFloat, staking } = require('../utils');
 
 const swopTokenId = 'Ehie5xYpeN8op1Cctc6aGUrqx8jq3jtf1DSjXDbfm7aT';
