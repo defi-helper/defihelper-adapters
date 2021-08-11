@@ -1,6 +1,6 @@
-const { bn } = require('../lib');
-const { ethereum } = require('./ethereum');
-const { coingecko } = require('./coingecko');
+const { bn } = require('../../lib');
+const { ethereum } = require('../ethereum');
+const { coingecko } = require('../coingecko');
 
 class StakingToken {
   /**
