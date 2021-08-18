@@ -1,7 +1,7 @@
 const waves = {
-    defaultOptions: () => ({}),
+  defaultOptions: () => ({}),
 };
 
 module.exports = {
-    waves,
+  waves,
 };
