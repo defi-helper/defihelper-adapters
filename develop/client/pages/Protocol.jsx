@@ -1,9 +1,11 @@
 import React from 'react';
 import * as adaptersGateway from '../common/adapter';
-import { provider, signer } from '../common/ether';
+import { provider as ethProvider, signer as ethSigner } from '../common/ether';
+import { createWavesProvider } from '../common/waves';
 import ReactJson from 'react-json-view';
 
 export function Protocol(props) {
+  const [blockchain, setBlockchain] = React.useState('ethereum');
   const [protocol, setProtocol] = React.useState(null);
   const [currentAdapter, setCurrentAdapter] = React.useState('');
   const [contract, setContract] = React.useState('');
@@ -31,10 +33,13 @@ export function Protocol(props) {
 
     setContractReload(true);
     try {
-      const metrics = await protocol[currentAdapter](provider, contract, {
+      const bc = blockchain === 'ethereum' ? ethProvider : await createWavesProvider();
+      const params = blockchain === 'ethereum' ? {
         blockNumber: 'latest',
-        signer,
-      });
+        ethSigner,
+      } : undefined;
+
+      const metrics = await protocol[currentAdapter](bc, contract, params);
       setContractMetrics(metrics);
     } catch (e) {
       console.error(e);
@@ -81,6 +86,16 @@ export function Protocol(props) {
     <div className="container">
       <h2>{props.protocol}</h2>
       <div className="row">
+        <div className="column">
+          <label>Adapter: </label>
+          <select value={blockchain} onChange={(e) => setBlockchain(e.target.value)}>
+            {['ethereum', 'waves'].map((bc) => (
+                <option key={bc} value={bc}>
+                  {bc}
+                </option>
+            ))}
+          </select>
+        </div>
         <div className="column">
           <label>Adapter: </label>
           <select value={currentAdapter} onChange={(e) => setCurrentAdapter(e.target.value)}>
