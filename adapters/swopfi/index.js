@@ -3,6 +3,7 @@ const { waves, toFloat, coingecko, tokens} = require('../utils');
 
 const swopTokenId = 'Ehie5xYpeN8op1Cctc6aGUrqx8jq3jtf1DSjXDbfm7aT';
 const farmingContract = '3P73HDkPqG15nLXevjCbmXtazHYTZbpPoPw';
+const stakingContract = '3PLHVWCqA9DJPDbadUofTohnCULLauiDWhS';
 
 const mainTokensToCoingeckoId = {
   'DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p': 'neutrino-usd',
@@ -17,11 +18,11 @@ const convertFromTokenToUsd = async (tokenId, amount) => {
   return amount.multipliedBy(usdPrice);
 }
 
-const callFarmingContract = (fnName, args = [], payment = []) => {
+const prepareContractCall = (dApp, fnName, args = [], payment = []) => {
   return {
     type: 16,
     data: {
-      dApp: farmingContract,
+      dApp,
       call: {
         function: fnName,
         args,
@@ -59,6 +60,154 @@ const getUsdPriceOfToken = async (assetAddress) => {
   walletAddress = '3P9s27vtTw9Sux3T2qLSQ6ccx4PuQTYffiu';
  */
 module.exports = {
+  governanceStaking: async (provider, contractAddress, initOptions = waves.defaultOptions()) => {
+    const assets = (await axios.get('https://backend.swop.fi/assets')).data.data;
+    const apr = (new bn((await axios.get('https://backend.swop.fi/governance/apy/week')).data.data.apy)).div(100);
+
+    const swopToken = assets[swopTokenId];
+
+    const totalLiquidity = toFloat((await axios.get('https://backend.swop.fi/governance/')).data.data
+      .find(record => record.key === 'total_SWOP_amount')?.value || "0", swopToken.precision);
+
+    const totalLiquidityUSD = totalLiquidity.multipliedBy(await getUsdPriceOfToken(swopToken.id));
+
+
+    return {
+      staking: {
+        token: swopTokenId,
+      },
+      reward: {
+        token: swopTokenId,
+      },
+      metrics: {
+        tvl: totalLiquidityUSD.toString(10),
+        tvlTokens: totalLiquidity.toString(10),
+        aprDay: apr.div(365).toString(10),
+        aprWeek: apr.multipliedBy(7).div(365).toString(10),
+        aprMonth: apr.div(12).toString(10),
+        aprYear: apr.toString(10),
+      },
+      wallet: async (walletAddress) => {
+        const governance = (await axios.get(`https://backend.swop.fi/governance/${walletAddress}`)).data.data;
+
+        const staked = toFloat(governance.find(g => g.key === `${walletAddress}_SWOP_amount`)?.value || "0", swopToken.precision);
+        const stakedUSD = staked.multipliedBy(await getUsdPriceOfToken(swopToken.id));
+
+        const lastInterest = toFloat(governance.find(g => g.key === 'last_interest').value, swopToken.precision);
+        const lastUserInterest = toFloat(governance.find(g => g.key === `${walletAddress}_last_interest`).value, swopToken.precision);
+
+        const earned = staked.multipliedBy(lastInterest.minus(lastUserInterest));
+        const earnedUSD = earned.multipliedBy(await getUsdPriceOfToken(swopToken.id));
+
+        return {
+          staked: {
+            [swopToken.id]: {
+              balance: staked,
+              usd: stakedUSD,
+            },
+          },
+          earned: {
+            [swopToken.id]: {
+              balance: earned.toString(10),
+              usd: earnedUSD.toString(10),
+            },
+          },
+          metrics: {
+            staking: staked.toString(10),
+            stakingUSD: stakedUSD.toString(10),
+            earned: earned.toString(10),
+            earnedUSD: earnedUSD.toString(10),
+          },
+          tokens: tokens(
+            {
+              token: swopTokenId,
+              data: {
+                balance: earned.toString(10),
+                usd: earnedUSD.toString(10),
+              },
+            }
+          ),
+        };
+      },
+      actions: async (walletAddress) => {
+        const governance = (await axios.get(`https://backend.swop.fi/governance/${walletAddress}`)).data.data;
+        const balances = (await axios.get(`https://nodes.swop.fi/assets/balance/${walletAddress}`)).data.balances;
+
+        const staked = new bn(governance.find(g => g.key === `${walletAddress}_SWOP_amount`)?.value || "0");
+        const swopBalance = new bn(balances.find(a => a.assetId === swopToken.id)?.balance || 0);
+
+        const lockedInVoting = new bn(0); // TODO: Support locked SWOP
+
+        return {
+          stake: {
+            can: async (amount) => {
+              if (new bn(amount).isGreaterThan(swopBalance.toString())) {
+                return Error('Amount exceeds balance');
+              }
+
+              return true;
+            },
+            send: async (amount) => {
+              await provider.signAndPublishTransaction(prepareContractCall(
+                stakingContract,
+                'lockSWOP',
+                [],
+                [{ assetId: swopToken.id, tokens: toFloat(amount, swopToken.precision).toNumber() } ]
+              ));
+            },
+          },
+          unstake: {
+            can: async (amount) => {
+              if (new bn(amount).isGreaterThan(staked.minus(lockedInVoting).toString())) {
+                return Error('Amount exceeds balance');
+              }
+
+              return true;
+            },
+            send: async (amount) => {
+              await provider.signAndPublishTransaction(prepareContractCall(
+                stakingContract,
+                'withdrawSWOP',
+                [
+                  { type: 'integer', value: Math.round(new bn(amount).toNumber()) },
+                ],
+              ));
+            },
+          },
+          claim: {
+            can: async () => {
+              return true;
+            },
+            send: async () => {
+              await provider.signAndPublishTransaction(prepareContractCall(
+                stakingContract,
+                'claimAndStakeSWOP',
+                [],
+              ));
+            },
+          },
+          exit: {
+            can: async () => {
+              if (new bn(staked).isLessThanOrEqualTo(0)) {
+                return Error('No SWOP locked in contract');
+              }
+
+              return true;
+            },
+            send: async () => {
+              await provider.signAndPublishTransaction(prepareContractCall(
+                stakingContract,
+                'withdrawSWOP',
+                [
+                  { type: 'integer', value: Math.round(new bn(staked).toNumber()) },
+                ],
+              ));
+            },
+          },
+        };
+      },
+    };
+  },
   farming: async (provider, contractAddress, initOptions = waves.defaultOptions()) => {
     const options = {
       ...waves.defaultOptions(),
@@ -229,7 +378,8 @@ module.exports = {
               return true;
             },
             send: async (amount) => {
-              await provider.signAndPublishTransaction(callFarmingContract(
+              await provider.signAndPublishTransaction(prepareContractCall(
+                farmingContract,
                 'lockShareTokens',
                 [{ type: "string", value: contractAddress }],
                 [{ assetId: stakingToken.id, tokens: toFloat(amount, stakingToken.precision).toNumber() } ]
@@ -245,7 +395,8 @@ module.exports = {
               return true;
             },
             send: async (amount) => {
-              await provider.signAndPublishTransaction(callFarmingContract(
+              await provider.signAndPublishTransaction(prepareContractCall(
+                farmingContract,
                 'withdrawShareTokens',
                 [
                   { type: "string", value: contractAddress },
@@ -259,7 +410,8 @@ module.exports = {
               return true;
             },
             send: async () => {
-              await provider.signAndPublishTransaction(callFarmingContract(
+              await provider.signAndPublishTransaction(prepareContractCall(
+                farmingContract,
                 'claim',
                 [{ type: "string", value: contractAddress }],
               ));
@@ -274,7 +426,8 @@ module.exports = {
               return true;
             },
             send: async () => {
-              await provider.signAndPublishTransaction(callFarmingContract(
+              await provider.signAndPublishTransaction(prepareContractCall(
+                farmingContract,
                 'withdrawShareTokens',
                 [
                     { type: "string", value: contractAddress },
