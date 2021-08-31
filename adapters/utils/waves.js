@@ -1,5 +1,7 @@
 const waves = {
-  defaultOptions: () => ({}),
+  defaultOptions: () => ({
+    node: 'https://nodes.wavesexplorer.com',
+  }),
 };
 
 module.exports = {

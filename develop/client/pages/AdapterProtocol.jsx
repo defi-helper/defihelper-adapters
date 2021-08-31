@@ -1,10 +1,12 @@
 import React from "react";
 import * as adaptersGateway from "../common/adapter";
-import { useProvider } from "../common/ether";
+import { useProvider } from '../common/ether';
+import { createWavesProvider } from '../common/waves';
 import ReactJson from "react-json-view";
 
 export function AdapterProtocol(props) {
-  const [provider, signer] = useProvider();
+  const [ethProvider, ethSigner] = useProvider();
+  const [blockchain, setBlockchain] = React.useState('ethereum');
   const [protocol, setProtocol] = React.useState(null);
   const [currentAdapter, setCurrentAdapter] = React.useState("");
   const [contract, setContract] = React.useState("");
@@ -31,10 +33,12 @@ export function AdapterProtocol(props) {
 
     setContractReload(true);
     try {
-      const metrics = await protocol[currentAdapter](provider, contract, {
-        blockNumber: "latest",
-        signer,
-      });
+      const bc = blockchain === 'ethereum' ? ethProvider : await createWavesProvider();
+      const params = blockchain === 'ethereum' ? {
+        blockNumber: 'latest',
+        ethSigner,
+      } : undefined;
+      const metrics = await protocol[currentAdapter](bc, contract, params);
       setContractMetrics(metrics);
     } catch (e) {
       console.error(e);
@@ -91,10 +95,17 @@ export function AdapterProtocol(props) {
       <div className="row">
         <div className="column">
           <label>Adapter: </label>
-          <select
-            value={currentAdapter}
-            onChange={(e) => setCurrentAdapter(e.target.value)}
-          >
+          <select value={blockchain} onChange={(e) => setBlockchain(e.target.value)}>
+            {['ethereum', 'waves'].map((bc) => (
+                <option key={bc} value={bc}>
+                  {bc}
+                </option>
+            ))}
+          </select>
+        </div>
+        <div className="column">
+          <label>Adapter: </label>
+          <select value={currentAdapter} onChange={(e) => setCurrentAdapter(e.target.value)}>
             {Object.keys(protocol).map((adapterName) => (
               <option key={adapterName} value={adapterName}>
                 {adapterName}
