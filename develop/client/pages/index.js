@@ -1,2 +1,3 @@
 export * from './Main';
-export * from './Protocol';
+export * from './AdapterProtocol';
+export * from './EthereumAutomateProtocol';

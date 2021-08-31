@@ -28,7 +28,7 @@ jobs:
         run: npm ci
       - name: npm build
         run: |
-          npm run build:adapters --if-present
+          npm run adapters:build --if-present
       - name: Archive artifacts
         uses: actions/upload-artifact@v2
         with:

@@ -1,7 +1,8 @@
 adapters-public
-automates-public
+automates-public/ethereum/deployment/local
 public/dist
 .cache
+cache
 
 # dependencies
 /node_modules

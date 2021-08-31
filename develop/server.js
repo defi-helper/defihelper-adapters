@@ -1,3 +1,4 @@
+const hardhat = require('hardhat');
 const path = require('path');
 const Express = require('express');
 const glob = require('tiny-glob');
@@ -5,19 +6,56 @@ const fs = require('fs');
 
 const app = Express();
 app.use(Express.static(path.resolve(__dirname, '../adapters-public')));
-app.get(/^\/automates\/ethereum\/([a-z0-9_\/-]+)\/([a-z0-9_]+)$/i, async (req, res) => {
-  const { 0: dir, 1: contract } = req.params;
-  const contractPath = path.resolve(
+app.get(/^\/automates\/ethereum\/([a-z0-9_\/-]+?)\/([a-z0-9_]+)\/([0-9]+)$/i, async (req, res) => {
+  const { 0: dir, 1: contract, 2: network } = req.params;
+  const contractBuildArtifactPath = path.resolve(
     __dirname,
-    `../automates-public/ethereum/automates/${dir}/${contract}.sol/${contract}.json`
+    `../automates-public/ethereum/build/automates/${dir}/${contract}.automate.sol/${contract}.json`
   );
   try {
-    await fs.promises.access(contractPath, fs.F_OK);
-    return res.sendFile(contractPath);
+    await fs.promises.access(contractBuildArtifactPath, fs.F_OK);
+    const buildArtifact = await fs.promises.readFile(contractBuildArtifactPath);
+    const { contractName, abi, bytecode, linkReferences } = JSON.parse(buildArtifact.toString('utf-8'));
+
+    const [networkName] = Object.entries(hardhat.config.networks).find(
+      ([, { chainId }]) => parseInt(network, 10) === chainId
+    ) ?? [''];
+
+    const contractDeployArtifactPath = path.resolve(
+      __dirname,
+      `../automates-public/ethereum/deployment/${networkName}/${dir.replace('/', '')}${contract}.json`
+    );
+    let deployAddress = undefined;
+    try {
+      await fs.promises.access(contractDeployArtifactPath, fs.F_OK);
+      const deployArtifact = await fs.promises.readFile(contractDeployArtifactPath);
+      deployAddress = JSON.parse(deployArtifact.toString('utf-8')).address;
+    } catch (e) {
+      if (e.message.indexOf('ENOENT: no such file or directory') === -1) console.error(e);
+    }
+
+    return res.json({
+      contractName,
+      address: deployAddress,
+      abi,
+      bytecode,
+      linkReferences,
+    });
   } catch (e) {
-    console.log(contractPath, e.toString());
+    console.log(contractBuildArtifactPath, e.toString());
     return res.status(404).send('Automate not found');
   }
+});
+app.get('/automates/ethereum', async (req, res) => {
+  const automates = await glob(
+    path.resolve(__dirname, '../automates-public/ethereum/build/automates/**/*.automate.sol')
+  );
+  return res.json(
+    automates.map((automate) => {
+      const { name, dir } = path.parse(automate);
+      return `${path.parse(dir).name}/${path.parse(name).name}`;
+    })
+  );
 });
 app.get('/', async (req, res) => {
   const adapters = await glob(path.resolve(__dirname, '../adapters-public/*.js'));

@@ -1,6 +1,6 @@
-import React from 'react';
-import { BrowserRouter, Switch, Route, Link } from 'react-router-dom';
-import { Main, Protocol } from './pages';
+import React from "react";
+import { BrowserRouter, Switch, Route, Link } from "react-router-dom";
+import { Main, AdapterProtocol, EthereumAutomateProtocol } from "./pages";
 
 export function Router() {
   return (
@@ -12,7 +12,18 @@ export function Router() {
           </div>
         </nav>
         <Switch>
-          <Route path="/client/:protocol" render={({ match }) => <Protocol protocol={match.params.protocol} />}></Route>
+          <Route
+            path="/client/adapter/:protocol"
+            render={({ match }) => (
+              <AdapterProtocol protocol={match.params.protocol} />
+            )}
+          ></Route>
+          <Route
+            path="/client/automate/ethereum/:protocol"
+            render={({ match }) => (
+              <EthereumAutomateProtocol protocol={match.params.protocol} />
+            )}
+          ></Route>
           <Route path="/client" component={Main}></Route>
         </Switch>
       </div>
