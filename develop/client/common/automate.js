@@ -1,4 +1,4 @@
-import { ethers } from "ethers";
+import { ethers } from 'ethers';
 
 export class Automate {
   constructor(protocol, contract) {
@@ -20,13 +20,11 @@ export class Automate {
 export async function ethereumList() {
   return fetch('/automates/ethereum')
     .then((res) => res.json())
-    .then((automates) => automates.map(Automate.fromString));
+    .then((automates) => automates.map(({ protocol, contract }) => new Automate(protocol, contract)));
 }
 
-export async function load(automate) {
-  return fetch(`/automates/ethereum/${automate}`)
-    .then((res) => res.json())
-    .then(({ contractName, abi, bytecode, linkReferences }) => ({ contractName, bytecode, abi, linkReferences }));
+export async function load({ protocol, contract }, network) {
+  return fetch(`/automates/ethereum/${protocol}/${contract}/${network}`).then((res) => res.json());
 }
 
 export function linkLibraries({ bytecode, linkReferences }, libraries) {

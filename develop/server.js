@@ -6,11 +6,11 @@ const fs = require('fs');
 
 const app = Express();
 app.use(Express.static(path.resolve(__dirname, '../adapters-public')));
-app.get(/^\/automates\/ethereum\/([a-z0-9_\/-]+?)\/([a-z0-9_]+)\/([0-9]+)$/i, async (req, res) => {
-  const { 0: dir, 1: contract, 2: network } = req.params;
+app.get(/^\/automates\/ethereum\/([a-z0-9_-]+)\/([a-z0-9_]+)\/([0-9]+)$/i, async (req, res) => {
+  const { 0: protocol, 1: contract, 2: network } = req.params;
   const contractBuildArtifactPath = path.resolve(
     __dirname,
-    `../automates-public/ethereum/build/automates/${dir}/${contract}.automate.sol/${contract}.json`
+    `../automates-public/ethereum/build/automates/${protocol}/${contract}.automate.sol/${contract}.json`
   );
   try {
     await fs.promises.access(contractBuildArtifactPath, fs.F_OK);
@@ -23,7 +23,7 @@ app.get(/^\/automates\/ethereum\/([a-z0-9_\/-]+?)\/([a-z0-9_]+)\/([0-9]+)$/i, as
 
     const contractDeployArtifactPath = path.resolve(
       __dirname,
-      `../automates-public/ethereum/deployment/${networkName}/${dir.replace('/', '')}${contract}.json`
+      `../automates-public/ethereum/deployment/${networkName}/${protocol}${contract}.json`
     );
     let deployAddress = undefined;
     try {
@@ -53,7 +53,7 @@ app.get('/automates/ethereum', async (req, res) => {
   return res.json(
     automates.map((automate) => {
       const { name, dir } = path.parse(automate);
-      return `${path.parse(dir).name}/${path.parse(name).name}`;
+      return { protocol: path.parse(dir).name, contract: path.parse(name).name };
     })
   );
 });

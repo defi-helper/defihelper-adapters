@@ -1,5 +1,7 @@
-const { axios, bn } = require('../lib');
-const { waves, toFloat, staking } = require('../utils');
+const { ethers, axios, bn } = require('../lib');
+const { ethereum, waves, toFloat, staking } = require('../utils');
+const StakingABI = require('./abi/Staking.json');
+const SynthetixUniswapLpRestakeABI = require('./abi/SynthetixUniswapLpRestake.json');
 
 const swopTokenId = 'Ehie5xYpeN8op1Cctc6aGUrqx8jq3jtf1DSjXDbfm7aT';
 
@@ -66,5 +68,35 @@ module.exports = {
         };
       },
     };
+  },
+  automates: {
+    SynthetixUniswapLpRestake: async (signer, contractAddress) => {
+      const signerAddress = await signer.getAddress();
+      const automate = new ethers.Contract(contractAddress, SynthetixUniswapLpRestakeABI, signer);
+      const stakingAddress = await automate.staking();
+      const staking = new ethers.Contract(stakingAddress, StakingABI, signer);
+      const stakingTokenAddress = await staking.stakingToken();
+      const stakingToken = ethereum.erc20(signer, stakingTokenAddress);
+
+      return {
+        migrate: async () => {
+          await staking.exit();
+          this.deposit();
+        },
+        deposit: async () => {
+          const balance = await stakingToken.balanceOf(signerAddress);
+          if (balance.toString() === '0') return Error('Invalid balance');
+          await stakingToken.transfer(automate.address, balance);
+          await automate.deposit();
+        },
+        refund: async () => {
+          await automate.refund();
+        },
+        run: async () => {
+          const gasFee = await automate.estimateGas.run(0);
+          await automate.run(gasFee);
+        },
+      };
+    },
   },
 };
