@@ -78,23 +78,29 @@ module.exports = {
       const stakingTokenAddress = await staking.stakingToken();
       const stakingToken = ethereum.erc20(signer, stakingTokenAddress);
 
+      const deposit = async () => {
+        const signerBalance = await stakingToken.balanceOf(signerAddress);
+        if (signerBalance.toString() !== '0') {
+          await (await stakingToken.transfer(automate.address, balance)).wait();
+        }
+        const automateBalance = await stakingToken.balanceOf(automate.address);
+        if (automateBalance.toString() !== '0') {
+          await (await automate.deposit()).wait();
+        }
+      };
+
       return {
         migrate: async () => {
           await staking.exit();
-          this.deposit();
+          return deposit();
         },
-        deposit: async () => {
-          const balance = await stakingToken.balanceOf(signerAddress);
-          if (balance.toString() === '0') return Error('Invalid balance');
-          await stakingToken.transfer(automate.address, balance);
-          await automate.deposit();
-        },
+        deposit,
         refund: async () => {
-          await automate.refund();
+          return automate.refund();
         },
         run: async () => {
           const gasFee = await automate.estimateGas.run(0);
-          await automate.run(gasFee);
+          return automate.run(gasFee);
         },
       };
     },
