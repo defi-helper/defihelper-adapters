@@ -10,9 +10,8 @@ contract AutomateMock is Automate {
 
   constructor(address _info) Automate(_info) {}
 
-  function init(address _staking) public initializer {
+  function init(address _staking) external initializer {
     staking = _staking;
-    _owner = tx.origin;
   }
 
   function run(

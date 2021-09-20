@@ -1,6 +1,8 @@
 const { ethers, bn, ethersMulticall } = require('../lib');
 const ERC20ABI = require('./abi/erc20.json');
+const DFHStorageABI = require('./abi/dfh/storage.json');
 const UniswapPairABI = require('./abi/uniswap/pair.json');
+const UniswapRouterABI = require('./abi/uniswap/router.json');
 
 const ethereum = {
   abi: {
@@ -40,8 +42,14 @@ const ethereum = {
       totalSupply: totalSupply.toString(),
     };
   },
+  dfh: {
+    storageABI: DFHStorageABI,
+    storage: (provider, address) => new ethers.Contract(address, DFHStorageABI, provider),
+    storageKey: (k) => ethers.utils.keccak256(ethers.utils.toUtf8Bytes(k)),
+  },
   uniswap: {
     pairDecimals: 18,
+    pairABI: UniswapPairABI,
     pair: (provider, address) => new ethers.Contract(address, UniswapPairABI, provider),
     pairInfo: async (provider, address, options = ethereum.defaultOptions()) => {
       const multicall = new ethersMulticall.Provider(provider);
@@ -75,6 +83,8 @@ const ethereum = {
         totalSupply,
       };
     },
+    routerABI: UniswapRouterABI,
+    router: (provider, address) => new ethers.Contract(address, UniswapRouterABI, provider),
   },
 };
 

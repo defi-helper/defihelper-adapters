@@ -2,13 +2,12 @@
 pragma solidity ^0.8.6;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "./proxy/ERC1167.sol";
 import "./IStorage.sol";
 import "./IBalance.sol";
 
 // solhint-disable avoid-tx-origin
-abstract contract Automate is Initializable {
+abstract contract Automate {
   using ERC1167 for address;
 
   /// @notice Storage contract address.
@@ -35,6 +34,16 @@ abstract contract Automate is Initializable {
     if (impl == address(this)) return _info;
 
     return Automate(impl).info();
+  }
+
+  /// @dev Modifier to protect an initializer function from being invoked twice.
+  modifier initializer() {
+    if (_owner == address(0)) {
+      _owner = tx.origin;
+    } else {
+      require(_owner == msg.sender, "Automate: caller is not the owner");
+    }
+    _;
   }
 
   /**

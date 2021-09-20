@@ -1,4 +1,4 @@
-const { ethers, axios, bn } = require('../lib');
+const { ethers, axios, bn, ethersMulticall, dayjs } = require('../lib');
 const { ethereum, waves, toFloat, staking } = require('../utils');
 const StakingABI = require('./abi/Staking.json');
 const SynthetixUniswapLpRestakeABI = require('./abi/SynthetixUniswapLpRestake.json');
@@ -78,29 +78,69 @@ module.exports = {
       const stakingTokenAddress = await staking.stakingToken();
       const stakingToken = ethereum.erc20(signer, stakingTokenAddress);
 
-      const deposit = async () => {
-        const signerBalance = await stakingToken.balanceOf(signerAddress);
-        if (signerBalance.toString() !== '0') {
-          await (await stakingToken.transfer(automate.address, balance)).wait();
-        }
-        const automateBalance = await stakingToken.balanceOf(automate.address);
-        if (automateBalance.toString() !== '0') {
-          await (await automate.deposit()).wait();
-        }
-      };
-
       return {
-        migrate: async () => {
+        async migrate() {
           await staking.exit();
-          return deposit();
+          return this.deposit();
         },
-        deposit,
-        refund: async () => {
+        async deposit() {
+          const signerBalance = await stakingToken.balanceOf(signerAddress);
+          if (signerBalance.toString() !== '0') {
+            await (await stakingToken.transfer(automate.address, signerBalance)).wait();
+          }
+          const automateBalance = await stakingToken.balanceOf(automate.address);
+          if (automateBalance.toString() !== '0') {
+            await (await automate.deposit()).wait();
+          }
+        },
+        async refund() {
           return automate.refund();
         },
-        run: async () => {
-          const gasFee = await automate.estimateGas.run(0);
-          return automate.run(gasFee);
+        async run() {
+          const multicall = new ethersMulticall.Provider(signer, await signer.getChainId());
+          const automateMulticall = new ethersMulticall.Contract(contractAddress, SynthetixUniswapLpRestakeABI);
+          const stakingMulticall = new ethersMulticall.Contract(stakingAddress, StakingABI);
+          const stakingTokenMulticall = new ethersMulticall.Contract(stakingTokenAddress, ethereum.uniswap.pairABI);
+          const [
+            infoAddress,
+            slippagePercent,
+            deadlineSeconds,
+            token0Address,
+            token1Address,
+            rewardTokenAddress,
+            earned,
+          ] = await multicall.all([
+            automateMulticall.info(),
+            automateMulticall.slippage(),
+            automateMulticall.deadline(),
+            stakingTokenMulticall.token0(),
+            stakingTokenMulticall.token1(),
+            stakingMulticall.rewardsToken(),
+            stakingMulticall.earned(contractAddress),
+          ]);
+          if (earned.toString() === '0') return new Error('No earned');
+          const routerAddress = await ethereum.dfh
+            .storage(signer, infoAddress)
+            .getAddress(ethereum.dfh.storageKey('UniswapV2:Contract:Router2'));
+          const router = ethereum.uniswap.router(signer, routerAddress);
+
+          const deadline = dayjs().add(deadlineSeconds, 'seconds').unix();
+          const slippage = 1 - slippagePercent / 10000;
+          const token0AmountIn = new bn(earned.toString()).div(2).toFixed(0);
+          let token0Min = new bn(token0AmountIn).multipliedBy(slippage).toFixed(0);
+          if (token0Address.toLowerCase() !== rewardTokenAddress.toLowerCase()) {
+            const [, amountOut] = await router.getAmountsOut(token0AmountIn, [rewardTokenAddress, token0Address]);
+            token0Min = new bn(amountOut.toString()).multipliedBy(slippage).toFixed(0);
+          }
+          const token1AmountIn = new bn(earned.toString()).minus(token0AmountIn).toFixed(0);
+          let token1Min = new bn(token1AmountIn).multipliedBy(slippage).toFixed(0);
+          if (token1Address.toLowerCase() !== rewardTokenAddress.toLowerCase()) {
+            const [, amountOut] = await router.getAmountsOut(token1AmountIn, [rewardTokenAddress, token1Address]);
+            token1Min = new bn(amountOut.toString()).multipliedBy(slippage).toFixed(0);
+          }
+
+          const gasFee = await automate.estimateGas.run(0, deadline, [token0Min, token1Min]);
+          return (await automate.run(gasFee, deadline, [token0Min, token1Min])).wait();
         },
       };
     },

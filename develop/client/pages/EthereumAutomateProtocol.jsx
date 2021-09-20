@@ -43,22 +43,160 @@ function receiptMinimal({
   };
 }
 
+function AutomateArtifactSelector({ provider, automates, onReload }) {
+  const [current, setCurrent] = React.useState(automates[0]);
+  const [reload, setReload] = React.useState(false);
+
+  const onReloadHandler = async () => {
+    if (current === null) return;
+
+    setReload(true);
+    try {
+      const { chainId } = await provider.getNetwork();
+      onReload(current, await automatesGateway.load(current, chainId));
+    } catch (e) {
+      console.error(e);
+    }
+    setReload(false);
+  };
+
+  return (
+    <div>
+      <div>
+        <label>Contract: </label>
+      </div>
+      <div className="row">
+        <div className="column column-90">
+          <select
+            value={current === null ? "" : current}
+            onChange={(e) =>
+              setCurrent(automatesGateway.Automate.fromString(e.target.value))
+            }
+          >
+            {automates.map((automate) => (
+              <option key={automate} value={automate}>
+                {automate.contract}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="column column-10">
+          <button
+            className="button"
+            onClick={onReloadHandler}
+            disabled={reload}
+          >
+            {reload ? "Loading" : "Reload"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AutomateInit({
+  state: { artifact, erc1167, storage, inputs, prototype },
+  dispatch,
+}) {
+  const onChangeInitIntpus = (value, index) => {
+    const newInitInputs = [...inputs];
+    newInitInputs[index] = value;
+    dispatch({ type: "inputs", value: newInitInputs });
+  };
+
+  return (
+    <div>
+      <div className="row">
+        <div className="column column-50">
+          <label>ERC1167 Library:</label>
+          <input
+            type="text"
+            placeholder="0x"
+            value={erc1167}
+            onChange={(e) =>
+              dispatch({ type: "erc1167", value: e.target.value })
+            }
+          />
+        </div>
+        <div className="column column-50">
+          <label>Storage:</label>
+          <input
+            type="text"
+            placeholder="0x"
+            value={storage}
+            onChange={(e) =>
+              dispatch({ type: "storage", value: e.target.value })
+            }
+          />
+        </div>
+      </div>
+      <div>
+        <label>Init inputs:</label>
+        {new ethers.utils.Interface(artifact.abi)
+          .getFunction("init")
+          .inputs.map(({ name, type }, i) => (
+            <input
+              key={name}
+              type="text"
+              placeholder={`${type} ${name}`}
+              value={inputs[i]}
+              onChange={(e) => onChangeInitIntpus(e.target.value, i)}
+            />
+          ))}
+      </div>
+      <div>
+        <label>Prototype:</label>
+        <input
+          type="text"
+          placeholder="0x"
+          value={prototype}
+          onChange={(e) =>
+            dispatch({ type: "prototype", value: e.target.value })
+          }
+        />
+      </div>
+    </div>
+  );
+}
+
+function automateReducer(state, { type, value }) {
+  switch (type) {
+    case "artifact":
+      return {
+        ...state,
+        artifact: value,
+        inputs: new ethers.utils.Interface(value.abi)
+          .getFunction("init")
+          .inputs.map(() => ""),
+      };
+    case "erc1167":
+      return { ...state, erc1167: value };
+    case "storage":
+      return { ...state, storage: value };
+    case "inputs":
+      return { ...state, inputs: value };
+    case "prototype":
+      return { ...state, prototype: value };
+    default:
+      return state;
+  }
+}
+
 const automateAdapterActions = ["migrate", "deposit", "refund", "run"];
 
 export function EthereumAutomateProtocol(props) {
   const [provider, signer] = useProvider();
   const [automates, setAutomates] = React.useState(null);
-  const [currentAutomate, setCurrentAutomate] = React.useState(null);
+  const [automate, automateDispatch] = React.useReducer(automateReducer, {
+    artifact: null,
+    erc1167: "",
+    storage: "",
+    inputs: [],
+    prototype: "",
+  });
   const [adapters, setAdapters] = React.useState(null);
-  const [automateArtifact, setAutomateArtifact] = React.useState(null);
-  const [automateArtifactReload, setAutomateArtifactReload] =
-    React.useState(false);
-  const [erc1167, setErc1167] = React.useState("");
-  const [storage, setStorage] = React.useState("");
-  const [contract, setContract] = React.useState("");
   const [automateDeployReload, setAutomateDeployReload] = React.useState(false);
   const [deploy, setDeploy] = React.useState({ tx: null, receipt: null });
-  const [prototype, setPrototype] = React.useState("");
   const [automateProxyDeployReload, setAutomateProxyDeployReload] =
     React.useState(false);
   const [proxy, setProxy] = React.useState({ tx: null, receipt: null });
@@ -67,54 +205,37 @@ export function EthereumAutomateProtocol(props) {
   const [actionReload, setActionReload] = React.useState(false);
   const [actionResult, setActionResult] = React.useState(null);
 
-  React.useEffect(async () => {
+  React.useEffect(() => {
     automatesGateway
       .ethereumList()
-      .then((automates) => {
-        return automates.filter(({ protocol }) => protocol === props.protocol);
-      })
-      .then((automates) => {
-        setAutomates(automates);
-        setCurrentAutomate(automates[0]);
-      });
+      .then((automates) =>
+        automates.filter(({ protocol }) => protocol === props.protocol)
+      )
+      .then(setAutomates);
   }, []);
 
-  const onStorageAutodetect = async () => {
+  useEffect(async () => {
     if (!provider) return;
 
     const { chainId } = await provider.getNetwork();
     const network = networks[chainId.toString()];
-    if (!network) {
-      setStorage("");
-      return;
-    }
+    automateDispatch({
+      type: "storage",
+      value: network ? network.Storage.address : "",
+    });
+    automateDispatch({
+      type: "erc1167",
+      value: network ? network.ERC1167.address : "",
+    });
 
-    setStorage(network.Storage.address);
-  };
-  useEffect(onStorageAutodetect, [provider]);
+    if (!automate.artifact || !automate.artifact.address) return;
+    automateDispatch({
+      type: "prototype",
+      value: automate.artifact.address,
+    });
+  }, [provider, automate.artifact]);
 
-  const onErc1167Autodetect = async () => {
-    if (!provider) return;
-
-    const { chainId } = await provider.getNetwork();
-    const network = networks[chainId.toString()];
-    if (!network) {
-      setErc1167("");
-      return;
-    }
-
-    setErc1167(network.ERC1167.address);
-  };
-  useEffect(onErc1167Autodetect, [provider]);
-
-  const onPrototypeAutodetect = async () => {
-    if (!automateArtifact || !automateArtifact.address) return;
-
-    setPrototype(automateArtifact.address);
-  };
-  useEffect(onPrototypeAutodetect, [automateArtifact]);
-
-  const onAdapterAutodetect = async () => {
+  useEffect(async () => {
     if (proxy.receipt !== null) {
       setInstance(
         ethers.utils.defaultAbiCoder.decode(
@@ -124,59 +245,48 @@ export function EthereumAutomateProtocol(props) {
       );
     } else if (deploy.receipt !== null) {
       setInstance(deploy.receipt.contractAddress);
-    } else if (automateArtifact && automateArtifact.address) {
-      setInstance(automateArtifact.address);
+    } else if (automate.artifact && automate.artifact.address) {
+      setInstance(automate.artifact.address);
     }
-  };
-  useEffect(onAdapterAutodetect, [automateArtifact, deploy, proxy]);
+  }, [automate.artifact, deploy, proxy]);
 
-  const onAutomateReload = async () => {
-    if (currentAutomate === null) return;
-
-    setAutomateArtifactReload(true);
-    try {
-      const { chainId } = await provider.getNetwork();
-      const artifact = await automatesGateway.load(currentAutomate, chainId);
-      setAutomateArtifact(artifact);
-      onStorageAutodetect();
-      onErc1167Autodetect();
-      const protocolAdapters = await adaptersGateway.load(
-        currentAutomate.protocol
-      );
-      setAdapters(protocolAdapters.automates);
-    } catch (e) {
-      console.error(e);
-    }
-    setAutomateArtifactReload(false);
+  const onAutomateReload = async ({ protocol }, artifact) => {
+    automateDispatch({
+      type: "artifact",
+      value: artifact,
+    });
+    const protocolAdapters = await adaptersGateway.load(protocol);
+    setAdapters(protocolAdapters.automates);
   };
 
   const onAutomateDeploy = async () => {
     if (
       !provider ||
-      !automateArtifact ||
-      erc1167 === "" ||
-      storage === "" ||
-      contract === ""
+      automate.artifact === null ||
+      automate.erc1167 === "" ||
+      automate.storage === ""
     )
       return;
 
     setAutomateDeployReload(true);
     try {
       const factory = new ethers.ContractFactory(
-        automateArtifact.abi,
-        automatesGateway.linkLibraries(automateArtifact, {
-          ERC1167: erc1167,
+        automate.artifact.abi,
+        automatesGateway.linkLibraries(automate.artifact, {
+          ERC1167: automate.erc1167,
         }),
         signer
       );
-      const automate = await factory.deploy(storage);
-      const { deployTransaction } = automate;
+      const automateDeploy = await factory.deploy(automate.storage);
+      const { deployTransaction } = automateDeploy;
       setDeploy({
         tx: txMinimal(deployTransaction),
         receipt: null,
       });
       const receipt = await deployTransaction.wait();
-      await (await automate.init(contract)).wait();
+      await (
+        await automateDeploy.init.apply(automateDeploy, automate.inputs)
+      ).wait();
       setDeploy({
         tx: txMinimal(deployTransaction),
         receipt: receiptMinimal(receipt),
@@ -188,7 +298,8 @@ export function EthereumAutomateProtocol(props) {
   };
 
   const onAutomateProxyDeploy = async () => {
-    if (!provider || !automateArtifact || prototype === "") return;
+    if (!provider || automate.artifact === null || automate.prototype === "")
+      return;
 
     setAutomateProxyDeployReload(true);
     try {
@@ -200,10 +311,10 @@ export function EthereumAutomateProtocol(props) {
         signer
       );
       const tx = await proxyFactory.create(
-        prototype,
-        new ethers.utils.Interface(automateArtifact.abi).encodeFunctionData(
+        automate.prototype,
+        new ethers.utils.Interface(automate.artifact.abi).encodeFunctionData(
           "init",
-          [contract]
+          automate.inputs
         )
       );
       setProxy({
@@ -226,7 +337,7 @@ export function EthereumAutomateProtocol(props) {
 
     setActionReload(true);
     try {
-      const actions = await adapters[currentAutomate.contract](
+      const actions = await adapters[automate.artifact.contractName](
         signer,
         instance
       );
@@ -248,88 +359,46 @@ export function EthereumAutomateProtocol(props) {
   return (
     <div className="container">
       <h2>{props.protocol}</h2>
-      <div>
-        <div>
-          <label>Contract: </label>
-        </div>
-        <div className="row">
-          <div className="column column-90">
-            <select
-              value={currentAutomate === null ? "" : currentAutomate}
-              onChange={(e) =>
-                setCurrentAutomate(
-                  automatesGateway.Automate.fromString(e.target.value)
-                )
-              }
-            >
-              {automates.map((automate) => (
-                <option key={automate} value={automate}>
-                  {automate.contract}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="column column-10">
-            <button
-              className="button"
-              onClick={onAutomateReload}
-              disabled={automateArtifactReload}
-            >
-              {automateArtifactReload ? "Loading" : "Reload"}
-            </button>
-          </div>
-        </div>
-      </div>
-      {!automateArtifact || (
+      <AutomateArtifactSelector
+        provider={provider}
+        automates={automates}
+        onReload={onAutomateReload}
+      />
+      {automate.artifact === null || (
         <div>
           <h3>Automate</h3>
           <div>
             <ReactJson
-              src={JSON.parse(JSON.stringify(automateArtifact))}
+              src={JSON.parse(JSON.stringify(automate.artifact))}
               collapsed={1}
             />
           </div>
-          <div className="row">
-            <div className="column column-30">
-              <label>ERC1167 Library:</label>
-              <input
-                type="text"
-                placeholder="0x"
-                value={erc1167}
-                onChange={(e) => setErc1167(e.target.value)}
-              />
-            </div>
-            <div className="column column-30">
-              <label>Storage:</label>
-              <input
-                type="text"
-                placeholder="0x"
-                value={storage}
-                onChange={(e) => setStorage(e.target.value)}
-              />
-            </div>
-            <div className="column column-30">
-              <label>Target contract:</label>
-              <input
-                type="text"
-                placeholder="0x"
-                value={contract}
-                onChange={(e) => setContract(e.target.value)}
-              />
-            </div>
-            <div className="column column-10">
-              <button
-                className="button"
-                onClick={onAutomateDeploy}
-                disabled={automateDeployReload}
-              >
-                {automateDeployReload ? "Loading" : "Deploy"}
-              </button>
+          <div>
+            <AutomateInit state={automate} dispatch={automateDispatch} />
+            <div className="row">
+              <div className="column column-20">
+                <button
+                  className="button"
+                  onClick={onAutomateDeploy}
+                  disabled={automateDeployReload}
+                >
+                  {automateDeployReload ? "Loading" : "Deploy"}
+                </button>
+              </div>
+              <div className="column column-20">
+                <button
+                  className="button"
+                  onClick={onAutomateProxyDeploy}
+                  disabled={automateProxyDeployReload}
+                >
+                  {automateProxyDeployReload ? "Loading" : "Proxy"}
+                </button>
+              </div>
             </div>
           </div>
           {!deploy.tx || (
             <div>
-              <div>Transaction:</div>
+              <div>Deploy transaction:</div>
               <div>
                 <ReactJson
                   src={JSON.parse(JSON.stringify(deploy.tx))}
@@ -340,7 +409,7 @@ export function EthereumAutomateProtocol(props) {
                 <div>Transaction waiting...</div>
               ) : (
                 <>
-                  <div>Receipt:</div>
+                  <div>Deploy receipt:</div>
                   <div>
                     <ReactJson
                       src={JSON.parse(JSON.stringify(deploy.receipt))}
@@ -351,38 +420,9 @@ export function EthereumAutomateProtocol(props) {
               )}
             </div>
           )}
-          <div className="row">
-            <div className="column column-45">
-              <label>Prototype:</label>
-              <input
-                type="text"
-                placeholder="0x"
-                value={prototype}
-                onChange={(e) => setPrototype(e.target.value)}
-              />
-            </div>
-            <div className="column column-45">
-              <label>Target contract:</label>
-              <input
-                type="text"
-                placeholder="0x"
-                value={contract}
-                onChange={(e) => setContract(e.target.value)}
-              />
-            </div>
-            <div className="column column-10">
-              <button
-                className="button"
-                onClick={onAutomateProxyDeploy}
-                disabled={automateProxyDeployReload}
-              >
-                {automateProxyDeployReload ? "Loading" : "Proxy"}
-              </button>
-            </div>
-          </div>
           {!proxy.tx || (
             <div>
-              <div>Transaction:</div>
+              <div>Proxy transaction:</div>
               <div>
                 <ReactJson
                   src={JSON.parse(JSON.stringify(proxy.tx))}
@@ -393,7 +433,7 @@ export function EthereumAutomateProtocol(props) {
                 <div>Transaction waiting...</div>
               ) : (
                 <>
-                  <div>Receipt:</div>
+                  <div>Proxy receipt:</div>
                   <div>
                     <ReactJson
                       src={JSON.parse(JSON.stringify(proxy.receipt))}

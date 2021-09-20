@@ -31,7 +31,7 @@ describe('SynthetixUniswapLpRestake.refund', function () {
     );
     automate = await Automate.deploy(storage.address);
     await automate.deployed();
-    await automate.init(staking.address);
+    await automate.init(staking.address, 600, 0);
     await stakingToken.transfer(automate.address, stakingTokenAmount);
     await automate.deposit();
     await rewardToken.transfer(staking.address, rewardTokenAmount);

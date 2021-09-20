@@ -39,7 +39,7 @@ describe('Automate.owner', function () {
         .create(prototype.address, new ethers.utils.Interface(AutomateABI).encodeFunctionData('init', [stakingAddress]))
     ).wait();
     const proxyCreatedEvent = proxyTx.events.find(({ event }) => event === 'ProxyCreated');
-    const proxy = new ethers.Contract(proxyCreatedEvent.args.proxy, AutomateABI, prototypeOwner);
+    const proxy = new ethers.Contract(proxyCreatedEvent.args.proxy, AutomateABI, proxyOwner);
 
     strictEqual(await prototype.owner(), prototypeOwner.address, 'Invalid prototype owner');
     strictEqual(await proxy.owner(), proxyOwner.address, 'Invalid proxy owner');
@@ -90,11 +90,64 @@ describe('Automate.owner', function () {
         .create(prototype.address, new ethers.utils.Interface(AutomateABI).encodeFunctionData('init', [stakingAddress]))
     ).wait();
     const proxyCreatedEvent = proxyTx.events.find(({ event }) => event === 'ProxyCreated');
-    const proxy = new ethers.Contract(proxyCreatedEvent.args.proxy, AutomateABI, prototypeOwner);
+    const proxy = new ethers.Contract(proxyCreatedEvent.args.proxy, AutomateABI, proxyOwner);
 
     await assertions.reverts(
       proxy.connect(proxyOwner).transferOwnership(newOwner.address),
       'Automate: change the owner failed'
+    );
+  });
+
+  it('owner: should reinitialize if owner called', async function () {
+    const { abi: AutomateABI } = await artifacts.readArtifact('automates/utils/DFH/mock/AutomateMock.sol:AutomateMock');
+    const newStakingAddress = '0x0000000000000000000000000000000000000003';
+    const Prototype = await ethers.getContractFactory('automates/utils/DFH/mock/AutomateMock.sol:AutomateMock', {
+      libraries: {
+        ERC1167: erc1167.address,
+      },
+    });
+    const prototype = await Prototype.deploy(infoAddress);
+    await prototype.deployed();
+
+    const proxyTx = await (
+      await proxyFactory
+        .connect(proxyOwner)
+        .create(prototype.address, new ethers.utils.Interface(AutomateABI).encodeFunctionData('init', [stakingAddress]))
+    ).wait();
+    const proxyCreatedEvent = proxyTx.events.find(({ event }) => event === 'ProxyCreated');
+    const proxy = new ethers.Contract(proxyCreatedEvent.args.proxy, AutomateABI, proxyOwner);
+
+    strictEqual(await proxy.staking(), stakingAddress, 'Invalid configuration proxy');
+
+    await proxy.init(newStakingAddress);
+
+    strictEqual(await proxy.staking(), newStakingAddress, 'Invalid reconfiguration proxy');
+  });
+
+  it('owner: revert tx if call reinitialize not owner', async function () {
+    const { abi: AutomateABI } = await artifacts.readArtifact('automates/utils/DFH/mock/AutomateMock.sol:AutomateMock');
+    const newStakingAddress = '0x0000000000000000000000000000000000000003';
+    const Prototype = await ethers.getContractFactory('automates/utils/DFH/mock/AutomateMock.sol:AutomateMock', {
+      libraries: {
+        ERC1167: erc1167.address,
+      },
+    });
+    const prototype = await Prototype.deploy(infoAddress);
+    await prototype.deployed();
+
+    const proxyTx = await (
+      await proxyFactory
+        .connect(proxyOwner)
+        .create(prototype.address, new ethers.utils.Interface(AutomateABI).encodeFunctionData('init', [stakingAddress]))
+    ).wait();
+    const proxyCreatedEvent = proxyTx.events.find(({ event }) => event === 'ProxyCreated');
+    const proxy = new ethers.Contract(proxyCreatedEvent.args.proxy, AutomateABI, proxyOwner);
+
+    strictEqual(await proxy.staking(), stakingAddress, 'Invalid configuration proxy');
+
+    await assertions.reverts(
+      proxy.connect(newOwner.address).init(newStakingAddress),
+      'Automate: caller is not the owner'
     );
   });
 });

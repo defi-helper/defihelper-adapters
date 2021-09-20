@@ -1,4 +1,5 @@
 const { strictEqual } = require('assert');
+const dayjs = require('dayjs');
 const { ethers } = require('hardhat');
 const { storageKey, fixtures } = require('./fixtures');
 
@@ -56,7 +57,7 @@ describe('SynthetixUniswapLpRestake.run', function () {
     );
     automate = await Automate.deploy(storage.address);
     await automate.deployed();
-    await automate.init(staking.address);
+    await automate.init(staking.address, 600, 0);
     await stakingToken.transfer(automate.address, stakingTokenAmount);
     await automate.deposit();
     await rewardToken.transfer(staking.address, rewardTokenAmount);
@@ -64,9 +65,10 @@ describe('SynthetixUniswapLpRestake.run', function () {
   });
 
   it('run: should run automate', async function () {
-    const gasFee = await automate.estimateGas.run(1);
+    const deadline = dayjs().add(10, 'minutes').unix();
+    const gasFee = await automate.estimateGas.run(1, deadline, [0, 0]);
 
-    await automate.run(gasFee);
+    await automate.run(gasFee, deadline, [0, 0]);
 
     const endStakingBalance = await staking.balanceOf(automate.address);
     const endEarned = await staking.earned(automate.address);

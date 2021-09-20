@@ -9,6 +9,7 @@
     "automates:build": "hardhat compile",
     "automates:test": "hardhat test",
     "automates:deploy": "hardhat deploy --deploy-scripts ./automates/deploy --tags Automate,GovernanceOwner",
+    "automates:etherscan-verify": "scripts/etherscan-verify.sh",
     "adapters:build": "rollup -c adapters.rollup.js",
     "adapters:build-dev": "rollup -c adapters.rollup.js",
     "adapters:watch": "rollup -c adapters.rollup.js -w",
