@@ -71,7 +71,6 @@ module.exports = {
   },
   automates: {
     SynthetixUniswapLpRestake: async (signer, contractAddress) => {
-      const signerAddress = await signer.getAddress();
       const automate = new ethers.Contract(contractAddress, SynthetixUniswapLpRestakeABI, signer);
       const stakingAddress = await automate.staking();
       const staking = new ethers.Contract(stakingAddress, StakingABI, signer);
@@ -79,11 +78,13 @@ module.exports = {
       const stakingToken = ethereum.erc20(signer, stakingTokenAddress);
 
       return {
+        contract: stakingAddress,
         async migrate() {
           await staking.exit();
           return this.deposit();
         },
         async deposit() {
+          const signerAddress = await signer.getAddress();
           const signerBalance = await stakingToken.balanceOf(signerAddress);
           if (signerBalance.toString() !== '0') {
             await (await stakingToken.transfer(automate.address, signerBalance)).wait();
@@ -96,7 +97,7 @@ module.exports = {
         async refund() {
           return automate.refund();
         },
-        async run() {
+        async runParams() {
           const multicall = new ethersMulticall.Provider(signer, await signer.getChainId());
           const automateMulticall = new ethersMulticall.Contract(contractAddress, SynthetixUniswapLpRestakeABI);
           const stakingMulticall = new ethersMulticall.Contract(stakingAddress, StakingABI);
@@ -140,7 +141,11 @@ module.exports = {
           }
 
           const gasFee = await automate.estimateGas.run(0, deadline, [token0Min, token1Min]);
-          return (await automate.run(gasFee, deadline, [token0Min, token1Min])).wait();
+
+          return [gasFee.toFixed(0), deadline, [token0Min, token1Min]];
+        },
+        async run() {
+          return (await automate.run.apply(automate, await this.runParams())).wait();
         },
       };
     },
