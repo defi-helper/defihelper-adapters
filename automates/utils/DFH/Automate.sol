@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 pragma solidity ^0.8.6;
 
+import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./proxy/ERC1167.sol";
 import "./IStorage.sol";
@@ -19,11 +20,17 @@ abstract contract Automate {
   /// @notice Is contract paused.
   bool internal _paused;
 
+  /// @notice Protocol fee in USD (-1 if value in global storage).
+  int256 internal _protocolFee;
+
   event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+
+  event ProtocolFeeChanged(int256 protocolFee);
 
   constructor(address __info) {
     _info = __info;
     _owner = tx.origin;
+    _protocolFee = -1;
   }
 
   /**
@@ -40,6 +47,7 @@ abstract contract Automate {
   modifier initializer() {
     if (_owner == address(0)) {
       _owner = tx.origin;
+      _protocolFee = -1;
     } else {
       require(_owner == msg.sender, "Automate: caller is not the owner");
     }
@@ -127,6 +135,40 @@ abstract contract Automate {
   }
 
   /**
+   * @return Current protocol fee.
+   */
+  function protocolFee() public view returns (uint256) {
+    address impl = address(this).implementation();
+    if (impl != address(this) && _protocolFee < 0) {
+      return Automate(impl).protocolFee();
+    }
+
+    IStorage __info = IStorage(info());
+    uint256 feeOnUSD = _protocolFee < 0 ? __info.getUint(keccak256("DFH:Fee:Automate")) : uint256(_protocolFee);
+    if (feeOnUSD == 0) return 0;
+
+    (, int256 price, , , ) = AggregatorV3Interface(__info.getAddress(keccak256("DFH:Fee:PriceFeed"))).latestRoundData();
+    require(price > 0, "Automate: invalid price");
+
+    return (feeOnUSD * 1e18) / uint256(price);
+  }
+
+  /**
+   * @notice Change protocol fee.
+   * @param __protocolFee New protocol fee.
+   */
+  function changeProtocolFee(int256 __protocolFee) external {
+    address impl = address(this).implementation();
+    require(
+      (impl == address(this) ? _owner : Automate(impl).owner()) == msg.sender,
+      "Automate::changeProtocolFee: caller is not the protocol owner"
+    );
+
+    _protocolFee = __protocolFee;
+    emit ProtocolFeeChanged(__protocolFee);
+  }
+
+  /**
    * @dev Claim fees from owner.
    * @param gasFee Claim gas fee.
    * @param operation Claim description.
@@ -140,8 +182,7 @@ abstract contract Automate {
     address balance = __info.getAddress(keccak256("DFH:Contract:Balance"));
     require(balance != address(0), "Automate::_bill: balance contract not found");
 
-    uint256 protocolFee = __info.getUint(keccak256("DFH:Fee:Automate"));
-    return IBalance(balance).claim(account, gasFee, protocolFee, operation);
+    return IBalance(balance).claim(account, gasFee, protocolFee(), operation);
   }
 
   /**

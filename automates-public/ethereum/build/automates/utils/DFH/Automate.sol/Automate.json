@@ -23,6 +23,32 @@
       "type": "event"
     },
     {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "int256",
+          "name": "protocolFee",
+          "type": "int256"
+        }
+      ],
+      "name": "ProtocolFeeChanged",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "int256",
+          "name": "__protocolFee",
+          "type": "int256"
+        }
+      ],
+      "name": "changeProtocolFee",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
       "inputs": [],
       "name": "info",
       "outputs": [
@@ -63,6 +89,19 @@
           "internalType": "bool",
           "name": "",
           "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "protocolFee",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
         }
       ],
       "stateMutability": "view",

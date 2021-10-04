@@ -12,6 +12,12 @@ describe('Automate.bill', function () {
   before(async function () {
     [owner, notOwner] = await ethers.getSigners();
 
+    const priceFeedArtifact = await artifacts.readArtifact(
+      '@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol:AggregatorV3Interface'
+    );
+    const priceFeed = await deployMockContract(owner, priceFeedArtifact.abi);
+    await priceFeed.mock.latestRoundData.returns(0, protocolFee, 0, 0, 0);
+
     const balanceArtifact = await artifacts.readArtifact('automates/utils/DFH/IBalance.sol:IBalance');
     const balance = await deployMockContract(owner, balanceArtifact.abi);
     await balance.mock.claim.returns(0);
@@ -19,8 +25,8 @@ describe('Automate.bill', function () {
     const storageArtifact = await artifacts.readArtifact('automates/utils/DFH/IStorage.sol:IStorage');
     const storage = await deployMockContract(owner, storageArtifact.abi);
     await storage.mock.getAddress.withArgs(storageKey('DFH:Contract:Balance')).returns(balance.address);
-    await storage.mock.getUint.withArgs(storageKey('DFH:Fee:Automate')).returns(protocolFee);
     await storage.mock.getAddress.withArgs(storageKey('DFH:Pauser')).returns(owner.address);
+    await storage.mock.getAddress.withArgs(storageKey('DFH:Fee:PriceFeed')).returns(priceFeed.address);
 
     const ERC1167 = await ethers.getContractFactory('automates/utils/DFH/proxy/ERC1167.sol:ERC1167');
     erc1167 = await ERC1167.deploy();
@@ -51,6 +57,7 @@ describe('Automate.bill', function () {
     ).wait();
     const proxyCreatedEvent = proxyTx.events.find(({ event }) => event === 'ProxyCreated');
     proxy = new ethers.Contract(proxyCreatedEvent.args.proxy, AutomateABI, owner);
+    await proxy.connect(owner).changeProtocolFee(protocolFee);
   });
 
   it('bill: should make bill', async function () {
