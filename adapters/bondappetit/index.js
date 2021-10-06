@@ -138,9 +138,11 @@ module.exports = {
           token1Min = new bn(amountOut.toString()).multipliedBy(slippage).toFixed(0);
         }
 
-        const gasFee = await automate.estimateGas.run(0, deadline, [token0Min, token1Min]);
+        const gasLimit = await automate.estimateGas.run(0, deadline, [token0Min, token1Min]);
+        const gasPrice = await signer.getGasPrice();
+        const gasFee = new bn(gasLimit.toString()).multipliedBy(gasPrice.toString()).toFixed(0);
 
-        return [gasFee.toString(), deadline, [token0Min, token1Min]];
+        return [gasFee, deadline, [token0Min, token1Min]];
       };
       const run = async () => {
         return automate.run.apply(automate, await runParams());
