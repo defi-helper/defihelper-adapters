@@ -143,7 +143,7 @@ module.exports = {
         return [gasFee.toString(), deadline, [token0Min, token1Min]];
       };
       const run = async () => {
-        return (await automate.run.apply(automate, await runParams())).wait();
+        return automate.run.apply(automate, await runParams());
       };
 
       return {
