@@ -140,7 +140,7 @@ module.exports = {
 
         const gasFee = await automate.estimateGas.run(0, deadline, [token0Min, token1Min]);
 
-        return [gasFee.toFixed(0), deadline, [token0Min, token1Min]];
+        return [gasFee.toString(), deadline, [token0Min, token1Min]];
       };
       const run = async () => {
         return (await automate.run.apply(automate, await runParams())).wait();
