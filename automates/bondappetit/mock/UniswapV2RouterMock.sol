@@ -16,16 +16,16 @@ contract UniswapV2RouterMock {
     _amountsOut[keccak256(abi.encodePacked(path))] = amountsOut;
   }
 
-  function getAmountsOut(uint256 amountIn, address[] calldata path) external view returns (uint256[] memory amounts) {
+  function getAmountsOut(uint256, address[] calldata path) external view returns (uint256[] memory amounts) {
     amounts = _amountsOut[keccak256(abi.encodePacked(path))];
   }
 
   function swapExactTokensForTokens(
-    uint256 amountIn,
-    uint256 amountOutMin,
+    uint256,
+    uint256,
     address[] calldata path,
-    address to,
-    uint256 deadline
+    address,
+    uint256
   ) external returns (uint256[] memory amounts) {
     amounts = _amountsOut[keccak256(abi.encodePacked(path))];
     IERC20(path[path.length - 1]).transfer(msg.sender, amounts[amounts.length - 1]);
@@ -36,10 +36,10 @@ contract UniswapV2RouterMock {
     address tokenB,
     uint256 amountADesired,
     uint256 amountBDesired,
-    uint256 amountAMin,
-    uint256 amountBMin,
-    address to,
-    uint256 deadline
+    uint256,
+    uint256,
+    address,
+    uint256
   )
     external
     returns (

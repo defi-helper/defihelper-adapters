@@ -31,9 +31,9 @@ const coingecko = {
     let priceUSD = '0';
     if (isCurrent) {
       const currentPrice = await coingecko.simple.tokenPrice(platform, tokenAddress, 'usd');
-      if (currentPrice[tokenAddress].usd === undefined) return priceUSD;
+      if (currentPrice[tokenAddress.toLowerCase()].usd === undefined) return priceUSD;
 
-      priceUSD = currentPrice[tokenAddress].usd;
+      priceUSD = currentPrice[tokenAddress.toLowerCase()].usd;
     } else {
       const coingeckoContractInfo = await coingecko.coins.contract(platform, tokenAddress);
       const historyPrice = await coingecko.coins.history(coingeckoContractInfo.id, dayjs.unix(block.timestamp));
