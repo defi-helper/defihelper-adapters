@@ -48,7 +48,7 @@
   "dependencies": {
     "@chainlink/contracts": "^0.2.2",
     "@defihelper/ethers-multicall": "^0.3.0",
-    "@defihelper/networks": "^0.0.15",
+    "@defihelper/networks": "^0.0.16",
     "@openzeppelin/contracts": "^4.2.0",
     "axios": "^0.21.1",
     "bignumber.js": "^8.1.1",
