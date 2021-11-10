@@ -1,7 +1,7 @@
 const { strictEqual } = require('assert');
 const assertions = require('truffle-assertions');
 const { ethers } = require('hardhat');
-const { fixtures } = require('./fixtures');
+const DFHFixtures = require('../../../test/dfh.fixtures');
 const BN = require('bignumber.js');
 
 describe('SynthetixUniswapLpRestake.deposit', function () {
@@ -9,7 +9,7 @@ describe('SynthetixUniswapLpRestake.deposit', function () {
   const amount = 1000;
   before(async function () {
     [, other] = await ethers.getSigners();
-    let { erc1167, storage } = await fixtures();
+    let { erc1167, storage } = await DFHFixtures.fixtures();
 
     const ERC20Mock = await ethers.getContractFactory('automates/utils/ERC20Mock.sol:ERC20Mock');
     stakingToken = await ERC20Mock.deploy('Staking token', 'S', amount);

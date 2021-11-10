@@ -93,8 +93,7 @@
     "outputs": [{ "type": "int128", "name": "" }],
     "inputs": [{ "type": "address", "name": "_addr" }],
     "stateMutability": "view",
-    "type": "function",
-    "gas": 1625
+    "type": "function"
   },
   {
     "name": "add_gauge",
@@ -222,96 +221,84 @@
     "outputs": [{ "type": "uint256", "name": "" }],
     "inputs": [{ "type": "address", "name": "addr" }],
     "stateMutability": "view",
-    "type": "function",
-    "gas": 2974
+    "type": "function"
   },
   {
     "name": "get_type_weight",
     "outputs": [{ "type": "uint256", "name": "" }],
     "inputs": [{ "type": "int128", "name": "type_id" }],
     "stateMutability": "view",
-    "type": "function",
-    "gas": 2977
+    "type": "function"
   },
   {
     "name": "get_total_weight",
     "outputs": [{ "type": "uint256", "name": "" }],
     "inputs": [],
     "stateMutability": "view",
-    "type": "function",
-    "gas": 2693
+    "type": "function"
   },
   {
     "name": "get_weights_sum_per_type",
     "outputs": [{ "type": "uint256", "name": "" }],
     "inputs": [{ "type": "int128", "name": "type_id" }],
     "stateMutability": "view",
-    "type": "function",
-    "gas": 3109
+    "type": "function"
   },
   {
     "name": "admin",
     "outputs": [{ "type": "address", "name": "" }],
     "inputs": [],
     "stateMutability": "view",
-    "type": "function",
-    "gas": 1841
+    "type": "function"
   },
   {
     "name": "future_admin",
     "outputs": [{ "type": "address", "name": "" }],
     "inputs": [],
     "stateMutability": "view",
-    "type": "function",
-    "gas": 1871
+    "type": "function"
   },
   {
     "name": "token",
     "outputs": [{ "type": "address", "name": "" }],
     "inputs": [],
     "stateMutability": "view",
-    "type": "function",
-    "gas": 1901
+    "type": "function"
   },
   {
     "name": "voting_escrow",
     "outputs": [{ "type": "address", "name": "" }],
     "inputs": [],
     "stateMutability": "view",
-    "type": "function",
-    "gas": 1931
+    "type": "function"
   },
   {
     "name": "n_gauge_types",
     "outputs": [{ "type": "int128", "name": "" }],
     "inputs": [],
     "stateMutability": "view",
-    "type": "function",
-    "gas": 1961
+    "type": "function"
   },
   {
     "name": "n_gauges",
     "outputs": [{ "type": "int128", "name": "" }],
     "inputs": [],
     "stateMutability": "view",
-    "type": "function",
-    "gas": 1991
+    "type": "function"
   },
   {
     "name": "gauge_type_names",
     "outputs": [{ "type": "string", "name": "" }],
     "inputs": [{ "type": "int128", "name": "arg0" }],
     "stateMutability": "view",
-    "type": "function",
-    "gas": 8628
+    "type": "function"
   },
   {
     "name": "gauges",
     "outputs": [{ "type": "address", "name": "" }],
     "inputs": [{ "type": "uint256", "name": "arg0" }],
     "stateMutability": "view",
-    "type": "function",
-    "gas": 2160
+    "type": "function"
   },
   {
     "name": "vote_user_slopes",
@@ -325,16 +312,14 @@
       { "type": "address", "name": "arg1" }
     ],
     "stateMutability": "view",
-    "type": "function",
-    "gas": 5020
+    "type": "function"
   },
   {
     "name": "vote_user_power",
     "outputs": [{ "type": "uint256", "name": "" }],
     "inputs": [{ "type": "address", "name": "arg0" }],
     "stateMutability": "view",
-    "type": "function",
-    "gas": 2265
+    "type": "function"
   },
   {
     "name": "last_user_vote",
@@ -344,8 +329,7 @@
       { "type": "address", "name": "arg1" }
     ],
     "stateMutability": "view",
-    "type": "function",
-    "gas": 2449
+    "type": "function"
   },
   {
     "name": "points_weight",
@@ -358,16 +342,14 @@
       { "type": "uint256", "name": "arg1" }
     ],
     "stateMutability": "view",
-    "type": "function",
-    "gas": 3859
+    "type": "function"
   },
   {
     "name": "time_weight",
     "outputs": [{ "type": "uint256", "name": "" }],
     "inputs": [{ "type": "address", "name": "arg0" }],
     "stateMutability": "view",
-    "type": "function",
-    "gas": 2355
+    "type": "function"
   },
   {
     "name": "points_sum",
@@ -380,32 +362,28 @@
       { "type": "uint256", "name": "arg1" }
     ],
     "stateMutability": "view",
-    "type": "function",
-    "gas": 3970
+    "type": "function"
   },
   {
     "name": "time_sum",
     "outputs": [{ "type": "uint256", "name": "" }],
     "inputs": [{ "type": "uint256", "name": "arg0" }],
     "stateMutability": "view",
-    "type": "function",
-    "gas": 2370
+    "type": "function"
   },
   {
     "name": "points_total",
     "outputs": [{ "type": "uint256", "name": "" }],
     "inputs": [{ "type": "uint256", "name": "arg0" }],
     "stateMutability": "view",
-    "type": "function",
-    "gas": 2406
+    "type": "function"
   },
   {
     "name": "time_total",
     "outputs": [{ "type": "uint256", "name": "" }],
     "inputs": [],
     "stateMutability": "view",
-    "type": "function",
-    "gas": 2321
+    "type": "function"
   },
   {
     "name": "points_type_weight",
@@ -415,15 +393,13 @@
       { "type": "uint256", "name": "arg1" }
     ],
     "stateMutability": "view",
-    "type": "function",
-    "gas": 2671
+    "type": "function"
   },
   {
     "name": "time_type_weight",
     "outputs": [{ "type": "uint256", "name": "" }],
     "inputs": [{ "type": "uint256", "name": "arg0" }],
     "stateMutability": "view",
-    "type": "function",
-    "gas": 2490
+    "type": "function"
   }
 ]

@@ -1,10 +1,12 @@
 const { bn, ethers, ethersMulticall } = require('../lib');
 const { ethereum } = require('../utils/ethereum');
 const { coingecko } = require('../utils/coingecko');
+const registryABI = require('./abi/registryABI.json');
 const gaugeABI = require('./abi/gaugeABI.json');
 const poolABI = require('./abi/poolABI.json');
 const minterABI = require('./abi/minterABI.json');
 const gaugeControllerABI = require('./abi/gaugeControllerABI.json');
+const gaugeUniswapRestakeABI = require('./abi/gaugeUniswapRestakeABI.json');
 const { tokens } = require('../utils');
 
 class Pool {
@@ -35,54 +37,72 @@ class Pool {
   }
 }
 
-const pools = [
-  {
-    name: '3pool',
-    address: '0xbEbc44782C7dB0a1A60Cb6fe97d0b483032FF1C7',
-    lpToken: '0x6c3F90f043a72FA612cbac8115EE7e52BDe6E490',
-    gauge: '0xbFcF63294aD7105dEa65aA58F8AE5BE2D9d0952A',
-    coins: [
-      {
-        address: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
-        decimals: 18,
-      },
-      {
-        address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
-        decimals: 6,
-      },
-      {
-        address: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
-        decimals: 6,
-      },
-    ],
-  },
-  {
-    name: 'tusd',
-    address: '0xEcd5e75AFb02eFa118AF914515D6521aaBd189F1',
-    lpToken: '0xEcd5e75AFb02eFa118AF914515D6521aaBd189F1',
-    gauge: '0x359FD5d6417aE3D8D6497d9B2e7A890798262BA4',
-    coins: [
-      {
-        address: '0x0000000000085d4780B73119b644AE5ecd22b376',
-        decimals: 18,
-      },
-      {
-        address: '0x6c3F90f043a72FA612cbac8115EE7e52BDe6E490',
-        decimals: 18,
-      },
-    ],
-  },
-];
+class PoolRegistry {
+  constructor(connect) {
+    this.connect = connect;
+    this.registry = new ethersMulticall.Contract('0x90E00ACe148ca3b23Ac1bC8C240C2a7Dd9c2d7f5', registryABI);
+  }
 
-async function getUnderlyingBalance(getPriceUSD, pool, amount) {
+  async getInfoForPool(poolAddress) {
+    const { multicall, blockTag } = this.connect;
+    let [coinsAddresses, lpToken] = await multicall.all(
+      [this.registry.get_coins(poolAddress), this.registry.get_lp_token(poolAddress)],
+      { blockTag }
+    );
+    coinsAddresses = coinsAddresses.filter((address) => address !== '0x0000000000000000000000000000000000000000');
+    if (lpToken === '0x0000000000000000000000000000000000000000') {
+      throw new Error(`LP token for pool with address "${poolAddress}" not found`);
+    }
+    let [[gauges]] = await multicall.all([this.registry.get_gauges(poolAddress)], { blockTag });
+    gauges = gauges.filter((address) => address !== '0x0000000000000000000000000000000000000000');
+    const gauge = gauges[gauges.length - 1];
+    if (!gauge || gauge === '0x0000000000000000000000000000000000000000') {
+      throw new Error(`Gauge for pool with address "${poolAddress}" not found`);
+    }
+    const coinsDecimals = await multicall.all(
+      coinsAddresses.map((address) => new ethersMulticall.Contract(address, ethereum.abi.ERC20ABI).decimals())
+    );
+
+    return {
+      address: poolAddress,
+      lpToken,
+      gauge,
+      coins: coinsAddresses.map((address, i) => ({ address, decimals: coinsDecimals[i].toString() })),
+    };
+  }
+
+  async findByLp(lpToken) {
+    const { multicall, blockTag } = this.connect;
+    const [poolAddress] = await multicall.all([this.registry.get_pool_from_lp_token(lpToken)], { blockTag });
+    if (poolAddress === '0x0000000000000000000000000000000000000000') {
+      return poolAddress;
+    }
+
+    return this.getInfoForPool(poolAddress);
+  }
+
+  async findByGauge(gaugeAddress) {
+    const { multicall, blockTag } = this.connect;
+    const [lpToken] = await multicall.all([new ethersMulticall.Contract(gaugeAddress, gaugeABI).lp_token()], {
+      blockTag,
+    });
+
+    return this.findByLp(lpToken);
+  }
+}
+
+async function getUnderlyingBalance(pools, getPriceUSD, pool, amount) {
   const balances = await pool.underlyingBalance(amount);
 
   return pool.info.coins.reduce(async (resultPromise, { address, decimals }, i) => {
     const result = await resultPromise;
 
-    const subpoolInfo = pools.find(({ lpToken }) => lpToken === address);
-    if (subpoolInfo) {
-      return [...result, await getUnderlyingBalance(getPriceUSD, new Pool(pool.connect, subpoolInfo), balances[i])];
+    const subpoolInfo = await pools.findByLp(address);
+    if (subpoolInfo !== '0x0000000000000000000000000000000000000000') {
+      return [
+        ...result,
+        await getUnderlyingBalance(pools, getPriceUSD, new Pool(pool.connect, subpoolInfo), balances[i]),
+      ];
     }
     const balance = new bn(balances[i]).div(Number(`1e${decimals}`)).toString(10);
     const priceUSD = await getPriceUSD(address);
@@ -126,9 +146,9 @@ module.exports = {
     const crvToken = '0xD533a949740bb3306d119CC777fa900bA034cd52';
     const crvPriceUSD = await getPriceUSD(crvToken);
     const minter = new ethersMulticall.Contract('0xd061D61a4d941c39E5453435B6345Dc261C2fcE0', minterABI);
+    const pools = new PoolRegistry({ multicall, blockTag });
 
-    const poolInfo = pools.find(({ gauge }) => gauge === contractAddress);
-    if (!poolInfo) throw new Error(`Undefined gauge "${contractAddress}"`);
+    const poolInfo = await pools.findByGauge(contractAddress);
     const pool = new Pool({ multicall, blockTag }, poolInfo);
     const [stakedTotalSupply, inflationRate, workingSupply, virtualPrice, relativeWeight] = await multicall.all([
       pool.gauge.totalSupply(),
@@ -138,7 +158,7 @@ module.exports = {
       gaugeController.gauge_relative_weight(pool.gauge.address),
     ]);
 
-    const totalSupplyTokens = await getUnderlyingBalance(getPriceUSD, pool, stakedTotalSupply.toString());
+    const totalSupplyTokens = await getUnderlyingBalance(pools, getPriceUSD, pool, stakedTotalSupply.toString());
     const tvl = totalSupplyTokens.flat(Infinity).reduce((sum, { balanceUSD }) => sum.plus(balanceUSD), new bn(0));
 
     const aprDay = new bn(e18(inflationRate))
@@ -162,7 +182,7 @@ module.exports = {
           pool.gauge.balanceOf(walletAddress),
           minter.minted(walletAddress, pool.info.gauge),
         ]);
-        const stakedTokens = (await getUnderlyingBalance(getPriceUSD, pool, staked.toString())).flat(Infinity);
+        const stakedTokens = (await getUnderlyingBalance(pools, getPriceUSD, pool, staked.toString())).flat(Infinity);
         const earnedNormalize = new bn(earned.toString()).div(1e18).toString(10);
         const earnedUSD = new bn(earnedNormalize).multipliedBy(crvPriceUSD).toString(10);
 
@@ -273,5 +293,80 @@ module.exports = {
         };
       },
     };
+  },
+  automates: {
+    GaugeUniswapRestake: async (signer, contractAddress) => {
+      const automate = new ethers.Contract(contractAddress, gaugeUniswapRestakeABI, signer);
+      const stakingAddress = await automate.staking();
+      const staking = new ethers.Contract(stakingAddress, gaugeABI, signer);
+      const stakingTokenAddress = await staking.lp_token();
+      const stakingToken = ethereum.erc20(signer, stakingTokenAddress);
+
+      const deposit = async () => {
+        const signerAddress = await signer.getAddress();
+        const signerBalance = await stakingToken.balanceOf(signerAddress);
+        if (signerBalance.toString() !== '0') {
+          await (await stakingToken.transfer(automate.address, signerBalance)).wait();
+        }
+        const automateBalance = await stakingToken.balanceOf(automate.address);
+        if (automateBalance.toString() !== '0') {
+          await (await automate.deposit()).wait();
+        }
+      };
+      const refund = async () => {
+        return automate.refund();
+      };
+      const migrate = async () => {
+        const signerAddress = await signer.getAddress();
+        await staking.withdraw(staking.balanceOf(signerAddress));
+        return deposit();
+      };
+      const runParams = async () => {
+        const multicall = new ethersMulticall.Provider(signer, await signer.getChainId());
+        const automateMulticall = new ethersMulticall.Contract(contractAddress, gaugeUniswapRestakeABI);
+        const stakingMulticall = new ethersMulticall.Contract(stakingAddress, gaugeABI);
+        const minterAddress = await staking.minter();
+        const minterMulticall = new ethersMulticall.Contract(minterAddress, minterABI);
+        const [infoAddress, slippagePercent, deadlineSeconds, swapTokenAddress, rewardTokenAddress, earned] =
+          await multicall.all([
+            automateMulticall.info(),
+            automateMulticall.slippage(),
+            automateMulticall.deadline(),
+            automateMulticall.swapToken(),
+            stakingMulticall.crv_token(),
+            minterMulticall.minted(contractAddress, stakingAddress),
+          ]);
+        if (earned.toString() === '0') return new Error('No earned');
+        const routerAddress = await ethereum.dfh
+          .storage(signer, infoAddress)
+          .getAddress(ethereum.dfh.storageKey('UniswapV2:Contract:Router2'));
+        const router = ethereum.uniswap.router(signer, routerAddress);
+
+        const slippage = 1 - slippagePercent / 10000;
+        const [, swapAmountOut] = await router.getAmountsOut(earned.toString(), [rewardTokenAddress, swapTokenAddress]);
+        const swapOutMin = new bn(swapAmountOut.toString()).multipliedBy(slippage).toFixed(0);
+        const lpAmountOut = await automate.calcTokenAmount(swapOutMin);
+        const lpOutMin = new bn(lpAmountOut.toString()).multipliedBy(slippage).toFixed(0);
+        const deadline = dayjs().add(deadlineSeconds, 'seconds').unix();
+
+        const gasLimit = await automate.estimateGas.run(0, deadline, swapOutMin, lpOutMin);
+        const gasPrice = await signer.getGasPrice();
+        const gasFee = new bn(gasLimit.toString()).multipliedBy(gasPrice.toString()).toFixed(0);
+
+        return [gasFee, deadline, swapOutMin, lpOutMin];
+      };
+      const run = async () => {
+        return automate.run.apply(automate, await runParams());
+      };
+
+      return {
+        contract: stakingAddress,
+        deposit,
+        refund,
+        migrate,
+        runParams,
+        run,
+      };
+    },
   },
 };

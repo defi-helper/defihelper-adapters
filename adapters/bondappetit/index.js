@@ -123,7 +123,6 @@ module.exports = {
           .getAddress(ethereum.dfh.storageKey('UniswapV2:Contract:Router2'));
         const router = ethereum.uniswap.router(signer, routerAddress);
 
-        const deadline = dayjs().add(deadlineSeconds, 'seconds').unix();
         const slippage = 1 - slippagePercent / 10000;
         const token0AmountIn = new bn(earned.toString()).div(2).toFixed(0);
         let token0Min = new bn(token0AmountIn).multipliedBy(slippage).toFixed(0);
@@ -137,6 +136,7 @@ module.exports = {
           const [, amountOut] = await router.getAmountsOut(token1AmountIn, [rewardTokenAddress, token1Address]);
           token1Min = new bn(amountOut.toString()).multipliedBy(slippage).toFixed(0);
         }
+        const deadline = dayjs().add(deadlineSeconds, 'seconds').unix();
 
         const gasLimit = await automate.estimateGas.run(0, deadline, [token0Min, token1Min]);
         const gasPrice = await signer.getGasPrice();

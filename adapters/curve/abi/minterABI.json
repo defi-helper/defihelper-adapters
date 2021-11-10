@@ -58,16 +58,14 @@
     "outputs": [{ "type": "address", "name": "" }],
     "inputs": [],
     "stateMutability": "view",
-    "type": "function",
-    "gas": 1301
+    "type": "function"
   },
   {
     "name": "controller",
     "outputs": [{ "type": "address", "name": "" }],
     "inputs": [],
     "stateMutability": "view",
-    "type": "function",
-    "gas": 1331
+    "type": "function"
   },
   {
     "name": "minted",
@@ -77,8 +75,7 @@
       { "type": "address", "name": "arg1" }
     ],
     "stateMutability": "view",
-    "type": "function",
-    "gas": 1669
+    "type": "function"
   },
   {
     "name": "allowed_to_mint_for",
@@ -88,7 +85,6 @@
       { "type": "address", "name": "arg1" }
     ],
     "stateMutability": "view",
-    "type": "function",
-    "gas": 1699
+    "type": "function"
   }
 ]

@@ -1,7 +1,7 @@
 const { strictEqual } = require('assert');
 const dayjs = require('dayjs');
 const { ethers } = require('hardhat');
-const { storageKey, fixtures } = require('./fixtures');
+const DFHFixtures = require('../../../test/dfh.fixtures');
 
 describe('SynthetixUniswapLpRestake.run', function () {
   let automate, token0, token1, rewardToken, staking;
@@ -14,7 +14,7 @@ describe('SynthetixUniswapLpRestake.run', function () {
   const stakingTokenAmount = token0Amount + token1Amount - liquidityAmount;
   before(async function () {
     [owner] = await ethers.getSigners();
-    let { erc1167, storage, balance } = await fixtures();
+    let { erc1167, storage, balance } = await DFHFixtures.fixtures();
 
     await balance.mock.claim.returns(1);
 
@@ -36,7 +36,9 @@ describe('SynthetixUniswapLpRestake.run', function () {
     );
     uniRouter = await UniRouter.deploy(stakingToken.address);
     await uniRouter.deployed();
-    await storage.mock.getAddress.withArgs(storageKey('UniswapV2:Contract:Router2')).returns(uniRouter.address);
+    await storage.mock.getAddress
+      .withArgs(DFHFixtures.storageKey('UniswapV2:Contract:Router2'))
+      .returns(uniRouter.address);
     await uniRouter.setAmountsOut([rewardToken.address, token0.address], [100, token0Price]);
     await uniRouter.setAmountsOut([rewardToken.address, token1.address], [100, token1Price]);
     await token0.transfer(uniRouter.address, token0Price);
