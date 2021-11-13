@@ -95,7 +95,7 @@ contract MasterChefJoeLpRestake is Automate {
     uint256 gasFee,
     uint256 _deadline,
     uint256[2] memory _outMin
-  ) external bill(gasFee, "AvaxMasterChefJoeLPRestake") {
+  ) external bill(gasFee, "AvaxSmartcoinMasterChefJoeLPRestake") {
     IMasterChefJoeV2 _staking = staking; // gas optimization
     IMasterChefJoeV2.UserInfo memory userInfo = staking.userInfo(pool, address(this));
     require(userInfo.rewardDebt > 0, "MasterChefJoeLpRestake::run: no earned");
