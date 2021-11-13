@@ -6,6 +6,7 @@ const ethereumNetworkCoingeckoPlatformsMap = {
   128: 'huobi-token',
   137: 'polygon-pos',
   250: 'fantom',
+  43114: 'avalanche',
 };
 
 const coingecko = {

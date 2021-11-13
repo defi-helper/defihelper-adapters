@@ -38,7 +38,7 @@ module.exports = {
 
       let masterChefPools = masterChefSavedPools;
       if (!masterChefSavedPools || masterChefSavedPools.length === 0) {
-        const totalPools = await contract.poolLength();
+        const totalPools = await masterChiefContract.poolLength();
         masterChefPools = (
           await Promise.all(new Array(totalPools.toNumber()).fill(1).map((_, i) => masterChiefContract.poolInfo(i)))
         ).map((p, i) => ({
@@ -73,7 +73,9 @@ module.exports = {
       ]);
 
       const [rewardTokenPerBlock, totalAllocPoint] = await Promise.all([
-        await masterChiefContract[`${rewardTokenFunctionName}PerBlock`](),
+        await (masterChiefContract[`${rewardTokenFunctionName}PerBlock`]
+          ? masterChiefContract[`${rewardTokenFunctionName}PerBlock`]
+          : masterChiefContract[`${rewardTokenFunctionName}PerSec`])(),
         await masterChiefContract.totalAllocPoint(),
       ]);
 

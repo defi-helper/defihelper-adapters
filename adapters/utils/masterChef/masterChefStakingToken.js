@@ -128,7 +128,7 @@ class ErcStakingToken extends StakingToken {
         coingecko.platformByEthereumNetwork(this.network),
         this.blockTag === 'latest',
         this.block,
-        this.stakingToken
+        this.token
       )
     );
 
