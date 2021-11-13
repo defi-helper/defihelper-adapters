@@ -57,6 +57,34 @@ module.exports = {
       blockGasLimit: 6_000_000,
       accounts: [...maybeAccount(process.env.ETH_ROPSTEN_DEPLOYER)],
     },
+    bsc: {
+      url: process.env.BSC_NODE || 'http://127.0.0.1:8545',
+      chainId: 56,
+      gasPrice: 7_000_000_000,
+      blockGasLimit: 6_000_000,
+      accounts: [...maybeAccount(process.env.BSC_DEPLOYER)],
+    },
+    bscTest: {
+      url: process.env.BSC_TEST_NODE || 'http://127.0.0.1:8545',
+      chainId: 97,
+      gasPrice: 10_000_000_000,
+      blockGasLimit: 6_000_000,
+      accounts: [...maybeAccount(process.env.BSC_TEST_DEPLOYER)],
+    },
+    avalanche: {
+      url: process.env.AVALANCHE_NODE || 'http://127.0.0.1:8545',
+      chainId: 43114,
+      gasPrice: 25_000_000_000,
+      blockGasLimit: 8_000_000,
+      accounts: [...maybeAccount(process.env.AVALANCHE_DEPLOYER)],
+    },
+    avalancheTest: {
+      url: process.env.AVALANCHE_TEST_NODE || 'http://127.0.0.1:8545',
+      chainId: 43113,
+      gasPrice: 25_000_000_000,
+      blockGasLimit: 8_000_000,
+      accounts: [...maybeAccount(process.env.AVALANCHE_TEST_DEPLOYER)],
+    },
   },
   namedAccounts: {
     deployer: {
@@ -64,6 +92,9 @@ module.exports = {
       1: 0,
       3: 0,
       56: 0,
+      97: 0,
+      43113: 0,
+      43114: 0,
     },
   },
 };
