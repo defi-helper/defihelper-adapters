@@ -1,12 +1,12 @@
 const { migration } = require('../utils');
 
 module.exports = migration(async ({ utils: { dfhNetwork, read, execute } }) => {
-  const { Timelock } = dfhNetwork();
+  const { GovernorMultisig } = dfhNetwork();
 
-  if ((await read('avaxMasterChefJoeLpRestake', {}, 'owner')) === Timelock.address) {
+  if ((await read('avaxMasterChefJoeLpRestake', {}, 'owner')) === GovernorMultisig.address) {
     return;
   }
 
-  await execute('avaxMasterChefJoeLpRestake', {}, 'transferOwnership', Timelock.address);
+  await execute('avaxMasterChefJoeLpRestake', {}, 'transferOwnership', GovernorMultisig.address);
 });
 module.exports.tags = ['GovernanceOwner', 'Avax'];
