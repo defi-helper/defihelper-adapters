@@ -92,7 +92,7 @@ module.exports = {
         return automate.refund();
       };
       const migrate = async () => {
-        await staking.exit();
+        await (await staking.exit()).wait();
         return deposit();
       };
       const runParams = async () => {
