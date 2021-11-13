@@ -1,4 +1,5 @@
-const { masterChef } = require('../utils');
+const { ethers, bn, ethersMulticall, dayjs } = require('../lib');
+const { ethereum, masterChef } = require('../utils');
 const masterChefABI = require('./abi/masterChefABI.json');
 const masterChefPools = require('./abi/masterChefPools.json');
 const MasterChefJoeLpRestakeABI = require('./abi/MasterChefJoeLpRestakeABI.json');
