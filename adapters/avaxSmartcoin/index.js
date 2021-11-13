@@ -11,7 +11,7 @@ module.exports = {
     MasterChefJoeLpRestake: async (signer, contractAddress) => {
       const automate = new ethers.Contract(contractAddress, MasterChefJoeLpRestakeABI, signer);
       const stakingAddress = await automate.staking();
-      const staking = new ethers.Contract(stakingAddress, StakingABI, signer);
+      const staking = new ethers.Contract(stakingAddress, masterChefABI, signer);
       const stakingTokenAddress = await automate.stakingToken();
       const stakingToken = ethereum.erc20(signer, stakingTokenAddress);
       const poolId = await automate.pool().then((v) => v.toString());
