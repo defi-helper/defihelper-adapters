@@ -34,7 +34,7 @@ module.exports = {
       const migrate = async () => {
         const signerAddress = await signer.getAddress();
         const userInfo = await staking.userInfo(poolId, signerAddress);
-        await staking.withdraw(poolId, userInfo.amount.toString());
+        await (await staking.withdraw(poolId, userInfo.amount.toString())).wait();
         return deposit();
       };
       const runParams = async () => {
