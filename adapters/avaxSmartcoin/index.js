@@ -289,7 +289,7 @@ module.exports = {
           stakingTokenMulticall.token0(),
           stakingTokenMulticall.token1(),
           automateMulticall.rewardToken(),
-          stakingMulticall.userInfo(contractAddress),
+          stakingMulticall.userInfo(poolId, contractAddress),
           stakingMulticall.poolInfo(poolId),
         ]);
         const earned = new bn(amount.toString())
