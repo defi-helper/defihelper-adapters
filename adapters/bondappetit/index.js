@@ -138,14 +138,25 @@ module.exports = {
         }
         const deadline = dayjs().add(deadlineSeconds, 'seconds').unix();
 
-        const gasLimit = await automate.estimateGas.run(0, deadline, [token0Min, token1Min]);
-        const gasPrice = await signer.getGasPrice();
-        const gasFee = new bn(gasLimit.toString()).multipliedBy(gasPrice.toString()).toFixed(0);
+        const gasLimit = await automate.estimateGas.run(0, deadline, [token0Min, token1Min]).then((v) => v.toString());
+        const gasPrice = await signer.getGasPrice().then((v) => v.toString());
+        const gasFee = new bn(gasLimit).multipliedBy(gasPrice).toFixed(0);
 
-        return [gasFee, deadline, [token0Min, token1Min]];
+        return {
+          gasPrice,
+          gasLimit,
+          calldata: [gasFee, deadline, [token0Min, token1Min]],
+        };
       };
       const run = async () => {
-        return automate.run.apply(automate, await runParams());
+        const { gasPrice, gasLimit, calldata } = await runParams();
+        return automate.run.apply(automate, [
+          ...calldata,
+          {
+            gasPrice,
+            gasLimit,
+          },
+        ]);
       };
 
       return {
