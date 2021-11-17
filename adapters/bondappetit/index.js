@@ -96,7 +96,9 @@ module.exports = {
         return deposit();
       };
       const runParams = async () => {
-        const multicall = new ethersMulticall.Provider(signer, await signer.getChainId());
+        const provider = signer.provider || signer;
+        const chainId = await provider.getNetwork().then(({ chainId }) => chainId);
+        const multicall = new ethersMulticall.Provider(signer, chainId);
         const automateMulticall = new ethersMulticall.Contract(contractAddress, SynthetixUniswapLpRestakeABI);
         const stakingMulticall = new ethersMulticall.Contract(stakingAddress, StakingABI);
         const stakingTokenMulticall = new ethersMulticall.Contract(stakingTokenAddress, ethereum.uniswap.pairABI);
