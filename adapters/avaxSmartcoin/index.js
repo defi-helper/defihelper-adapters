@@ -339,7 +339,7 @@ module.exports = {
       };
 
       return {
-        contract: stakingAddress,
+        contract: stakingTokenAddress,
         deposit,
         refund,
         migrate,
