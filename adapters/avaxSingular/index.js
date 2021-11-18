@@ -97,8 +97,25 @@ module.exports = {
         rewardPerDay: rewardPerBlock.multipliedBy(blocksPerDay).toString(),
       },
       wallet: async (walletAddress) => {
-        const { amount, rewardDebt } = await masterChiefContract.userInfo(poolIndex, walletAddress);
-        const { accSingPerShare } = await masterChiefContract.poolInfo(poolIndex);
+        if (options.signer === null) {
+          throw new Error('Signer not found, use options.signer for use wallet');
+        }
+        const { signer } = options;
+
+        const provider = signer.provider || signer;
+        const chainId = (await provider.getNetwork()).chainId;
+
+        const multicall = new ethersMulticall.Provider(signer, chainId);
+        const masterchefMulticall = new ethersMulticall.Contract(masterChefAddress, masterChefABI);
+
+        const [
+          { amount, rewardDebt },
+          accSingPerShare
+        ] = await multicall.all([
+          masterchefMulticall.userInfo(poolIndex, walletAddress),
+          masterchefMulticall.poolInfo(poolIndex),
+        ]);
+
         const balance = toFloat(amount, ethereum.uniswap.pairDecimals);
         const earned = toFloat(
           new bn(amount.toString())
@@ -108,8 +125,8 @@ module.exports = {
             .toString(10),
           rewardsTokenDecimals
         );
-        const reviewedBalance = masterChiefStakingToken.reviewBalance(balance.toString(10));
 
+        const reviewedBalance = masterChiefStakingToken.reviewBalance(balance.toString(10));
         const earnedUSD = earned.multipliedBy(rewardTokenUSD);
 
         return {
