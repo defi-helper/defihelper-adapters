@@ -17,6 +17,7 @@ module.exports = {
     const block = await provider.getBlock(blockTag);
     const blockNumber = block.number;
     const avgBlockTime = await ethereum.getAvgBlockTime(provider, blockNumber);
+    const multicall = new ethersMulticall.Provider(provider, network);
     const rewardTokenFunctionName = 'sing';
 
     const masterChiefContract = new ethers.Contract(masterChefAddress, masterChefABI, provider);
@@ -97,20 +98,11 @@ module.exports = {
         rewardPerDay: rewardPerBlock.multipliedBy(blocksPerDay).toString(),
       },
       wallet: async (walletAddress) => {
-        if (options.signer === null) {
-          throw new Error('Signer not found, use options.signer for use wallet');
-        }
-        const { signer } = options;
-
-        const provider = signer.provider || signer;
-        const chainId = (await provider.getNetwork()).chainId;
-
-        const multicall = new ethersMulticall.Provider(signer, chainId);
         const masterchefMulticall = new ethersMulticall.Contract(masterChefAddress, masterChefABI);
 
         const [
           { amount, rewardDebt },
-          accSingPerShare
+          { accSingPerShare }
         ] = await multicall.all([
           masterchefMulticall.userInfo(poolIndex, walletAddress),
           masterchefMulticall.poolInfo(poolIndex),
