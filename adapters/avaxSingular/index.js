@@ -21,15 +21,12 @@ module.exports = {
 
     const masterChiefContract = new ethers.Contract(masterChefAddress, masterChefABI, provider);
 
-    let poolIndex = -1;
-    let foundPool = masterChefSavedPools.find((p) => p.stakingToken.toLowerCase() === contractAddress.toLowerCase());
-
+    const foundPool = masterChefSavedPools.find((p) => p.stakingToken.toLowerCase() === contractAddress.toLowerCase());
     if (foundPool === undefined) {
       throw new Error('Pool is not found');
-    } else {
-      poolIndex = foundPool.index
     }
 
+    const poolIndex = foundPool.index;
     const pool = await masterChiefContract.poolInfo(poolIndex);
     const stakingToken = contractAddress.toLowerCase();
     const rewardsToken = (await masterChiefContract[rewardTokenFunctionName]()).toLowerCase();
@@ -226,113 +223,5 @@ module.exports = {
       },
     };
   },
-  automates: {
-    MasterChefJoeLpRestake: async (signer, contractAddress) => {
-      const automate = new ethers.Contract(contractAddress, MasterChefJoeLpRestakeABI, signer);
-      const stakingAddress = await automate.staking();
-      const staking = new ethers.Contract(stakingAddress, masterChefABI, signer);
-      const stakingTokenAddress = await automate.stakingToken();
-      const stakingToken = ethereum.erc20(signer, stakingTokenAddress);
-      const poolId = await automate.pool().then((v) => v.toString());
-
-      const deposit = async () => {
-        const signerAddress = await signer.getAddress();
-        const signerBalance = await stakingToken.balanceOf(signerAddress);
-        if (signerBalance.toString() !== '0') {
-          await (await stakingToken.transfer(automate.address, signerBalance)).wait();
-        }
-        const automateBalance = await stakingToken.balanceOf(automate.address);
-        if (automateBalance.toString() !== '0') {
-          await (await automate.deposit()).wait();
-        }
-      };
-      const refund = async () => {
-        return automate.refund();
-      };
-      const migrate = async () => {
-        const signerAddress = await signer.getAddress();
-        const userInfo = await staking.userInfo(poolId, signerAddress);
-        await (await staking.withdraw(poolId, userInfo.amount.toString())).wait();
-        return deposit();
-      };
-      const runParams = async () => {
-        const multicall = new ethersMulticall.Provider(signer, await signer.getChainId());
-        const automateMulticall = new ethersMulticall.Contract(contractAddress, MasterChefJoeLpRestakeABI);
-        const stakingMulticall = new ethersMulticall.Contract(stakingAddress, masterChefABI);
-        const stakingTokenMulticall = new ethersMulticall.Contract(stakingTokenAddress, ethereum.uniswap.pairABI);
-        const [
-          infoAddress,
-          slippagePercent,
-          deadlineSeconds,
-          token0Address,
-          token1Address,
-          rewardTokenAddress,
-          { amount, rewardDebt },
-          { accSingPerShare },
-        ] = await multicall.all([
-          automateMulticall.info(),
-          automateMulticall.slippage(),
-          automateMulticall.deadline(),
-          stakingTokenMulticall.token0(),
-          stakingTokenMulticall.token1(),
-          automateMulticall.rewardToken(),
-          stakingMulticall.userInfo(poolId, contractAddress),
-          stakingMulticall.poolInfo(poolId),
-        ]);
-        const earned = new bn(amount.toString())
-          .multipliedBy(accSingPerShare.toString())
-          .div(new bn(10).pow(12))
-          .minus(rewardDebt.toString());
-        if (earned.toString(10) === '0') return new Error('No earned');
-        const routerAddress = await ethereum.dfh
-          .storage(signer, infoAddress)
-          .getAddress(ethereum.dfh.storageKey('Joe:Contract:Router2'));
-        const router = ethereum.uniswap.router(signer, routerAddress);
-
-        const slippage = 1 - slippagePercent / 10000;
-        const token0AmountIn = new bn(earned.toString(10)).div(2).toFixed(0);
-        let token0Min = new bn(token0AmountIn).multipliedBy(slippage).toFixed(0);
-        if (token0Address.toLowerCase() !== rewardTokenAddress.toLowerCase()) {
-          const [, amountOut] = await router.getAmountsOut(token0AmountIn, [rewardTokenAddress, token0Address]);
-          token0Min = new bn(amountOut.toString()).multipliedBy(slippage).toFixed(0);
-        }
-        const token1AmountIn = new bn(earned.toString(10)).minus(token0AmountIn).toFixed(0);
-        let token1Min = new bn(token1AmountIn).multipliedBy(slippage).toFixed(0);
-        if (token1Address.toLowerCase() !== rewardTokenAddress.toLowerCase()) {
-          const [, amountOut] = await router.getAmountsOut(token1AmountIn, [rewardTokenAddress, token1Address]);
-          token1Min = new bn(amountOut.toString()).multipliedBy(slippage).toFixed(0);
-        }
-        const deadline = dayjs().add(deadlineSeconds, 'seconds').unix();
-
-        const gasLimit = await automate.estimateGas.run(0, deadline, [token0Min, token1Min]).then((v) => v.toString());
-        const gasPrice = await signer.getGasPrice().then((v) => v.toString());
-        const gasFee = new bn(gasLimit).multipliedBy(gasPrice).toFixed(0);
-
-        return {
-          gasPrice,
-          gasLimit,
-          calldata: [gasFee, deadline, [token0Min, token1Min]],
-        };
-      };
-      const run = async () => {
-        const { gasPrice, gasLimit, calldata } = await runParams();
-        return automate.run.apply(automate, [
-          ...calldata,
-          {
-            gasPrice,
-            gasLimit,
-          },
-        ]);
-      };
-
-      return {
-        contract: stakingAddress,
-        deposit,
-        refund,
-        migrate,
-        runParams,
-        run,
-      };
-    },
-  },
+  automates: {},
 };
