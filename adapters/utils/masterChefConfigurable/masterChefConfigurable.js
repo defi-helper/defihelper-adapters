@@ -133,7 +133,6 @@ module.exports = {
           const balance = toFloat(amount, ethereum.uniswap.pairDecimals);
           const earned = toFloat(rewardDebt, rewardsTokenDecimals);
           const reviewedBalance = masterChiefStakingToken.reviewBalance(balance.toString(10));
-
           const earnedUSD = earned.multipliedBy(rewardTokenUSD);
 
           return {

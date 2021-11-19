@@ -137,7 +137,15 @@ class ErcStakingToken extends StakingToken {
     this.usd = tokenUSD;
   }
 
-  reviewBalance() {}
+  reviewBalance(balance) {
+    return [
+      {
+        token: this.token,
+        balance: new bn(balance).toString(10),
+        usd: new bn(balance).multipliedBy(this.usd).toString(10),
+      },
+    ];
+  }
 
   getUSD() {
     return this.usd;
