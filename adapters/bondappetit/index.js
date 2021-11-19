@@ -140,7 +140,11 @@ module.exports = {
         }
         const deadline = dayjs().add(deadlineSeconds, 'seconds').unix();
 
-        const gasLimit = await automate.estimateGas.run(0, deadline, [token0Min, token1Min]).then((v) => v.toString());
+        const gasLimit = new bn(
+          await automate.estimateGas.run(0, deadline, [token0Min, token1Min]).then((v) => v.toString())
+        )
+          .multipliedBy(1.1)
+          .toFixed(0);
         const gasPrice = await signer.getGasPrice().then((v) => v.toString());
         const gasFee = new bn(gasLimit).multipliedBy(gasPrice).toFixed(0);
 
