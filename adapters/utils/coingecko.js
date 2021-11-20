@@ -32,7 +32,10 @@ const coingecko = {
     let priceUSD = '0';
     if (isCurrent) {
       const currentPrice = await coingecko.simple.tokenPrice(platform, tokenAddress, 'usd');
-      if (currentPrice[tokenAddress.toLowerCase()].usd === undefined) return priceUSD;
+      if (!currentPrice[tokenAddress.toLowerCase()]) {
+        console.log(`unable to find token's(${tokenAddress.toLowerCase()}) price`)
+        return priceUSD;
+      }
 
       priceUSD = currentPrice[tokenAddress.toLowerCase()].usd;
     } else {

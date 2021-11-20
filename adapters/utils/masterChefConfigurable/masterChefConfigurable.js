@@ -46,6 +46,8 @@ module.exports = {
           index: i,
           stakingToken: p.lpToken,
         }));
+
+        console.info(masterChefPools);
       }
 
       const foundPoolIndex = masterChefPools.find(
