@@ -14,6 +14,7 @@ module.exports = {
       rewardTokenName: 'luan',
       rewardPerBlockFunctionName: 'luanPerSec', //or reward per sec
       rewardDebtPropertyName: 'rewardDebt',
+      isRewardPerSec: true,
     },
     []
   ),

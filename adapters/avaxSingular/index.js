@@ -112,7 +112,7 @@ module.exports = {
         const earned = toFloat(
           new bn(amount.toString())
             .multipliedBy(accSingPerShare.toString())
-            .div(new bn(10).pow(12))
+            .div(new bn(10).pow(18))
             .minus(rewardDebt.toString())
             .toString(10),
           rewardsTokenDecimals

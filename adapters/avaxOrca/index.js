@@ -14,6 +14,7 @@ module.exports = {
       rewardTokenName: 'orca',
       rewardPerBlockFunctionName: 'rewardsPerSecond',
       rewardDebtPropertyName: 'rewardTokenDebt',
+      isRewardPerSec: true,
     },
     []
   ),

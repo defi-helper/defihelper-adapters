@@ -14,6 +14,7 @@ module.exports = {
       rewardTokenName: 'terra',
       rewardPerBlockFunctionName: 'terraPerSec', //or reward per sec
       rewardDebtPropertyName: 'rewardDebt',
+      isRewardPerSec: true,
     },
     []
   ),
