@@ -58,14 +58,14 @@ module.exports = {
         .then((res) => Number(res.toString())),
     ]);
 
-    const [rewardTokenPerBlock, totalAllocPoint] = await Promise.all([
+    const [rewardTokenPerSec, totalAllocPoint] = await Promise.all([
       await masterChiefContract[`${rewardTokenFunctionName}PerSec`](),
       await masterChiefContract.totalAllocPoint(),
     ]);
 
-    const rewardPerBlock = toFloat(
+    const rewardPerSec = toFloat(
       new bn(pool.allocPoint.toString())
-        .multipliedBy(rewardTokenPerBlock.toString())
+        .multipliedBy(rewardTokenPerSec.toString())
         .dividedBy(totalAllocPoint.toString()),
       rewardsTokenDecimals
     );
@@ -86,14 +86,13 @@ module.exports = {
 
     const tvl = new bn(totalLocked).multipliedBy(masterChiefStakingToken.getUSD());
 
-    let aprBlock = rewardPerBlock.multipliedBy(rewardTokenUSD).div(tvl);
-    if (!aprBlock.isFinite()) aprBlock = new bn(0);
+    let aprSec = rewardPerSec.multipliedBy(rewardTokenUSD).div(tvl);
+    if (!aprSec.isFinite()) aprSec = new bn(0);
 
-    const blocksPerDay = new bn((1000 * 60 * 60 * 24) / avgBlockTime);
-    const aprDay = aprBlock.multipliedBy(blocksPerDay);
-    const aprWeek = aprBlock.multipliedBy(blocksPerDay.multipliedBy(7));
-    const aprMonth = aprBlock.multipliedBy(blocksPerDay.multipliedBy(30));
-    const aprYear = aprBlock.multipliedBy(blocksPerDay.multipliedBy(365));
+    const aprDay = aprSec.multipliedBy(60 * 60 * 24);
+    const aprWeek = aprDay.multipliedBy(7);
+    const aprMonth = aprDay.multipliedBy(30);
+    const aprYear = aprDay.multipliedBy(365);
 
     return {
       staking: {
@@ -110,7 +109,6 @@ module.exports = {
         aprWeek: aprWeek.toString(10),
         aprMonth: aprMonth.toString(10),
         aprYear: aprYear.toString(10),
-        rewardPerDay: rewardPerBlock.multipliedBy(blocksPerDay).toString(),
       },
       wallet: async (walletAddress) => {
         const { amount, rewardDebt } = await masterChiefContract.userInfo(poolIndex, walletAddress);
