@@ -349,10 +349,15 @@ module.exports = {
         const lpOutMin = new bn(lpAmountOut.toString()).multipliedBy(slippage).toFixed(0);
         const deadline = dayjs().add(deadlineSeconds, 'seconds').unix();
 
-        const gasLimit = await automate.estimateGas.run(0, deadline, swapOutMin, lpOutMin);
+        const gasLimit = new bn(
+          await automate.estimateGas.run(0, deadline, swapOutMin, lpOutMin).then((v) => v.toString())
+        )
+          .multipliedBy(1.1)
+          .toFixed(0);
         const gasPrice = await signer.getGasPrice();
         const gasFee = new bn(gasLimit.toString()).multipliedBy(gasPrice.toString()).toFixed(0);
 
+        await automate.estimateGas.run(gasFee, deadline, swapOutMin, lpOutMin);
         return [gasFee, deadline, swapOutMin, lpOutMin];
       };
       const run = async () => {
