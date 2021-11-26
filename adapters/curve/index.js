@@ -357,6 +357,7 @@ module.exports = {
         const gasPrice = await signer.getGasPrice();
         const gasFee = new bn(gasLimit.toString()).multipliedBy(gasPrice.toString()).toFixed(0);
 
+        await automate.estimateGas.run(gasFee, deadline, swapOutMin, lpOutMin);
         return [gasFee, deadline, swapOutMin, lpOutMin];
       };
       const run = async () => {
