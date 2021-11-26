@@ -1,6 +1,7 @@
 const { ethers, bn, ethersMulticall, dayjs } = require('../lib');
 const { ethereum, toFloat, tokens, coingecko } = require('../utils');
 const { getMasterChefStakingToken } = require('../utils/masterChef/masterChefStakingToken');
+const AutomateActions = require('../utils/automate/actions');
 const masterChefABI = require('./abi/masterChefABI.json');
 const masterChefSavedPools = require('./abi/masterChefPools.json');
 const MasterChefJoeLpRestakeABI = require('./abi/MasterChefJoeLpRestakeABI.json');
@@ -17,7 +18,6 @@ module.exports = {
     const network = (await provider.detectNetwork()).chainId;
     const block = await provider.getBlock(blockTag);
     const blockNumber = block.number;
-    const avgBlockTime = await ethereum.getAvgBlockTime(provider, blockNumber);
     const rewardTokenFunctionName = 'joe';
 
     const masterChiefContract = new ethers.Contract(masterChefAddress, masterChefABI, provider);
@@ -164,7 +164,6 @@ module.exports = {
           ),
         };
       },
-
       actions: async (walletAddress) => {
         if (options.signer === null) {
           throw new Error('Signer not found, use options.signer for use actions');
@@ -239,33 +238,88 @@ module.exports = {
   },
   automates: {
     MasterChefJoeLpRestake: async (signer, contractAddress) => {
+      const signerAddress = await signer.getAddress();
       const automate = new ethers.Contract(contractAddress, MasterChefJoeLpRestakeABI, signer);
       const stakingAddress = await automate.staking();
       const staking = new ethers.Contract(stakingAddress, masterChefABI, signer);
       const stakingTokenAddress = await automate.stakingToken();
       const stakingToken = ethereum.erc20(signer, stakingTokenAddress);
+      const stakingTokenDecimals = await stakingToken.decimals().then((v) => v.toString());
       const poolId = await automate.pool().then((v) => v.toString());
 
-      const deposit = async () => {
-        const signerAddress = await signer.getAddress();
-        const signerBalance = await stakingToken.balanceOf(signerAddress);
-        if (signerBalance.toString() !== '0') {
-          await (await stakingToken.transfer(automate.address, signerBalance)).wait();
-        }
-        const automateBalance = await stakingToken.balanceOf(automate.address);
-        if (automateBalance.toString() !== '0') {
-          await (await automate.deposit()).wait();
-        }
-      };
-      const refund = async () => {
-        return automate.refund();
-      };
-      const migrate = async () => {
-        const signerAddress = await signer.getAddress();
-        const userInfo = await staking.userInfo(poolId, signerAddress);
-        await (await staking.withdraw(poolId, userInfo.amount.toString())).wait();
-        return deposit();
-      };
+      const deposit = [
+        AutomateActions.tab(
+          async () => ({
+            label: 'Transfer',
+            description: 'Transfer your tokens to automate',
+            inputs: [
+              AutomateActions.input({
+                placeholder: 'amount',
+                value: new bn(await stakingToken.balanceOf(signerAddress).then((v) => v.toString()))
+                  .div(`1e${stakingTokenDecimals}`)
+                  .toString(10),
+              }),
+            ],
+          }),
+          async (amount) => {
+            const signerBalance = await stakingToken.balanceOf(signerAddress).then((v) => v.toString());
+            const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
+
+            return new bn(signerBalance).gte(amountInt);
+          },
+          async (amount) => ({
+            tx: await stakingToken.transfer(automate.address, new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`)),
+          })
+        ),
+        AutomateActions.tab(
+          async () => ({
+            label: 'Deposit',
+            description: 'Deposit tokens to staking',
+          }),
+          async () => {
+            const automateBalance = await stakingToken.balanceOf(automate.address).then((v) => v.toString());
+
+            return (
+              new bn(automateBalance).gt(0) &&
+              signerAddress.toLowerCase() === (await automate.owner().then((v) => v.toLowerCase()))
+            );
+          },
+          async () => ({
+            tx: await automate.deposit(),
+          })
+        ),
+      ];
+      const refund = [
+        AutomateActions.tab(
+          async () => ({
+            label: 'Refund',
+            description: 'Transfer your tokens from automate',
+          }),
+          async () => signerAddress.toLowerCase() === (await automate.owner().then((v) => v.toLowerCase())),
+          async () => ({
+            tx: await automate.refund(),
+          })
+        ),
+      ];
+      const migrate = [
+        AutomateActions.tab(
+          async () => ({
+            label: 'Withdraw',
+            description: 'Withdraw your tokens from staking',
+          }),
+          async () => {
+            const userInfo = await staking.userInfo(poolId, signerAddress);
+            return new bn(userInfo.amount.toString()).gt(0);
+          },
+          async () => {
+            const userInfo = await staking.userInfo(poolId, signerAddress);
+            return {
+              tx: await staking.withdraw(poolId, userInfo.amount.toString()),
+            };
+          }
+        ),
+        ...deposit,
+      ];
       const runParams = async () => {
         const provider = signer.provider || signer;
         const chainId = await provider.getNetwork().then(({ chainId }) => chainId);
