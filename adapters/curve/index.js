@@ -178,10 +178,9 @@ module.exports = {
         aprYear: aprDay.multipliedBy(365).toString(10),
       },
       wallet: async (walletAddress) => {
-        const [staked, earned] = await multicall.all([
-          pool.gauge.balanceOf(walletAddress),
-          minter.minted(walletAddress, pool.info.gauge),
-        ]);
+        const [staked] = await multicall.all([pool.gauge.balanceOf(walletAddress)]);
+        const gauge = new ethers.Contract(pool.info.gauge, gaugeABI, provider);
+        const earned = await gauge.callStatic.claimable_tokens(walletAddress).then((v) => v.toString());
         const stakedTokens = (await getUnderlyingBalance(pools, getPriceUSD, pool, staked.toString())).flat(Infinity);
         const earnedNormalize = new bn(earned.toString()).div(1e18).toString(10);
         const earnedUSD = new bn(earnedNormalize).multipliedBy(crvPriceUSD).toString(10);
