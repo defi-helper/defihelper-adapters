@@ -53,7 +53,7 @@
     "axios": "^0.21.1",
     "bignumber.js": "^8.1.1",
     "dayjs": "^1.10.5",
-    "ethers": "^5.3.1",
+    "ethers": "^5.5.1",
     "hardhat-deploy": "^0.9.6",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
