@@ -2,6 +2,7 @@ const { ethers, axios, bn, ethersMulticall, dayjs } = require('../lib');
 const { ethereum, waves, toFloat, staking } = require('../utils');
 const StakingABI = require('./abi/Staking.json');
 const SynthetixUniswapLpRestakeABI = require('./abi/SynthetixUniswapLpRestake.json');
+const AutomateActions = require('../utils/automate/actions');
 
 const swopTokenId = 'Ehie5xYpeN8op1Cctc6aGUrqx8jq3jtf1DSjXDbfm7aT';
 
@@ -71,30 +72,89 @@ module.exports = {
   },
   automates: {
     SynthetixUniswapLpRestake: async (signer, contractAddress) => {
+      const signerAddress = await signer.getAddress();
       const automate = new ethers.Contract(contractAddress, SynthetixUniswapLpRestakeABI, signer);
       const stakingAddress = await automate.staking();
       const staking = new ethers.Contract(stakingAddress, StakingABI, signer);
       const stakingTokenAddress = await staking.stakingToken();
       const stakingToken = ethereum.erc20(signer, stakingTokenAddress);
+      const stakingTokenDecimals = await stakingToken.decimals().then((v) => v.toString());
 
-      const deposit = async () => {
-        const signerAddress = await signer.getAddress();
-        const signerBalance = await stakingToken.balanceOf(signerAddress);
-        if (signerBalance.toString() !== '0') {
-          await (await stakingToken.transfer(automate.address, signerBalance)).wait();
-        }
-        const automateBalance = await stakingToken.balanceOf(automate.address);
-        if (automateBalance.toString() !== '0') {
-          await (await automate.deposit()).wait();
-        }
-      };
-      const refund = async () => {
-        return automate.refund();
-      };
-      const migrate = async () => {
-        await (await staking.exit()).wait();
-        return deposit();
-      };
+      const deposit = [
+        AutomateActions.tab(
+          'Transfer',
+          async () => ({
+            description: 'Transfer your tokens to automate',
+            inputs: [
+              AutomateActions.input({
+                placeholder: 'amount',
+                value: new bn(await stakingToken.balanceOf(signerAddress).then((v) => v.toString()))
+                  .div(`1e${stakingTokenDecimals}`)
+                  .toString(10),
+              }),
+            ],
+          }),
+          async (amount) => {
+            const signerBalance = await stakingToken.balanceOf(signerAddress).then((v) => v.toString());
+            const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
+
+            return new bn(amountInt).gt(0) && new bn(signerBalance).gte(amountInt);
+          },
+          async (amount) => ({
+            tx: await stakingToken.transfer(
+              automate.address,
+              new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`).toFixed(0)
+            ),
+          })
+        ),
+        AutomateActions.tab(
+          'Deposit',
+          async () => ({
+            description: 'Deposit tokens to staking',
+          }),
+          async () => {
+            const automateBalance = await stakingToken.balanceOf(automate.address).then((v) => v.toString());
+
+            return (
+              new bn(automateBalance).gt(0) &&
+              signerAddress.toLowerCase() === (await automate.owner().then((v) => v.toLowerCase()))
+            );
+          },
+          async () => ({
+            tx: await automate.deposit(),
+          })
+        ),
+      ];
+      const refund = [
+        AutomateActions.tab(
+          'Refund',
+          async () => ({
+            description: 'Transfer your tokens from automate',
+          }),
+          async () => signerAddress.toLowerCase() === (await automate.owner().then((v) => v.toLowerCase())),
+          async () => ({
+            tx: await automate.refund(),
+          })
+        ),
+      ];
+      const migrate = [
+        AutomateActions.tab(
+          'Withdraw',
+          async () => ({
+            description: 'Withdraw your tokens from staking',
+          }),
+          async () => {
+            const stakingBalance = await staking.balanceOf(signerAddress).then((v) => v.toString());
+            return new bn(stakingBalance).gt(0);
+          },
+          async () => {
+            return {
+              tx: await staking.exit(),
+            };
+          }
+        ),
+        ...deposit,
+      ];
       const runParams = async () => {
         const provider = signer.provider || signer;
         const chainId = await provider.getNetwork().then(({ chainId }) => chainId);

@@ -249,8 +249,8 @@ module.exports = {
 
       const deposit = [
         AutomateActions.tab(
+          'Transfer',
           async () => ({
-            label: 'Transfer',
             description: 'Transfer your tokens to automate',
             inputs: [
               AutomateActions.input({
@@ -265,15 +265,18 @@ module.exports = {
             const signerBalance = await stakingToken.balanceOf(signerAddress).then((v) => v.toString());
             const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
 
-            return new bn(signerBalance).gte(amountInt);
+            return new bn(amountInt).gt(0) && new bn(signerBalance).gte(amountInt);
           },
           async (amount) => ({
-            tx: await stakingToken.transfer(automate.address, new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`)),
+            tx: await stakingToken.transfer(
+              automate.address,
+              new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`).toFixed(0)
+            ),
           })
         ),
         AutomateActions.tab(
+          'Deposit',
           async () => ({
-            label: 'Deposit',
             description: 'Deposit tokens to staking',
           }),
           async () => {
@@ -291,8 +294,8 @@ module.exports = {
       ];
       const refund = [
         AutomateActions.tab(
+          'Refund',
           async () => ({
-            label: 'Refund',
             description: 'Transfer your tokens from automate',
           }),
           async () => signerAddress.toLowerCase() === (await automate.owner().then((v) => v.toLowerCase())),
@@ -303,8 +306,8 @@ module.exports = {
       ];
       const migrate = [
         AutomateActions.tab(
+          'Withdraw',
           async () => ({
-            label: 'Withdraw',
             description: 'Withdraw your tokens from staking',
           }),
           async () => {

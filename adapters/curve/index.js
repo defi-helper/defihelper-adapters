@@ -296,31 +296,90 @@ module.exports = {
   },
   automates: {
     GaugeUniswapRestake: async (signer, contractAddress) => {
+      const signerAddress = await signer.getAddress();
       const automate = new ethers.Contract(contractAddress, gaugeUniswapRestakeABI, signer);
       const stakingAddress = await automate.staking();
       const staking = new ethers.Contract(stakingAddress, gaugeABI, signer);
       const stakingTokenAddress = await staking.lp_token();
       const stakingToken = ethereum.erc20(signer, stakingTokenAddress);
+      const stakingTokenDecimals = await stakingToken.decimals().then((v) => v.toString());
 
-      const deposit = async () => {
-        const signerAddress = await signer.getAddress();
-        const signerBalance = await stakingToken.balanceOf(signerAddress);
-        if (signerBalance.toString() !== '0') {
-          await (await stakingToken.transfer(automate.address, signerBalance)).wait();
-        }
-        const automateBalance = await stakingToken.balanceOf(automate.address);
-        if (automateBalance.toString() !== '0') {
-          await (await automate.deposit()).wait();
-        }
-      };
-      const refund = async () => {
-        return automate.refund();
-      };
-      const migrate = async () => {
-        const signerAddress = await signer.getAddress();
-        await staking.withdraw(staking.balanceOf(signerAddress));
-        return deposit();
-      };
+      const deposit = [
+        AutomateActions.tab(
+          'Transfer',
+          async () => ({
+            description: 'Transfer your tokens to automate',
+            inputs: [
+              AutomateActions.input({
+                placeholder: 'amount',
+                value: new bn(await stakingToken.balanceOf(signerAddress).then((v) => v.toString()))
+                  .div(`1e${stakingTokenDecimals}`)
+                  .toString(10),
+              }),
+            ],
+          }),
+          async (amount) => {
+            const signerBalance = await stakingToken.balanceOf(signerAddress).then((v) => v.toString());
+            const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
+
+            return new bn(amountInt).gt(0) && new bn(signerBalance).gte(amountInt);
+          },
+          async (amount) => ({
+            tx: await stakingToken.transfer(
+              automate.address,
+              new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`).toFixed(0)
+            ),
+          })
+        ),
+        AutomateActions.tab(
+          'Deposit',
+          async () => ({
+            description: 'Deposit tokens to staking',
+          }),
+          async () => {
+            const automateBalance = await stakingToken.balanceOf(automate.address).then((v) => v.toString());
+
+            return (
+              new bn(automateBalance).gt(0) &&
+              signerAddress.toLowerCase() === (await automate.owner().then((v) => v.toLowerCase()))
+            );
+          },
+          async () => ({
+            tx: await automate.deposit(),
+          })
+        ),
+      ];
+      const refund = [
+        AutomateActions.tab(
+          'Refund',
+          async () => ({
+            description: 'Transfer your tokens from automate',
+          }),
+          async () => signerAddress.toLowerCase() === (await automate.owner().then((v) => v.toLowerCase())),
+          async () => ({
+            tx: await automate.refund(),
+          })
+        ),
+      ];
+      const migrate = [
+        AutomateActions.tab(
+          'Withdraw',
+          async () => ({
+            description: 'Withdraw your tokens from staking',
+          }),
+          async () => {
+            const stakingBalance = await staking.balanceOf(signerAddress).then((v) => v.toString());
+            return new bn(stakingBalance).gt(0);
+          },
+          async () => {
+            const stakingBalance = await staking.balanceOf(signerAddress).then((v) => v.toString());
+            return {
+              tx: await staking.withdraw(stakingBalance),
+            };
+          }
+        ),
+        ...deposit,
+      ];
       const runParams = async () => {
         const multicall = new ethersMulticall.Provider(signer, await signer.getChainId());
         const automateMulticall = new ethersMulticall.Contract(contractAddress, gaugeUniswapRestakeABI);

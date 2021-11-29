@@ -204,6 +204,10 @@ export function EthereumAutomateProtocol(props) {
   const [instance, setInstance] = React.useState("");
   const [actionReload, setActionReload] = React.useState(false);
   const [actionResult, setActionResult] = React.useState(null);
+  const [steps, setSteps] = React.useState([]);
+  const [stepName, setStepName] = React.useState("");
+  const [stepInfo, setStepInfo] = React.useState(null);
+  const [stepInputs, setStepInputs] = React.useState([]);
 
   React.useEffect(() => {
     automatesGateway
@@ -341,16 +345,67 @@ export function EthereumAutomateProtocol(props) {
         signer,
         instance
       );
-      const action = actions[currentAction];
-      const actionResult = await action();
-      setActionResult(
-        actionResult instanceof Error ? actionResult.toString() : actionResult
-      );
+      if (currentAction === "run") {
+        const actionResult = await actions.run();
+        setActionResult(
+          actionResult instanceof Error ? actionResult.toString() : actionResult
+        );
+      } else {
+        setSteps(actions[currentAction]);
+        const firstStep = actions[currentAction][0];
+        if (!firstStep) return;
+        setStepInputs([]);
+        setStepInfo(null);
+        setStepName(firstStep.name);
+        setActionResult(null);
+      }
     } catch (e) {
       console.error(e);
     }
     setActionReload(false);
   };
+
+  const onStepInputChange = (inputIndex, newValue) => {
+    setStepInputs(
+      stepInputs.reduce(
+        (result, value, i) => [...result, i === inputIndex ? newValue : value],
+        []
+      )
+    );
+  };
+
+  const onStepCanClick = async () => {
+    const step = steps.find(({ name }) => stepName === name);
+    if (!step) return;
+
+    setActionResult(await step.can.apply(step, stepInputs));
+  };
+
+  const onStepSendClick = async () => {
+    const step = steps.find(({ name }) => stepName === name);
+    if (!step) return;
+
+    const { tx } = await step.send.apply(step, stepInputs);
+    setActionResult({
+      tx,
+    });
+    setActionResult({
+      tx,
+      receipt: await tx.wait(),
+    });
+  };
+
+  useEffect(async () => {
+    const step = steps.find(({ name }) => stepName === name);
+    if (!step) return;
+    const stepInfo = await step.info();
+    setStepInputs(
+      Array.from(new Array((stepInfo.inputs ?? []).length).values()).map(
+        (_, i) => stepInfo.inputs[i].value ?? ""
+      )
+    );
+    setStepInfo(stepInfo);
+  }, [stepName]);
 
   if (automates === null) {
     return <div>Loading...</div>;
@@ -482,9 +537,51 @@ export function EthereumAutomateProtocol(props) {
               </button>
             </div>
           </div>
-          {!actionResult || JSON.stringify(actionResult)}
         </div>
       )}
+      {!steps.length || (
+        <div>
+          <h3>Action steps</h3>
+          <div className="row">
+            {steps.map(({ name }) => (
+              <div
+                style={{
+                  cursor: "pointer",
+                  backgroundColor: name === stepName ? "#eee" : "",
+                }}
+                className="column"
+                key={name}
+                onClick={() => setStepName(name)}
+              >
+                {name}
+              </div>
+            ))}
+          </div>
+          {stepInfo && (
+            <div>
+              <p>{stepInfo.description}</p>
+              <div>
+                {(stepInfo.inputs ?? []).map(({ placeholder, value }, i) => (
+                  <div key={i}>
+                    {placeholder !== "" && <label>{placeholder}:</label>}
+                    <input
+                      type="text"
+                      placeholder={placeholder}
+                      value={stepInputs[i]}
+                      onChange={(e) => onStepInputChange(i, e.target.value)}
+                    />
+                  </div>
+                ))}
+              </div>
+              <div>
+                <button onClick={onStepCanClick}>Can</button>
+                <button onClick={onStepSendClick}>Send</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {actionResult !== null && <div>{JSON.stringify(actionResult)}</div>}
     </div>
   );
 }
