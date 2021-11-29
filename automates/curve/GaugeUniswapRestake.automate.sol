@@ -77,9 +77,8 @@ contract GaugeUniswapRestake is Automate {
     }
 
     IMinter _minter = IMinter(staking.minter());
-    if (_minter.minted(address(this), address(_staking)) > 0) {
-      _minter.mint(address(_staking));
-    }
+    _minter.mint(address(_staking));
+
     IERC20 rewardToken = IERC20(_staking.crv_token());
     uint256 rewardBalance = rewardToken.balanceOf(address(this));
     if (rewardBalance > 0) {
@@ -141,11 +140,10 @@ contract GaugeUniswapRestake is Automate {
     uint256 lpOutMin
   ) external bill(gasFee, "CurveGaugeUniswapRestake") {
     IGauge _staking = staking; // gas optimization
-    IMinter _minter = IMinter(staking.minter());
-    require(_minter.minted(address(this), address(_staking)) > 0, "GaugeUniswapRestake::run: no earned");
     address router = IStorage(info()).getAddress(keccak256("UniswapV2:Contract:Router2"));
     require(router != address(0), "GaugeUniswapRestake::run: uniswap router contract not found");
 
+    IMinter _minter = IMinter(staking.minter());
     _minter.mint(address(staking));
     address rewardToken = _staking.crv_token();
     uint256 rewardAmount = IERC20(rewardToken).balanceOf(address(this));
