@@ -53,7 +53,7 @@ function AutomateArtifactSelector({ provider, automates, onReload }) {
     setReload(true);
     try {
       const { chainId } = await provider.getNetwork();
-      onReload(current, await automatesGateway.load(current, chainId));
+      onReload(current, await automatesGateway.ethereumLoad(current, chainId));
     } catch (e) {
       console.error(e);
     }
