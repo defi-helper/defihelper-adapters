@@ -30,7 +30,7 @@ const input = ({ placeholder = '', value = '' }) => ({ placeholder, value });
 /**
  * @param {string} name
  * @param {() => Promise<TabInfo>} info
- * @param {(...args: any) => Promise<boolean>} can
+ * @param {(...args: any) => Promise<boolean | Error>} can
  * @param {(...args: any) => Promise<{tx}>} send
  */
 const tab = (name, info, can, send) => ({ name, info, can, send });
