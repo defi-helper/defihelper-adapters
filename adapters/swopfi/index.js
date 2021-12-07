@@ -1,5 +1,6 @@
 const { axios, bn } = require('../lib');
 const { waves, toFloat, coingecko, tokens } = require('../utils');
+const AutomateActions = require('../utils/automate/actions');
 
 const swopTokenId = 'Ehie5xYpeN8op1Cctc6aGUrqx8jq3jtf1DSjXDbfm7aT';
 const farmingContract = '3P73HDkPqG15nLXevjCbmXtazHYTZbpPoPw';
@@ -455,15 +456,86 @@ module.exports = {
   },
   automates: {
     autorestake: async (signer, contractAddress) => {
+      const deposit = [
+        AutomateActions.tab(
+          'Transfer',
+          async () => ({
+            description: 'Transfer your tokens to automate',
+            inputs: [
+              AutomateActions.input({
+                placeholder: 'amount',
+                value: '0'
+              }),
+            ],
+          }),
+          async (amount) => {
+            return true;
+          },
+          async (amount) => ({
+            tx: null,
+          })
+        ),
+        AutomateActions.tab(
+          'Deposit',
+          async () => ({
+            description: 'Deposit tokens to staking',
+          }),
+          async () => {
+            return true;
+          },
+          async () => ({
+            tx: null,
+          })
+        ),
+      ];
+      const refund = [
+        AutomateActions.tab(
+          'Refund',
+          async () => ({
+            description: 'Transfer your tokens from automate',
+          }),
+          async () => {
+            return true;
+          },
+          async () => ({
+            tx: null,
+          })
+        ),
+      ];
+      const migrate = [
+        AutomateActions.tab(
+          'Withdraw',
+          async () => ({
+            description: 'Withdraw your tokens from staking',
+          }),
+          async () => {
+            return true;
+          },
+          async () => {
+            return {
+              tx: null,
+            };
+          }
+        ),
+        ...deposit,
+      ];
+      const runParams = async () => {
+        return {
+          calldata: [],
+        };
+      };
+      const run = async () => {
+        const { calldata } = await runParams();
+        return null;
+      };
+
       return {
         contract: contractAddress,
-        deposit: [],
-        refund: [],
-        migrate: [],
-        runParams: () => {},
-        run: () => {
-          return {};
-        },
+        deposit,
+        refund,
+        migrate,
+        runParams,
+        run,
       };
     },
   },

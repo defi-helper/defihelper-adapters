@@ -294,6 +294,54 @@ module.exports = {
     };
   },
   automates: {
+    deploy: {
+      GaugeUniswapRestake: async (signer, factoryAddress, prototypeAddress) => ({
+        deploy: [
+          AutomateActions.tab(
+            'Deploy',
+            async () => ({
+              description: 'Deploy your automate contract',
+              inputs: [
+                AutomateActions.input({
+                  placeholder: 'Target gauge',
+                  value: '',
+                }),
+                AutomateActions.input({
+                  placeholder: 'Swap token address',
+                  value: '',
+                }),
+                AutomateActions.input({
+                  placeholder: 'Slippage percent',
+                  value: '1',
+                }),
+                AutomateActions.input({
+                  placeholder: 'Deadline (seconds)',
+                  value: '300'
+                }),
+              ],
+            }),
+            async (gauge, swapToken, slippage, deadline) => {
+              if (slippage < 0 || slippage > 100) return new Error('Invalid slippage percent');
+              if (deadline < 0) return new Error('Deadline has already passed');
+
+              return true;
+            },
+            async (gauge, swapToken, slippage, deadline) =>
+              AutomateActions.ethereum.proxyDeploy(
+                signer,
+                factoryAddress,
+                prototypeAddress,
+                new ethers.utils.Interface(gaugeUniswapRestakeABI).encodeFunctionData('init', [
+                  gauge,
+                  swapToken,
+                  Math.floor(slippage * 10),
+                  deadline,
+                ])
+              )
+          ),
+        ],
+      }),
+    },
     GaugeUniswapRestake: async (signer, contractAddress) => {
       const signerAddress = await signer.getAddress();
       const automate = new ethers.Contract(contractAddress, gaugeUniswapRestakeABI, signer);

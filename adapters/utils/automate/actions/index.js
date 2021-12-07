@@ -1,3 +1,6 @@
+const { ethers } = require('../../../lib');
+const ProxyFactoryABI = require('../../abi/dfh/proxyFactory.json');
+
 /**
  * @typedef {{
  * 	placeholder: string;
@@ -35,7 +38,27 @@ const input = ({ placeholder = '', value = '' }) => ({ placeholder, value });
  */
 const tab = (name, info, can, send) => ({ name, info, can, send });
 
+const ethereum = {
+  proxyDeploy: async (signer, factoryAddress, prototypeAddress, inputs) => {
+    const proxyFactory = new ethers.Contract(factoryAddress, ProxyFactoryABI, signer);
+    const tx = await proxyFactory.create(prototypeAddress, inputs);
+
+    return {
+      tx,
+      getAddress: async () => {
+        const receipt = await tx.wait();
+        const proxyCreatedEvent = receipt.logs[0];
+        const proxyAddressBytes = proxyCreatedEvent.topics[2];
+        const [proxyAddress] = ethers.utils.defaultAbiCoder.decode(['address'], proxyAddressBytes);
+
+        return proxyAddress;
+      },
+    };
+  },
+};
+
 module.exports = {
+  ethereum,
   input,
   tab,
 };

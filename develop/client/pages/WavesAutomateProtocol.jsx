@@ -1,9 +1,10 @@
-import React, { useEffect } from "react";
+import React from "react";
 import * as automatesGateway from "../common/automate";
 import * as adaptersGateway from "../common/adapter";
 import ReactJson from "react-json-view";
 import { useProvider } from "../common/waves";
 import * as WavesTx from "@waves/waves-transactions";
+import { AutomateSteps } from "../components";
 
 function AutomateArtifactSelector({ automates, onReload }) {
   const [current, setCurrent] = React.useState(automates[0]);
@@ -90,6 +91,7 @@ export function WavesAutomateProtocol(props) {
   const [currentAction, setCurrentAction] = React.useState("run");
   const [actionReload, setActionReload] = React.useState(false);
   const [actionResult, setActionResult] = React.useState(null);
+  const [steps, setSteps] = React.useState([]);
 
   React.useEffect(() => {
     automatesGateway
@@ -165,6 +167,7 @@ export function WavesAutomateProtocol(props) {
     if (!instance || !currentAction) return;
 
     setActionReload(true);
+    setSteps([]);
     try {
       const actions = await adapters[automate.artifact.contractName](
         signer,
@@ -176,15 +179,10 @@ export function WavesAutomateProtocol(props) {
           actionResult instanceof Error ? actionResult.toString() : actionResult
         );
       } else {
-        /*
         setSteps(actions[currentAction]);
         const firstStep = actions[currentAction][0];
         if (!firstStep) return;
-        setStepInputs([]);
-        setStepInfo(null);
-        setStepName(firstStep.name);
         setActionResult(null);
-	*/
       }
     } catch (e) {
       console.error(e);
@@ -268,10 +266,16 @@ export function WavesAutomateProtocol(props) {
                 onClick={onAction}
                 disabled={actionReload}
               >
-                Send
+                Call
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {!steps.length || (
+        <div>
+          <h3>Action steps</h3>
+          <AutomateSteps steps={steps} onAction={setActionResult} />
         </div>
       )}
       {actionResult !== null && <div>{JSON.stringify(actionResult)}</div>}

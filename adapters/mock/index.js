@@ -1,5 +1,5 @@
-const { ethers, bn, ethersMulticall, dayjs } = require('../lib');
-const { ethereum, toFloat, tokens, coingecko } = require('../utils');
+const { ethers, bn, ethersMulticall } = require('../lib');
+const { ethereum, tokens } = require('../utils');
 const EthStakingABI = require('./abi/EthStaking.json');
 const EthAutomateABI = require('./abi/EthAutomate.json');
 const AutomateActions = require('../utils/automate/actions');
@@ -106,6 +106,37 @@ module.exports = {
     };
   },
   automates: {
+    deploy: {
+      EthAutomate: async (signer, factoryAddress, prototypeAddress) => ({
+        deploy: [
+          AutomateActions.tab(
+            'Deploy',
+            async () => ({
+              description: 'Deploy your automate contract',
+              inputs: [
+                AutomateActions.input({
+                  placeholder: 'Staking contract',
+                  value: '0x3c8b066EDB020Db5C5489cE1Ec335744F5593BCe',
+                }),
+              ],
+            }),
+            async (staking) => {
+              if (staking.toLowerCase() !== '0x3c8b066edb020db5c5489ce1ec335744f5593bce')
+                return new Error('Invalid staking contract address');
+
+              return true;
+            },
+            async (staking) =>
+              AutomateActions.ethereum.proxyDeploy(
+                signer,
+                factoryAddress,
+                prototypeAddress,
+                new ethers.utils.Interface(EthAutomateABI).encodeFunctionData('init', [staking])
+              )
+          ),
+        ],
+      }),
+    },
     EthAutomate: async (signer, contractAddress) => {
       const signerAddress = await signer.getAddress();
       const automate = new ethers.Contract(contractAddress, EthAutomateABI, signer);
@@ -132,8 +163,10 @@ module.exports = {
           async (amount) => {
             const signerBalance = await stakingToken.balanceOf(signerAddress).then((v) => v.toString());
             const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
+            if (amountInt.lte(0)) return Error('Invalid amount');
+            if (amountInt.gt(signerBalance)) return Error('Insufficient funds on the balance');
 
-            return new bn(amountInt).gt(0) && new bn(signerBalance).gte(amountInt);
+            return true;
           },
           async (amount) => ({
             tx: await stakingToken.transfer(
@@ -148,12 +181,12 @@ module.exports = {
             description: 'Deposit tokens to staking',
           }),
           async () => {
-            const automateBalance = await stakingToken.balanceOf(automate.address).then((v) => v.toString());
+            const automateBalance = new bn(await stakingToken.balanceOf(automate.address).then((v) => v.toString()));
+            const automateOwner = await automate.owner();
+            if (automateBalance.lte(0)) return new Error('Insufficient funds on the automate contract balance');
+            if (signerAddress.toLowerCase() !== automateOwner.toLowerCase()) return new Error('Someone else contract');
 
-            return (
-              new bn(automateBalance).gt(0) &&
-              signerAddress.toLowerCase() === (await automate.owner().then((v) => v.toLowerCase()))
-            );
+            return true;
           },
           async () => ({
             tx: await automate.deposit(),
@@ -166,7 +199,12 @@ module.exports = {
           async () => ({
             description: 'Transfer your tokens from automate',
           }),
-          async () => signerAddress.toLowerCase() === (await automate.owner().then((v) => v.toLowerCase())),
+          async () => {
+            const automateOwner = await automate.owner();
+            if (signerAddress.toLowerCase() !== automateOwner.toLowerCase()) return new Error('Someone else contract');
+
+            return true;
+          },
           async () => ({
             tx: await automate.refund(),
           })
@@ -179,8 +217,10 @@ module.exports = {
             description: 'Withdraw your tokens from staking',
           }),
           async () => {
-            const stakingBalance = await staking.balanceOf(signerAddress).then((v) => v.toString());
-            return new bn(stakingBalance).gt(0);
+            const stakingBalance = new bn(await staking.balanceOf(signerAddress).then((v) => v.toString()));
+            if (stakingBalance.lte(0)) return new Error('Insufficient funds on the staking contract balance');
+
+            return true;
           },
           async () => {
             const stakingBalance = await staking.balanceOf(signerAddress).then((v) => v.toString());
