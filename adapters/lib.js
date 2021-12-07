@@ -4,4 +4,5 @@ module.exports = {
   axios: global.axios,
   ethers: global.ethers,
   ethersMulticall: global.ethersMulticall,
+  wavesTransaction: global.wavesTransaction,
 };

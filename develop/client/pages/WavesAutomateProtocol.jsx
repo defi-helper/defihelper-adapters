@@ -3,7 +3,6 @@ import * as automatesGateway from "../common/automate";
 import * as adaptersGateway from "../common/adapter";
 import ReactJson from "react-json-view";
 import { useProvider } from "../common/waves";
-import * as WavesTx from "@waves/waves-transactions";
 import { AutomateSteps } from "../components";
 
 function AutomateArtifactSelector({ automates, onReload }) {
@@ -86,12 +85,13 @@ export function WavesAutomateProtocol(props) {
     wallet: null,
   });
   const [adapters, setAdapters] = React.useState(null);
-  const [automateDeployReload, setAutomateDeployReload] = React.useState(false);
+  const [deploySteps, setDeploySteps] = React.useState([]);
+  const [deployResult, setDeployResult] = React.useState(null);
   const [instance, setInstance] = React.useState("");
   const [currentAction, setCurrentAction] = React.useState("run");
   const [actionReload, setActionReload] = React.useState(false);
   const [actionResult, setActionResult] = React.useState(null);
-  const [steps, setSteps] = React.useState([]);
+  const [actionSteps, setActionSteps] = React.useState([]);
 
   React.useEffect(() => {
     automatesGateway
@@ -109,65 +109,35 @@ export function WavesAutomateProtocol(props) {
     });
     const protocolAdapters = await adaptersGateway.load(protocol);
     setAdapters(protocolAdapters.automates);
+
+    setDeploySteps(
+      await protocolAdapters.automates.deploy[artifact.contractName](
+        provider,
+        artifact.base64
+      ).then(({ deploy }) => deploy)
+    );
   };
 
-  const onAutomateDeploy = async () => {
-    if (!provider || automate.artifact === null) return;
+  const onAutomateDeploy = async (data) => {
+    if (typeof data === "object") {
+      if (typeof data.wait === "function") {
+        await data.wait();
+      }
+      if (typeof data.getAddress === "function") {
+        setInstance(await data.getAddress());
+      }
 
-    setAutomateDeployReload(true);
-    automateDispatch({
-      type: "wallet",
-      value: { seed: null, address: null },
-    });
-    try {
-      const deploySeed = WavesTx.libs.crypto.randomSeed();
-      const deployAddress = WavesTx.libs.crypto.address(
-        deploySeed,
-        signer.network.code
-      );
-      automateDispatch({
-        type: "wallet",
-        value: { seed: deploySeed, address: deployAddress },
-      });
-
-      const transferTx = JSON.parse(
-        await provider.signAndPublishTransaction({
-          type: 4,
-          data: {
-            amount: { tokens: "0.04", assetId: "WAVES" },
-            recipient: deployAddress,
-          },
-        })
-      );
-      await WavesTx.waitForTx(transferTx.id, {
-        apiBase: signer.network.server,
-      });
-      const setScriptTx = await WavesTx.broadcast(
-        WavesTx.setScript(
-          {
-            script: `base64:${automate.artifact.base64}`,
-            chainId: signer.network.code,
-          },
-          deploySeed
-        ),
-        signer.network.server
-      );
-      await WavesTx.waitForTx(setScriptTx.id, {
-        apiBase: signer.network.server,
-      });
-
-      setInstance(deployAddress);
-    } catch (e) {
-      console.error(e);
+      setDeployResult({ tx: data.tx });
+    } else {
+      setDeployResult(data);
     }
-    setAutomateDeployReload(false);
   };
 
   const onAction = async () => {
     if (!instance || !currentAction) return;
 
     setActionReload(true);
-    setSteps([]);
+    setActionSteps([]);
     try {
       const actions = await adapters[automate.artifact.contractName](
         signer,
@@ -179,7 +149,7 @@ export function WavesAutomateProtocol(props) {
           actionResult instanceof Error ? actionResult.toString() : actionResult
         );
       } else {
-        setSteps(actions[currentAction]);
+        setActionSteps(actions[currentAction]);
         const firstStep = actions[currentAction][0];
         if (!firstStep) return;
         setActionResult(null);
@@ -210,28 +180,10 @@ export function WavesAutomateProtocol(props) {
               collapsed={1}
             />
           </div>
-          <div>
-            {automate.wallet === null || (
-              <div>
-                <h4>wallet</h4>
-                <ReactJson
-                  src={JSON.parse(JSON.stringify(automate.wallet))}
-                  collapsed={1}
-                />
-              </div>
-            )}
-            <div className="row">
-              <div className="column column-20">
-                <button
-                  className="button"
-                  onClick={onAutomateDeploy}
-                  disabled={automateDeployReload}
-                >
-                  {automateDeployReload ? "Loading" : "Deploy"}
-                </button>
-              </div>
-            </div>
-          </div>
+          {!deploySteps.length || (
+            <AutomateSteps steps={deploySteps} onAction={onAutomateDeploy} />
+          )}
+          {!deployResult || <div>{JSON.stringify(deployResult)}</div>}
         </div>
       )}
       {!adapters || (
@@ -272,10 +224,10 @@ export function WavesAutomateProtocol(props) {
           </div>
         </div>
       )}
-      {!steps.length || (
+      {!actionSteps.length || (
         <div>
           <h3>Action steps</h3>
-          <AutomateSteps steps={steps} onAction={setActionResult} />
+          <AutomateSteps steps={actionSteps} onAction={setActionResult} />
         </div>
       )}
       {actionResult !== null && <div>{JSON.stringify(actionResult)}</div>}

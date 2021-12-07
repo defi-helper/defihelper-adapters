@@ -45,6 +45,7 @@ const ethereum = {
 
     return {
       tx,
+      wait: tx.wait.bind(tx),
       getAddress: async () => {
         const receipt = await tx.wait();
         const proxyCreatedEvent = receipt.logs[0];

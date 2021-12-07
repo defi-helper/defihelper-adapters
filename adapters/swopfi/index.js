@@ -1,4 +1,4 @@
-const { axios, bn } = require('../lib');
+const { axios, bn, wavesTransaction } = require('../lib');
 const { waves, toFloat, coingecko, tokens } = require('../utils');
 const AutomateActions = require('../utils/automate/actions');
 
@@ -455,6 +455,74 @@ module.exports = {
     };
   },
   automates: {
+    deploy: {
+      autorestake: async (provider, dAppBase64) => {
+        const signer = await provider.publicState();
+        const deploySeed = wavesTransaction.libs.crypto.randomSeed();
+        const deployAddress = wavesTransaction.libs.crypto.address(deploySeed, signer.network.code);
+
+        return {
+          deploy: [
+            AutomateActions.tab(
+              'Transfer',
+              async () => ({
+                description: `Transfer 0.04 Waves tokens to contract wallet ${deployAddress}`,
+              }),
+              async () => {
+                return true;
+              },
+              async () => {
+                const tx = JSON.parse(
+                  await provider.signAndPublishTransaction({
+                    type: 4,
+                    data: {
+                      amount: { tokens: '0.04', assetId: 'WAVES' },
+                      recipient: deployAddress,
+                    },
+                  })
+                );
+                return {
+                  tx,
+                  wait: async () =>
+                    wavesTransaction.waitForTx(tx.id, {
+                      apiBase: signer.network.server,
+                    }),
+                };
+              }
+            ),
+            AutomateActions.tab(
+              'Deploy',
+              async () => ({
+                description: 'Deploy your automate contract',
+              }),
+              async () => {
+                return true;
+              },
+              async () => {
+                const tx = await wavesTransaction.broadcast(
+                  wavesTransaction.setScript(
+                    {
+                      script: `base64:${dAppBase64}`,
+                      chainId: signer.network.code,
+                    },
+                    deploySeed
+                  ),
+                  signer.network.server
+                );
+                return {
+                  tx,
+                  wait: async () =>
+                    wavesTransaction.waitForTx(tx.id, {
+                      apiBase: signer.network.server,
+                    }),
+                  getAddress: () => deployAddress,
+                };
+              }
+            ),
+          ],
+        };
+      },
+    },
     autorestake: async (signer, contractAddress) => {
       const deposit = [
         AutomateActions.tab(
@@ -464,7 +532,7 @@ module.exports = {
             inputs: [
               AutomateActions.input({
                 placeholder: 'amount',
-                value: '0'
+                value: '0',
               }),
             ],
           }),
