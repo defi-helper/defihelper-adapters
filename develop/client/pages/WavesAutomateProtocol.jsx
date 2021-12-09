@@ -78,7 +78,7 @@ function automateReducer(state, { type, value }) {
 const automateAdapterActions = ["migrate", "deposit", "refund", "run"];
 
 export function WavesAutomateProtocol(props) {
-  const [provider, signer] = useProvider();
+  const [signer] = useProvider();
   const [automates, setAutomates] = React.useState(null);
   const [automate, automateDispatch] = React.useReducer(automateReducer, {
     artifact: null,
@@ -110,11 +110,10 @@ export function WavesAutomateProtocol(props) {
     const protocolAdapters = await adaptersGateway.load(protocol);
     setAdapters(protocolAdapters.automates);
 
+    const deployFactory =
+      protocolAdapters.automates.deploy[artifact.contractName];
     setDeploySteps(
-      await protocolAdapters.automates.deploy[artifact.contractName](
-        provider,
-        artifact.base64
-      ).then(({ deploy }) => deploy)
+      await deployFactory(signer, artifact.base64).then(({ deploy }) => deploy)
     );
   };
 

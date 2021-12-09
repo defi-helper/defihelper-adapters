@@ -1,4 +1,4 @@
-const { axios, bn, wavesTransaction } = require('../lib');
+const { axios, bn, wavesTransaction, wavesSigner, wavesSeedProvider } = require('../lib');
 const { waves, toFloat, coingecko, tokens } = require('../utils');
 const AutomateActions = require('../utils/automate/actions');
 
@@ -456,10 +456,10 @@ module.exports = {
   },
   automates: {
     deploy: {
-      autorestake: async (provider, dAppBase64) => {
-        const signer = await provider.publicState();
+      autorestake: async (signer, dAppBase64) => {
+        const netByte = await signer.getNetworkByte();
         const deploySeed = wavesTransaction.libs.crypto.randomSeed();
-        const deployAddress = wavesTransaction.libs.crypto.address(deploySeed, signer.network.code);
+        const deployAddress = wavesTransaction.libs.crypto.address(deploySeed, netByte);
 
         return {
           deploy: [
@@ -472,21 +472,16 @@ module.exports = {
                 return true;
               },
               async () => {
-                const tx = JSON.parse(
-                  await provider.signAndPublishTransaction({
-                    type: 4,
-                    data: {
-                      amount: { tokens: '0.04', assetId: 'WAVES' },
-                      recipient: deployAddress,
-                    },
+                const tx = await signer
+                  .transfer({
+                    amount: 4e6, // 0.04 WAVES
+                    recipient: deployAddress,
                   })
-                );
+                  .broadcast();
+
                 return {
                   tx,
-                  wait: async () =>
-                    wavesTransaction.waitForTx(tx.id, {
-                      apiBase: signer.network.server,
-                    }),
+                  wait: () => signer.waitTxConfirm(tx, 1),
                 };
               }
             ),
@@ -499,22 +494,13 @@ module.exports = {
                 return true;
               },
               async () => {
-                const tx = await wavesTransaction.broadcast(
-                  wavesTransaction.setScript(
-                    {
-                      script: `base64:${dAppBase64}`,
-                      chainId: signer.network.code,
-                    },
-                    deploySeed
-                  ),
-                  signer.network.server
-                );
+                const contractSigner = new wavesSigner({ NODE_URL: signer });
+                await contractSigner.setProvider(new wavesSeedProvider(deploySeed));
+                const tx = await contractSigner.setScript({ script: `base64:${dAppBase64}` }).broadcast();
+
                 return {
                   tx,
-                  wait: async () =>
-                    wavesTransaction.waitForTx(tx.id, {
-                      apiBase: signer.network.server,
-                    }),
+                  wait: () => contractSigner.waitTxConfirm(tx, 1),
                   getAddress: () => deployAddress,
                 };
               }
