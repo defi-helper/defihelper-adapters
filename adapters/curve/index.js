@@ -8,6 +8,7 @@ const minterABI = require('./abi/minterABI.json');
 const gaugeControllerABI = require('./abi/gaugeControllerABI.json');
 const gaugeUniswapRestakeABI = require('./abi/gaugeUniswapRestakeABI.json');
 const { tokens } = require('../utils');
+const AutomateActions = require('../utils/automate/actions');
 
 class Pool {
   constructor(connect, info) {
