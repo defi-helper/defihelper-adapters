@@ -17,7 +17,7 @@
     "server": "node ./develop/server.js",
     "client:build": "parcel build ./develop/client/index.js -d public/dist --no-cache",
     "client:watch": "parcel watch ./develop/client/index.js -d public/dist",
-    "dev": "npm-run-all --parallel watch:adapters watch:client server"
+    "dev": "npm-run-all --parallel adapters:watch client:watch server"
   },
   "author": "DeFi Helper",
   "license": "",
