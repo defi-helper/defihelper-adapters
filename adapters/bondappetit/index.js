@@ -3,6 +3,7 @@ const { ethereum, waves, toFloat, staking } = require('../utils');
 const StakingABI = require('./abi/Staking.json');
 const SynthetixUniswapLpRestakeABI = require('./abi/SynthetixUniswapLpRestake.json');
 const AutomateActions = require('../utils/automate/actions');
+const stakingContracts = require('./abi/stakingContracts.json');
 
 const swopTokenId = 'Ehie5xYpeN8op1Cctc6aGUrqx8jq3jtf1DSjXDbfm7aT';
 
@@ -72,47 +73,57 @@ module.exports = {
   },
   automates: {
     deploy: {
-      SynthetixUniswapLpRestake: async (signer, factoryAddress, prototypeAddress) => ({
-        deploy: [
-          AutomateActions.tab(
-            'Deploy',
-            async () => ({
-              description: 'Deploy your automate contract',
-              inputs: [
-                AutomateActions.input({
-                  placeholder: 'Staking contract',
-                  value: '',
-                }),
-                AutomateActions.input({
-                  placeholder: 'Slippage percent',
-                  value: '1',
-                }),
-                AutomateActions.input({
-                  placeholder: 'Deadline (seconds)',
-                  value: '300'
-                }),
-              ],
-            }),
-            async (staking, slippage, deadline) => {
-              if (slippage < 0 || slippage > 100) return new Error('Invalid slippage percent');
-              if (deadline < 0) return new Error('Deadline has already passed');
+      SynthetixUniswapLpRestake: async (signer, factoryAddress, prototypeAddress, contractAddress = undefined) => {
+        const stakingContract = contractAddress ?? stakingContracts[0].stakingContract;
 
-              return true;
-            },
-            async (staking, slippage, deadline) =>
-              AutomateActions.ethereum.proxyDeploy(
-                signer,
-                factoryAddress,
-                prototypeAddress,
-                new ethers.utils.Interface(SynthetixUniswapLpRestakeABI).encodeFunctionData('init', [
-                  staking,
-                  Math.floor(slippage * 10),
-                  deadline,
-                ])
-              )
-          ),
-        ],
-      }),
+        return {
+          deploy: [
+            AutomateActions.tab(
+              'Deploy',
+              async () => ({
+                description: 'Deploy your automate contract',
+                inputs: [
+                  AutomateActions.input({
+                    placeholder: 'Staking contract',
+                    value: stakingContract,
+                  }),
+                  AutomateActions.input({
+                    placeholder: 'Slippage percent',
+                    value: '1',
+                  }),
+                  AutomateActions.input({
+                    placeholder: 'Deadline (seconds)',
+                    value: '300',
+                  }),
+                ],
+              }),
+              async (staking, slippage, deadline) => {
+                if (
+                  stakingContracts.find(
+                    ({ stakingContract }) => staking.toLowerCase() === stakingContract.toLowerCase()
+                  ) === undefined
+                )
+                  return new Error('Invalid staking contract');
+                if (slippage < 0 || slippage > 100) return new Error('Invalid slippage percent');
+                if (deadline < 0) return new Error('Deadline has already passed');
+
+                return true;
+              },
+              async (staking, slippage, deadline) =>
+                AutomateActions.ethereum.proxyDeploy(
+                  signer,
+                  factoryAddress,
+                  prototypeAddress,
+                  new ethers.utils.Interface(SynthetixUniswapLpRestakeABI).encodeFunctionData('init', [
+                    staking,
+                    Math.floor(slippage * 10),
+                    deadline,
+                  ])
+                )
+            ),
+          ],
+        };
+      },
     },
     SynthetixUniswapLpRestake: async (signer, contractAddress) => {
       const signerAddress = await signer.getAddress();

@@ -4,6 +4,8 @@ const EthStakingABI = require('./abi/EthStaking.json');
 const EthAutomateABI = require('./abi/EthAutomate.json');
 const AutomateActions = require('../utils/automate/actions');
 
+const stakingContracts = ['0x3c8b066edb020db5c5489ce1ec335744f5593bce'];
+
 module.exports = {
   staking: async (provider, contractAddress, initOptions = ethereum.defaultOptions()) => {
     const options = {
@@ -107,35 +109,39 @@ module.exports = {
   },
   automates: {
     deploy: {
-      EthAutomate: async (signer, factoryAddress, prototypeAddress) => ({
-        deploy: [
-          AutomateActions.tab(
-            'Deploy',
-            async () => ({
-              description: 'Deploy your automate contract',
-              inputs: [
-                AutomateActions.input({
-                  placeholder: 'Staking contract',
-                  value: '0x3c8b066EDB020Db5C5489cE1Ec335744F5593BCe',
-                }),
-              ],
-            }),
-            async (staking) => {
-              if (staking.toLowerCase() !== '0x3c8b066edb020db5c5489ce1ec335744f5593bce')
-                return new Error('Invalid staking contract address');
+      EthAutomate: async (signer, factoryAddress, prototypeAddress, contractAddress = undefined) => {
+        const stakingContract = contractAddress ?? stakingContracts[0];
 
-              return true;
-            },
-            async (staking) =>
-              AutomateActions.ethereum.proxyDeploy(
-                signer,
-                factoryAddress,
-                prototypeAddress,
-                new ethers.utils.Interface(EthAutomateABI).encodeFunctionData('init', [staking])
-              )
-          ),
-        ],
-      }),
+        return {
+          deploy: [
+            AutomateActions.tab(
+              'Deploy',
+              async () => ({
+                description: 'Deploy your automate contract',
+                inputs: [
+                  AutomateActions.input({
+                    placeholder: 'Staking contract',
+                    value: stakingContract,
+                  }),
+                ],
+              }),
+              async (staking) => {
+                if (!stakingContracts.includes(staking.toLowerCase()))
+                  return new Error('Invalid staking contract address');
+
+                return true;
+              },
+              async (staking) =>
+                AutomateActions.ethereum.proxyDeploy(
+                  signer,
+                  factoryAddress,
+                  prototypeAddress,
+                  new ethers.utils.Interface(EthAutomateABI).encodeFunctionData('init', [staking])
+                )
+            ),
+          ],
+        };
+      },
     },
     EthAutomate: async (signer, contractAddress) => {
       const signerAddress = await signer.getAddress();
