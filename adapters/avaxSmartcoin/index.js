@@ -238,50 +238,60 @@ module.exports = {
   },
   automates: {
     deploy: {
-      MasterChefJoeLpRestake: async (signer, factoryAddress, prototypeAddress) => ({
-        deploy: [
-          AutomateActions.tab(
-            'Deploy',
-            async () => ({
-              description: 'Deploy your automate contract',
-              inputs: [
-                AutomateActions.input({
-                  placeholder: 'Target pool index',
-                  value: '0',
-                }),
-                AutomateActions.input({
-                  placeholder: 'Slippage (percent)',
-                  value: '1',
-                }),
-                AutomateActions.input({
-                  placeholder: 'Deadline (seconds)',
-                  value: '300',
-                }),
-              ],
-            }),
-            async (pool, slippage, deadline) => {
-              if (masterChefSavedPools.find(({ index }) => index === parseInt(pool, 10)))
-                return new Error('Invalid pool index');
-              if (slippage < 0 || slippage > 100) return new Error('Invalid slippage percent');
-              if (deadline < 0) return new Error('Deadline has already passed');
+      MasterChefJoeLpRestake: async (signer, factoryAddress, prototypeAddress, contractAddress = undefined) => {
+        let poolIndex = masterChefSavedPools[0].index.toString();
+        if (contractAddress) {
+          poolIndex =
+            masterChefSavedPools.find(
+              ({ stakingToken }) => stakingToken.toLowerCase() === contractAddress.toLowerCase()
+            )?.index ?? poolIndex;
+        }
 
-              return true;
-            },
-            async (pool, slippage, deadline) =>
-              AutomateActions.ethereum.proxyDeploy(
-                signer,
-                factoryAddress,
-                prototypeAddress,
-                new ethers.utils.Interface(MasterChefJoeLpRestakeABI).encodeFunctionData('init', [
-                  masterChefAddress,
-                  pool,
-                  Math.floor(slippage * 10),
-                  deadline,
-                ])
-              )
-          ),
-        ],
-      }),
+        return {
+          deploy: [
+            AutomateActions.tab(
+              'Deploy',
+              async () => ({
+                description: 'Deploy your automate contract',
+                inputs: [
+                  AutomateActions.input({
+                    placeholder: 'Target pool index',
+                    value: poolIndex,
+                  }),
+                  AutomateActions.input({
+                    placeholder: 'Slippage (percent)',
+                    value: '1',
+                  }),
+                  AutomateActions.input({
+                    placeholder: 'Deadline (seconds)',
+                    value: '300',
+                  }),
+                ],
+              }),
+              async (pool, slippage, deadline) => {
+                if (masterChefSavedPools.find(({ index }) => index === parseInt(pool, 10)))
+                  return new Error('Invalid pool index');
+                if (slippage < 0 || slippage > 100) return new Error('Invalid slippage percent');
+                if (deadline < 0) return new Error('Deadline has already passed');
+
+                return true;
+              },
+              async (pool, slippage, deadline) =>
+                AutomateActions.ethereum.proxyDeploy(
+                  signer,
+                  factoryAddress,
+                  prototypeAddress,
+                  new ethers.utils.Interface(MasterChefJoeLpRestakeABI).encodeFunctionData('init', [
+                    masterChefAddress,
+                    pool,
+                    Math.floor(slippage * 10),
+                    deadline,
+                  ])
+                )
+            ),
+          ],
+        };
+      },
     },
     MasterChefJoeLpRestake: async (signer, contractAddress) => {
       const signerAddress = await signer.getAddress();
