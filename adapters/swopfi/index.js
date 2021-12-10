@@ -458,6 +458,7 @@ module.exports = {
     deploy: {
       autorestake: async (signer, dAppBase64) => {
         const netByte = await signer.getNetworkByte();
+        const node = waves.nodes[netByte] ?? waves.nodes.main;
         const deploySeed = wavesTransaction.libs.crypto.randomSeed();
         const deployAddress = wavesTransaction.libs.crypto.address(deploySeed, netByte);
 
@@ -494,7 +495,7 @@ module.exports = {
                 return true;
               },
               async () => {
-                const contractSigner = new wavesSigner({ NODE_URL: signer });
+                const contractSigner = new wavesSigner({ NODE_URL: node });
                 await contractSigner.setProvider(new wavesSeedProvider(deploySeed));
                 const tx = await contractSigner.setScript({ script: `base64:${dAppBase64}` }).broadcast();
 
@@ -510,6 +511,9 @@ module.exports = {
       },
     },
     autorestake: async (signer, contractAddress) => {
+      const netByte = await signer.getNetworkByte();
+      const node = waves.nodes[netByte] ?? waves.nodes.main;
+
       const deposit = [
         AutomateActions.tab(
           'Transfer',
@@ -525,9 +529,34 @@ module.exports = {
           async (amount) => {
             return true;
           },
-          async (amount) => ({
-            tx: null,
-          })
+          async (amount) => {
+            const tx = await signer.invokeScript({
+
+            }).broadcast();
+
+            /*
+            const tx = invokeScript(
+              {
+                dApp: contractAddress,
+                fee: 500000,
+                payment: [
+                  {
+                    amount: 10000,
+                    assetId: swopFeeAssetId,
+                  },
+                ],
+                call: {
+                  function: 'governanceLockSWOP',
+                },
+              },
+              'wallet seed'
+            );
+            */
+
+            return {
+              tx,
+            };
+          }
         ),
         AutomateActions.tab(
           'Deposit',

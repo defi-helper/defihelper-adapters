@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Signer } from '@waves/signer';
-import { ProviderKeeper } from '@waves/provider-keeper';
+import { ProviderKeeper } from '@defihelper/provider-keeper';
 
 let address;
 export const createWavesProvider = async () => {

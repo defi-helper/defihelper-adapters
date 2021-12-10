@@ -78,7 +78,7 @@ function automateReducer(state, { type, value }) {
 const automateAdapterActions = ["migrate", "deposit", "refund", "run"];
 
 export function WavesAutomateProtocol(props) {
-  const [signer] = useProvider();
+  const [provider, signer] = useProvider();
   const [automates, setAutomates] = React.useState(null);
   const [automate, automateDispatch] = React.useReducer(automateReducer, {
     artifact: null,
