@@ -6,13 +6,13 @@ import "../utils/DFH/Automate.sol";
 import "../utils/DFH/IStorage.sol";
 import "../utils/Uniswap/IUniswapV2Router02.sol";
 import "../utils/Uniswap/IUniswapV2Pair.sol";
-import "./IMasterChefJoeV2.sol";
+import "./IMasterChefFinnV2.sol";
 import {ERC20Tools} from "../utils/ERC20Tools.sol";
 
-contract MasterChefJoeLpRestake is Automate {
+contract MasterChefFinnLpRestake is Automate {
   using ERC20Tools for IERC20;
 
-  IMasterChefJoeV2 public staking;
+  IMasterChefFinnV2 public staking;
 
   uint256 public pool;
 
@@ -33,14 +33,14 @@ contract MasterChefJoeLpRestake is Automate {
     uint16 _slippage,
     uint16 _deadline
   ) external initializer {
-    staking = IMasterChefJoeV2(_staking);
+    staking = IMasterChefFinnV2(_staking);
     pool = _pool;
     slippage = _slippage;
     deadline = _deadline;
 
-    IMasterChefJoeV2.PoolInfo memory poolInfo = staking.poolInfo(pool);
+    IMasterChefFinnV2.PoolInfo memory poolInfo = staking.poolInfo(pool);
     stakingToken = IERC20(poolInfo.lpToken);
-    rewardToken = IERC20(staking.joe());
+    rewardToken = IERC20(staking.finn());
   }
 
   function deposit() external onlyOwner {
@@ -49,9 +49,9 @@ contract MasterChefJoeLpRestake is Automate {
   }
 
   function refund() external onlyOwner {
-    IMasterChefJoeV2 _staking = staking; // gas optimisation
+    IMasterChefFinnV2 _staking = staking; // gas optimisation
     address __owner = owner(); // gas optimisation
-    IMasterChefJoeV2.UserInfo memory userInfo = staking.userInfo(pool, address(this));
+    IMasterChefFinnV2.UserInfo memory userInfo = staking.userInfo(pool, address(this));
     _staking.withdraw(pool, userInfo.amount);
     stakingToken.transfer(__owner, stakingToken.balanceOf(address(this)));
     rewardToken.transfer(__owner, rewardToken.balanceOf(address(this)));
@@ -95,12 +95,12 @@ contract MasterChefJoeLpRestake is Automate {
     uint256 gasFee,
     uint256 _deadline,
     uint256[2] memory _outMin
-  ) external bill(gasFee, "AvaxSmartcoinMasterChefJoeLPRestake") {
-    IMasterChefJoeV2 _staking = staking; // gas optimization
-    IMasterChefJoeV2.UserInfo memory userInfo = staking.userInfo(pool, address(this));
-    require(userInfo.rewardDebt > 0, "MasterChefJoeLpRestake::run: no earned");
-    address router = IStorage(info()).getAddress(keccak256("Joe:Contract:Router2"));
-    require(router != address(0), "MasterChefJoeLpRestake::run: joe router contract not found");
+  ) external bill(gasFee, "AvaxSmartcoinMasterChefFinnLPRestake") {
+    IMasterChefFinnV2 _staking = staking; // gas optimization
+    IMasterChefFinnV2.UserInfo memory userInfo = staking.userInfo(pool, address(this));
+    require(userInfo.rewardDebt > 0, "MasterChefFinnLpRestake::run: no earned");
+    address router = IStorage(info()).getAddress(keccak256("Finn:Contract:Router2"));
+    require(router != address(0), "MasterChefFinnLpRestake::run: finn router contract not found");
 
     _staking.deposit(pool, 0); // get all reward
     uint256 rewardAmount = rewardToken.balanceOf(address(this));

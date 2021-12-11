@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 pragma solidity ^0.8.6;
 
-interface IMasterChefJoeV2 {
+interface IMasterChefFinnV2 {
   struct UserInfo {
     uint256 amount;
     uint256 rewardDebt;
@@ -11,11 +11,11 @@ interface IMasterChefJoeV2 {
     address lpToken;
     uint256 allocPoint;
     uint256 lastRewardTimestamp;
-    uint256 accJoePerShare;
+    uint256 accFinnPerShare;
     address rewarder;
   }
 
-  function joe() external view returns (address);
+  function finn() external view returns (address);
 
   function poolInfo(uint256 pool) external view returns (PoolInfo memory);
 
