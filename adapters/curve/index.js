@@ -488,10 +488,21 @@ module.exports = {
         const gasFee = new bn(gasLimit.toString()).multipliedBy(gasPrice.toString()).toFixed(0);
 
         await automate.estimateGas.run(gasFee, deadline, swapOutMin, lpOutMin);
-        return [gasFee, deadline, swapOutMin, lpOutMin];
+        return {
+          gasPrice,
+          gasLimit,
+          calldata: [gasFee, deadline, swapOutMin, lpOutMin],
+        };
       };
       const run = async () => {
-        return automate.run.apply(automate, await runParams());
+        const { gasPrice, gasLimit, calldata } = await runParams();
+        return automate.run.apply(automate, [
+          ...calldata,
+          {
+            gasPrice,
+            gasLimit,
+          },
+        ]);
       };
 
       return {
