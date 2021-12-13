@@ -88,6 +88,10 @@ module.exports = {
                     value: stakingContract,
                   }),
                   AutomateActions.input({
+                    placeholder: 'Liquidity pool router address',
+                    value: '0x7a250d5630b4cf539739df2c5dacb4c659f2488d',
+                  }),
+                  AutomateActions.input({
                     placeholder: 'Slippage percent',
                     value: '1',
                   }),
@@ -97,7 +101,7 @@ module.exports = {
                   }),
                 ],
               }),
-              async (staking, slippage, deadline) => {
+              async (staking, router, slippage, deadline) => {
                 if (
                   stakingContracts.find(
                     ({ stakingContract }) => staking.toLowerCase() === stakingContract.toLowerCase()
@@ -109,13 +113,14 @@ module.exports = {
 
                 return true;
               },
-              async (staking, slippage, deadline) =>
+              async (staking, router, slippage, deadline) =>
                 AutomateActions.ethereum.proxyDeploy(
                   signer,
                   factoryAddress,
                   prototypeAddress,
                   new ethers.utils.Interface(SynthetixUniswapLpRestakeABI).encodeFunctionData('init', [
                     staking,
+                    router,
                     Math.floor(slippage * 10),
                     deadline,
                   ])

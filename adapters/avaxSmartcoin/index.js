@@ -255,6 +255,10 @@ module.exports = {
                 description: 'Deploy your automate contract',
                 inputs: [
                   AutomateActions.input({
+                    placeholder: 'Liquidity pool router address',
+                    value: '0x60aE616a2155Ee3d9A68541Ba4544862310933d4',
+                  }),
+                  AutomateActions.input({
                     placeholder: 'Target pool index',
                     value: poolIndex,
                   }),
@@ -268,7 +272,7 @@ module.exports = {
                   }),
                 ],
               }),
-              async (pool, slippage, deadline) => {
+              async (router, pool, slippage, deadline) => {
                 if (masterChefSavedPools.find(({ index }) => index === parseInt(pool, 10)))
                   return new Error('Invalid pool index');
                 if (slippage < 0 || slippage > 100) return new Error('Invalid slippage percent');
@@ -276,13 +280,14 @@ module.exports = {
 
                 return true;
               },
-              async (pool, slippage, deadline) =>
+              async (router, pool, slippage, deadline) =>
                 AutomateActions.ethereum.proxyDeploy(
                   signer,
                   factoryAddress,
                   prototypeAddress,
                   new ethers.utils.Interface(MasterChefJoeLpRestakeABI).encodeFunctionData('init', [
                     masterChefAddress,
+                    router,
                     pool,
                     Math.floor(slippage * 10),
                     deadline,

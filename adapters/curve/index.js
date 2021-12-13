@@ -321,6 +321,10 @@ module.exports = {
                     value: gauge,
                   }),
                   AutomateActions.input({
+                    placeholder: 'Liquidity pool router address',
+                    value: '0x7a250d5630b4cf539739df2c5dacb4c659f2488d',
+                  }),
+                  AutomateActions.input({
                     placeholder: 'Swap token address',
                     value: swapToken,
                   }),
@@ -334,19 +338,20 @@ module.exports = {
                   }),
                 ],
               }),
-              async (gauge, swapToken, slippage, deadline) => {
+              async (gauge, router, swapToken, slippage, deadline) => {
                 if (slippage < 0 || slippage > 100) return new Error('Invalid slippage percent');
                 if (deadline < 0) return new Error('Deadline has already passed');
 
                 return true;
               },
-              async (gauge, swapToken, slippage, deadline) =>
+              async (gauge, router, swapToken, slippage, deadline) =>
                 AutomateActions.ethereum.proxyDeploy(
                   signer,
                   factoryAddress,
                   prototypeAddress,
                   new ethers.utils.Interface(gaugeUniswapRestakeABI).encodeFunctionData('init', [
                     gauge,
+                    router,
                     swapToken,
                     Math.floor(slippage * 10),
                     deadline,
@@ -455,17 +460,15 @@ module.exports = {
         const multicall = new ethersMulticall.Provider(signer, await signer.getChainId());
         const automateMulticall = new ethersMulticall.Contract(contractAddress, gaugeUniswapRestakeABI);
         const stakingMulticall = new ethersMulticall.Contract(stakingAddress, gaugeABI);
-        const minterAddress = await staking.minter();
-        const minterMulticall = new ethersMulticall.Contract(minterAddress, minterABI);
-        const [infoAddress, slippagePercent, deadlineSeconds, swapTokenAddress, rewardTokenAddress, earned] =
+        const [infoAddress, slippagePercent, deadlineSeconds, swapTokenAddress, rewardTokenAddress] =
           await multicall.all([
             automateMulticall.info(),
             automateMulticall.slippage(),
             automateMulticall.deadline(),
             automateMulticall.swapToken(),
             stakingMulticall.crv_token(),
-            minterMulticall.minted(contractAddress, stakingAddress),
           ]);
+        const earned = await staking.callStatic.claimable_tokens(contractAddress).then((v) => v.toString());
         if (earned.toString() === '0') return new Error('No earned');
         const routerAddress = await ethereum.dfh
           .storage(signer, infoAddress)
@@ -488,10 +491,21 @@ module.exports = {
         const gasFee = new bn(gasLimit.toString()).multipliedBy(gasPrice.toString()).toFixed(0);
 
         await automate.estimateGas.run(gasFee, deadline, swapOutMin, lpOutMin);
-        return [gasFee, deadline, swapOutMin, lpOutMin];
+        return {
+          gasPrice,
+          gasLimit,
+          calldata: [gasFee, deadline, swapOutMin, lpOutMin],
+        };
       };
       const run = async () => {
-        return automate.run.apply(automate, await runParams());
+        const { gasPrice, gasLimit, calldata } = await runParams();
+        return automate.run.apply(automate, [
+          ...calldata,
+          {
+            gasPrice,
+            gasLimit,
+          },
+        ]);
       };
 
       return {

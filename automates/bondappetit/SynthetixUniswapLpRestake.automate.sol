@@ -15,6 +15,8 @@ contract SynthetixUniswapLpRestake is Automate {
 
   IStaking public staking;
 
+  address public liquidityRouter;
+
   uint16 public slippage;
 
   uint16 public deadline;
@@ -24,19 +26,22 @@ contract SynthetixUniswapLpRestake is Automate {
 
   function init(
     address _staking,
+    address _liquidityRouter,
     uint16 _slippage,
     uint16 _deadline
   ) external initializer {
     staking = IStaking(_staking);
+    liquidityRouter = _liquidityRouter;
     slippage = _slippage;
     deadline = _deadline;
   }
 
   function deposit() external onlyOwner {
     IStaking _staking = staking; // gas optimisation
-    address stakingToken = _staking.stakingToken();
-    IERC20(stakingToken).safeApproveAll(address(_staking));
-    _staking.stake(IERC20(stakingToken).balanceOf(address(this)));
+    IERC20 stakingToken = IERC20(_staking.stakingToken());
+    uint256 balance = stakingToken.balanceOf(address(this));
+    stakingToken.safeApprove(address(_staking), balance);
+    _staking.stake(balance);
   }
 
   function refund() external onlyOwner {
@@ -52,29 +57,37 @@ contract SynthetixUniswapLpRestake is Automate {
   }
 
   function _swap(
-    address[3] memory path,
+    address[2] memory path,
     uint256[2] memory amount,
     uint256 _deadline
   ) internal returns (uint256) {
-    if (path[1] == path[2]) return amount[0];
+    if (path[0] == path[1]) return amount[0];
 
     address[] memory _path = new address[](2);
-    _path[0] = path[1];
-    _path[1] = path[2];
+    _path[0] = path[0];
+    _path[1] = path[1];
 
-    IERC20(path[2]).safeApproveAll(path[0]); // For add liquidity call
     return
-      IUniswapV2Router02(path[0]).swapExactTokensForTokens(amount[0], amount[1], _path, address(this), _deadline)[1];
+      IUniswapV2Router02(liquidityRouter).swapExactTokensForTokens(
+        amount[0],
+        amount[1],
+        _path,
+        address(this),
+        _deadline
+      )[1];
   }
 
   function _addLiquidity(
-    address[3] memory path,
+    address[2] memory path,
     uint256[4] memory amount,
     uint256 _deadline
   ) internal {
-    IUniswapV2Router02(path[0]).addLiquidity(
+    address _liquidityRouter = liquidityRouter; // gas optimisation
+    IERC20(path[0]).safeApprove(_liquidityRouter, amount[0]);
+    IERC20(path[1]).safeApprove(_liquidityRouter, amount[1]);
+    IUniswapV2Router02(_liquidityRouter).addLiquidity(
+      path[0],
       path[1],
-      path[2],
       amount[0],
       amount[1],
       amount[2],
@@ -91,25 +104,24 @@ contract SynthetixUniswapLpRestake is Automate {
   ) external bill(gasFee, "BondappetitSynthetixLPRestake") {
     IStaking _staking = staking; // gas optimization
     require(_staking.earned(address(this)) > 0, "SynthetixUniswapLpRestake::run: no earned");
-    address router = IStorage(info()).getAddress(keccak256("UniswapV2:Contract:Router2"));
-    require(router != address(0), "SynthetixUniswapLpRestake::run: uniswap router contract not found");
 
     _staking.getReward();
     address rewardToken = _staking.rewardsToken();
     uint256 rewardAmount = IERC20(rewardToken).balanceOf(address(this));
-    IERC20(rewardToken).safeApproveAll(router);
+    IERC20(rewardToken).safeApprove(liquidityRouter, rewardAmount);
 
     IUniswapV2Pair stakingToken = IUniswapV2Pair(_staking.stakingToken());
     address[2] memory tokens = [stakingToken.token0(), stakingToken.token1()];
     uint256[4] memory amount = [
-      _swap([router, rewardToken, tokens[0]], [rewardAmount / 2, _outMin[0]], _deadline),
-      _swap([router, rewardToken, tokens[1]], [rewardAmount - rewardAmount / 2, _outMin[1]], _deadline),
+      _swap([rewardToken, tokens[0]], [rewardAmount / 2, _outMin[0]], _deadline),
+      _swap([rewardToken, tokens[1]], [rewardAmount - rewardAmount / 2, _outMin[1]], _deadline),
       0,
       0
     ];
 
-    _addLiquidity([router, tokens[0], tokens[1]], amount, _deadline);
-    IERC20(stakingToken).safeApproveAll(address(_staking));
-    _staking.stake(IERC20(stakingToken).balanceOf(address(this)));
+    _addLiquidity([tokens[0], tokens[1]], amount, _deadline);
+    uint256 stakingAmount = stakingToken.balanceOf(address(this));
+    IERC20(stakingToken).safeApprove(address(_staking), stakingAmount);
+    _staking.stake(stakingAmount);
   }
 }
