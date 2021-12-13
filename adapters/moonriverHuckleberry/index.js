@@ -112,10 +112,6 @@ module.exports = {
       },
       wallet: async (walletAddress) => {
         const { amount, rewardDebt } = await masterChiefContract.userInfo(poolIndex, walletAddress);
-
-        console.log(amount.toString());
-        console.log(rewardDebt.toString());
-
         const { accRewardPerShare } = await masterChiefContract.poolInfo(poolIndex);
         const balance = toFloat(amount, ethereum.uniswap.pairDecimals);
         const earned = toFloat(
