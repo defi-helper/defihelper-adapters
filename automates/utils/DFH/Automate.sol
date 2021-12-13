@@ -105,7 +105,7 @@ abstract contract Automate {
   }
 
   /**
-   * @dev Throws if contract paused.
+   * @dev Throws if contract unpaused.
    */
   modifier whenPaused() {
     require(paused(), "Automate: not paused");
@@ -113,7 +113,7 @@ abstract contract Automate {
   }
 
   /**
-   * @dev Throws if contract unpaused.
+   * @dev Throws if contract paused.
    */
   modifier whenNotPaused() {
     require(!paused(), "Automate: paused");

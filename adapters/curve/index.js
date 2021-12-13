@@ -321,6 +321,10 @@ module.exports = {
                     value: gauge,
                   }),
                   AutomateActions.input({
+                    placeholder: 'Liquidity pool router address',
+                    value: '0x7a250d5630b4cf539739df2c5dacb4c659f2488d',
+                  }),
+                  AutomateActions.input({
                     placeholder: 'Swap token address',
                     value: swapToken,
                   }),
@@ -334,19 +338,20 @@ module.exports = {
                   }),
                 ],
               }),
-              async (gauge, swapToken, slippage, deadline) => {
+              async (gauge, router, swapToken, slippage, deadline) => {
                 if (slippage < 0 || slippage > 100) return new Error('Invalid slippage percent');
                 if (deadline < 0) return new Error('Deadline has already passed');
 
                 return true;
               },
-              async (gauge, swapToken, slippage, deadline) =>
+              async (gauge, router, swapToken, slippage, deadline) =>
                 AutomateActions.ethereum.proxyDeploy(
                   signer,
                   factoryAddress,
                   prototypeAddress,
                   new ethers.utils.Interface(gaugeUniswapRestakeABI).encodeFunctionData('init', [
                     gauge,
+                    router,
                     swapToken,
                     Math.floor(slippage * 10),
                     deadline,

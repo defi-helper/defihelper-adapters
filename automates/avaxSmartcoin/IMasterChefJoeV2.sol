@@ -21,7 +21,19 @@ interface IMasterChefJoeV2 {
 
   function userInfo(uint256 pool, address user) external view returns (UserInfo memory);
 
+  function pendingTokens(uint256 pool, address user)
+    external
+    view
+    returns (
+      uint256 pendingJoe,
+      address bonusTokenAddress,
+      string memory bonusTokenSymbol,
+      uint256 pendingBonusToken
+    );
+
   function deposit(uint256 pool, uint256 amount) external;
 
   function withdraw(uint256 pool, uint256 amount) external;
+
+  function emergencyWithdraw(uint256 pool) external;
 }

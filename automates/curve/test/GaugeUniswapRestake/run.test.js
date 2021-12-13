@@ -33,9 +33,6 @@ describe('GaugeUniswapRestake.run', function () {
     );
     uniRouter = await UniRouter.deploy(uniPair.address);
     await uniRouter.deployed();
-    await storage.mock.getAddress
-      .withArgs(DFHFixtures.storageKey('UniswapV2:Contract:Router2'))
-      .returns(uniRouter.address);
     await crvToken.transfer(uniRouter.address, crvTokenLiquidity);
     await usdc.transfer(uniRouter.address, usdcTokenLiquidity);
     await uniRouter.setAmountsOut([crvToken.address, usdc.address], [crvTokenLiquidity, usdcTokenLiquidity]);
@@ -50,7 +47,7 @@ describe('GaugeUniswapRestake.run', function () {
     );
     automate = await Automate.deploy(storage.address);
     await automate.deployed();
-    await automate.init(plainPoolGauge.address, usdc.address, 600, 0);
+    await automate.init(plainPoolGauge.address, uniRouter.address, usdc.address, 600, 0);
     await plainPoolLP.transfer(automate.address, stakingTokenAmount);
     await automate.deposit();
     await crvToken.transfer(minter.address, rewardTokenAmount);

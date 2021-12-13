@@ -36,9 +36,6 @@ describe('SynthetixUniswapLpRestake.run', function () {
     );
     uniRouter = await UniRouter.deploy(stakingToken.address);
     await uniRouter.deployed();
-    await storage.mock.getAddress
-      .withArgs(DFHFixtures.storageKey('UniswapV2:Contract:Router2'))
-      .returns(uniRouter.address);
     await uniRouter.setAmountsOut([rewardToken.address, token0.address], [100, token0Price]);
     await uniRouter.setAmountsOut([rewardToken.address, token1.address], [100, token1Price]);
     await token0.transfer(uniRouter.address, token0Price);
@@ -59,7 +56,7 @@ describe('SynthetixUniswapLpRestake.run', function () {
     );
     automate = await Automate.deploy(storage.address);
     await automate.deployed();
-    await automate.init(staking.address, 600, 0);
+    await automate.init(staking.address, uniRouter.address, 600, 0);
     await stakingToken.transfer(automate.address, stakingTokenAmount);
     await automate.deposit();
     await rewardToken.transfer(staking.address, rewardTokenAmount);
