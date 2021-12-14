@@ -14,6 +14,7 @@ export default glob(path.resolve(__dirname, './adapters/*/index.js')).then((file
         output: {
           file: `adapters-public/${path.parse(path.parse(adapter).dir).name}.js`,
           format: 'cjs',
+          strict: false,
         },
         plugins: [json(), nodeResolve(), commonjs()],
       });
