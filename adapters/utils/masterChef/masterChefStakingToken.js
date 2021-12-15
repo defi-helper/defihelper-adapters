@@ -158,6 +158,28 @@ module.exports = {
    * @param {number} network
    * @param {string} blockTag
    * @param {string} block
+   * @returns {Promise<PairStakingToken>}
+   */
+  getUniPairToken: (provider, token, network, blockTag, block) =>
+    PairStakingToken.create(provider, token, network, blockTag, block),
+  /**
+   *
+   * @param {!*} provider
+   * @param {string} token
+   * @param {number} network
+   * @param {string} blockTag
+   * @param {string} block
+   * @returns {Promise<ErcStakingToken>}
+   */
+  getPlainToken: (provider, token, network, blockTag, block) =>
+    ErcStakingToken.create(provider, token, network, blockTag, block),
+  /**
+   *
+   * @param {!*} provider
+   * @param {string} token
+   * @param {number} network
+   * @param {string} blockTag
+   * @param {string} block
    * @returns {Promise<StakingToken>}
    */
   getMasterChefStakingToken: async (provider, token, network, blockTag, block) => {
