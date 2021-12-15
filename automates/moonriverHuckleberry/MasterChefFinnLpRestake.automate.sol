@@ -121,7 +121,7 @@ contract MasterChefFinnLpRestake is Automate {
     uint256[2] memory _outMin
   ) external bill(gasFee, "MoonriverHuckleberryMasterChefFinnLPRestake") {
     IMasterChefFinnV2 _staking = staking; // gas optimization
-    (uint256 pendingFinn, , , ) = _staking.pendingTokens(pool, address(this));
+    uint256 pendingFinn = _staking.pendingReward(pool, address(this));
     require(pendingFinn > 0, "MasterChefFinnLpRestake::run: no earned");
 
     _staking.deposit(pool, 0); // get all reward

@@ -60,26 +60,11 @@
           "type": "address"
         }
       ],
-      "name": "pendingTokens",
+      "name": "pendingReward",
       "outputs": [
         {
           "internalType": "uint256",
-          "name": "pendingFinn",
-          "type": "uint256"
-        },
-        {
-          "internalType": "address",
-          "name": "bonusTokenAddress",
-          "type": "address"
-        },
-        {
-          "internalType": "string",
-          "name": "bonusTokenSymbol",
-          "type": "string"
-        },
-        {
-          "internalType": "uint256",
-          "name": "pendingBonusToken",
+          "name": "",
           "type": "uint256"
         }
       ],
@@ -115,13 +100,8 @@
             },
             {
               "internalType": "uint256",
-              "name": "accFinnPerShare",
+              "name": "accRewardPerShare",
               "type": "uint256"
-            },
-            {
-              "internalType": "address",
-              "name": "rewarder",
-              "type": "address"
             }
           ],
           "internalType": "struct IMasterChefFinnV2.PoolInfo",

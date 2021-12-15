@@ -401,6 +401,8 @@ module.exports = {
         const automateMulticall = new ethersMulticall.Contract(contractAddress, MasterChefFinnLpRestakeABI);
         const stakingMulticall = new ethersMulticall.Contract(stakingAddress, masterChefABI);
         const stakingTokenMulticall = new ethersMulticall.Contract(stakingTokenAddress, ethereum.uniswap.pairABI);
+
+        console.log('aaaa');
         const [
           routerAddress,
           slippagePercent,
@@ -420,12 +422,17 @@ module.exports = {
           stakingMulticall.userInfo(poolId, contractAddress),
           stakingMulticall.poolInfo(poolId),
         ]);
+
+        console.log('bbbb');
+
         const earned = new bn(amount.toString())
           .multipliedBy(accRewardPerShare.toString())
          .div(new bn(10).pow(12))
          .minus(rewardDebt.toString());
         if (earned.toString(10) === '0') return new Error('No earned');
         const router = ethereum.uniswap.router(signer, routerAddress);
+
+        console.log('cccc');
 
         const slippage = 1 - slippagePercent / 10000;
         const token0AmountIn = new bn(earned.toString(10)).div(2).toFixed(0);
@@ -440,13 +447,22 @@ module.exports = {
           const [, amountOut] = await router.getAmountsOut(token1AmountIn, [rewardTokenAddress, token1Address]);
           token1Min = new bn(amountOut.toString()).multipliedBy(slippage).toFixed(0);
         }
+        console.log('gggg');
+
         const deadline = dayjs().add(deadlineSeconds, 'seconds').unix();
+
+        console.log('hhhh');
+
+        console.log(deadline, token0Min, token1Min);
 
         const gasLimit = new bn(
             await automate.estimateGas.run(0, deadline, [token0Min, token1Min]).then((v) => v.toString())
         )
         .multipliedBy(1.1)
          .toFixed(0);
+
+        console.log('ooo');
+
         const gasPrice = await signer.getGasPrice().then((v) => v.toString());
         const gasFee = new bn(gasLimit).multipliedBy(gasPrice).toFixed(0);
 
