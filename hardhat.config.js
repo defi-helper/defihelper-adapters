@@ -85,6 +85,20 @@ module.exports = {
       blockGasLimit: 8_000_000,
       accounts: [...maybeAccount(process.env.AVALANCHE_TEST_DEPLOYER)],
     },
+    moonriver: {
+      url: process.env.MOONRIVER_NODE || 'http://127.0.0.1:8545',
+      chainId: 1285,
+      gasPrice: 1_000_000_000,
+      blockGasLimit: 15_000_000,
+      accounts: [...maybeAccount(process.env.MOONRIVER_DEPLOYER)],
+    },
+    moonbaseAlpha: {
+      url: process.env.MOONBASE_ALPHA_NODE || 'http://127.0.0.1:8545',
+      chainId: 1287,
+      gasPrice: 1_000_000_000,
+      blockGasLimit: 15_000_000,
+      accounts: [...maybeAccount(process.env.MOONBASE_ALPHA_DEPLOYER)],
+    },
   },
   namedAccounts: {
     deployer: {
