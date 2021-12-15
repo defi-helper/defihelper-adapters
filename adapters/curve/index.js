@@ -460,9 +460,9 @@ module.exports = {
         const multicall = new ethersMulticall.Provider(signer, await signer.getChainId());
         const automateMulticall = new ethersMulticall.Contract(contractAddress, gaugeUniswapRestakeABI);
         const stakingMulticall = new ethersMulticall.Contract(stakingAddress, gaugeABI);
-        const [infoAddress, slippagePercent, deadlineSeconds, swapTokenAddress, rewardTokenAddress] =
+        const [routerAddress, slippagePercent, deadlineSeconds, swapTokenAddress, rewardTokenAddress] =
           await multicall.all([
-            automateMulticall.info(),
+            automateMulticall.liquidityRouter(),
             automateMulticall.slippage(),
             automateMulticall.deadline(),
             automateMulticall.swapToken(),
@@ -470,9 +470,6 @@ module.exports = {
           ]);
         const earned = await staking.callStatic.claimable_tokens(contractAddress).then((v) => v.toString());
         if (earned.toString() === '0') return new Error('No earned');
-        const routerAddress = await ethereum.dfh
-          .storage(signer, infoAddress)
-          .getAddress(ethereum.dfh.storageKey('UniswapV2:Contract:Router2'));
         const router = ethereum.uniswap.router(signer, routerAddress);
 
         const slippage = 1 - slippagePercent / 10000;

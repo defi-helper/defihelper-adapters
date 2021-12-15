@@ -402,7 +402,7 @@ module.exports = {
         const stakingMulticall = new ethersMulticall.Contract(stakingAddress, masterChefABI);
         const stakingTokenMulticall = new ethersMulticall.Contract(stakingTokenAddress, ethereum.uniswap.pairABI);
         const [
-          infoAddress,
+          routerAddress,
           slippagePercent,
           deadlineSeconds,
           token0Address,
@@ -411,7 +411,7 @@ module.exports = {
           { amount, rewardDebt },
           { accRewardPerShare },
         ] = await multicall.all([
-          automateMulticall.info(),
+          automateMulticall.liquidityRouter(),
           automateMulticall.slippage(),
           automateMulticall.deadline(),
           stakingTokenMulticall.token0(),
@@ -425,9 +425,6 @@ module.exports = {
          .div(new bn(10).pow(12))
          .minus(rewardDebt.toString());
         if (earned.toString(10) === '0') return new Error('No earned');
-        const routerAddress = await ethereum.dfh
-                                             .storage(signer, infoAddress)
-          .getAddress(ethereum.dfh.storageKey('Finn:Contract:Router2'));
         const router = ethereum.uniswap.router(signer, routerAddress);
 
         const slippage = 1 - slippagePercent / 10000;
