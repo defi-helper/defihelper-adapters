@@ -273,7 +273,7 @@ module.exports = {
                   ],
                 }),
                 async (router, pool, slippage, deadline) => {
-                  if (masterChefSavedPools.find(({ index }) => index === parseInt(pool, 10)))
+                  if (!masterChefSavedPools.find(({ index }) => index === parseInt(pool, 10)))
                     return new Error('Invalid pool index');
                   if (slippage < 0 || slippage > 100) return new Error('Invalid slippage percent');
                   if (deadline < 0) return new Error('Deadline has already passed');
