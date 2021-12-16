@@ -4,6 +4,7 @@ const { coingecko } = require('../utils/coingecko');
 const registryABI = require('./abi/registryABI.json');
 const gaugeABI = require('./abi/gaugeABI.json');
 const poolABI = require('./abi/poolABI.json');
+const landingPoolABI = require('./abi/landingPoolABI.json');
 const minterABI = require('./abi/minterABI.json');
 const gaugeControllerABI = require('./abi/gaugeControllerABI.json');
 const gaugeUniswapRestakeABI = require('./abi/gaugeUniswapRestakeABI.json');
@@ -14,7 +15,7 @@ class Pool {
   constructor(connect, info) {
     this.connect = connect;
     this.info = info;
-    this.pool = new ethersMulticall.Contract(info.address, poolABI);
+    this.pool = new ethersMulticall.Contract(info.address, info.abi);
     this.lpToken = new ethersMulticall.Contract(info.lpToken, ethereum.abi.ERC20ABI);
     this.gauge = new ethersMulticall.Contract(info.gauge, gaugeABI);
   }
@@ -102,7 +103,12 @@ async function getUnderlyingBalance(pools, getPriceUSD, pool, amount) {
     if (subpoolInfo !== '0x0000000000000000000000000000000000000000') {
       return [
         ...result,
-        await getUnderlyingBalance(pools, getPriceUSD, new Pool(pool.connect, subpoolInfo), balances[i]),
+        await getUnderlyingBalance(
+          pools,
+          getPriceUSD,
+          new Pool(pool.connect, { ...subpoolInfo, abi: pool.info.abi }),
+          balances[i]
+        ),
       ];
     }
     const balance = new bn(balances[i]).div(Number(`1e${decimals}`)).toString(10);
@@ -123,8 +129,8 @@ function e18(v) {
   return new bn(v.toString()).div(1e18);
 }
 
-module.exports = {
-  staking: async (provider, contractAddress, initOptions = ethereum.defaultOptions()) => {
+function stakingAdapterFactory(poolABI) {
+  return async (provider, contractAddress, initOptions = ethereum.defaultOptions()) => {
     const options = {
       ...ethereum.defaultOptions(),
       ...initOptions,
@@ -150,7 +156,7 @@ module.exports = {
     const pools = new PoolRegistry({ multicall, blockTag });
 
     const poolInfo = await pools.findByGauge(contractAddress);
-    const pool = new Pool({ multicall, blockTag }, poolInfo);
+    const pool = new Pool({ multicall, blockTag }, { ...poolInfo, abi: poolABI });
     const [stakedTotalSupply, inflationRate, workingSupply, virtualPrice, relativeWeight] = await multicall.all([
       pool.gauge.totalSupply(),
       pool.gauge.inflation_rate(),
@@ -293,7 +299,12 @@ module.exports = {
         };
       },
     };
-  },
+  };
+}
+
+module.exports = {
+  staking: stakingAdapterFactory(poolABI),
+  stakingLanding: stakingAdapterFactory(landingPoolABI),
   automates: {
     deploy: {
       GaugeUniswapRestake: async (signer, factoryAddress, prototypeAddress, contractAddress = undefined) => {
