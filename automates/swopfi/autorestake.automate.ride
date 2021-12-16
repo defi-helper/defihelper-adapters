@@ -1,0 +1,132 @@
+{-# STDLIB_VERSION 5     #-}
+{-# SCRIPT_TYPE ACCOUNT  #-}
+{-# CONTENT_TYPE DAPP    #-}
+
+let oracle = Address(base58'') # Need to filled
+
+let balance = oracle.getString("balance_address").valueOrErrorMessage("Empty key balance_address").addressFromStringValue()
+let SWOPgovernanceAdr = oracle.getString("swop_governance").valueOrErrorMessage("Empty key swop_governance").addressFromStringValue()
+let SWOP = oracle.getString("SWOP").valueOrErrorMessage("Empty key SWOP").fromBase58String()
+let consumers = oracle.getString("consumers").valueOrElse("Empty key consumer").split(",")
+let admin1 = oracle.getString("admin_1").valueOrElse("Empty key admin_1").addressFromStringValue()
+let admin2 = oracle.getString("admin_2").valueOrElse("Empty key admin_2").addressFromStringValue()
+let admin3 = oracle.getString("admin_3").valueOrElse("Empty key admin_3").addressFromStringValue()
+let admin4 = oracle.getString("admin_4").valueOrElse("Empty key admin_4").addressFromStringValue()
+let admin5 = oracle.getString("admin_5").valueOrElse("Empty key admin_5").addressFromStringValue()
+let isProtocolActive = oracle.getBoolean("is_protocol_active").valueOrErrorMessage("Empty key is_protocol_active")
+
+
+let keyOwner = "owner"
+let keyIsDappActive = "is_dapp_active"
+
+let isDappActive = this.getBoolean(keyIsDappActive).valueOrErrorMessage("Empty key is_dapp_active")
+let ownerStr = this.getString(keyOwner).valueOrErrorMessage("Empty keyOwner")
+let owner = ownerStr.addressFromString()
+
+# START Part from 'https://github.com/swopfi/swopfi-smart-contracts/blob/master/dApps/SWOP/governance.ride'
+
+let keyLastInterest = "last_interest"
+let keyUserSWOPLocked = "_SWOP_amount"
+let keyUserLastInterest = "_last_interest"
+
+let scaleValue = 100000000 # 10^8
+
+func getLastInterestInfo () = {
+    let lastInterest = valueOrElse(getInteger(SWOPgovernanceAdr, keyLastInterest), 0)
+    lastInterest
+}
+
+func getUserSWOPLocked (user:Address) = valueOrElse(getInteger(SWOPgovernanceAdr, (toString(user) + keyUserSWOPLocked)), 0)
+
+func getUserInterestInfo (user:Address,lastInterest:Int) = {
+    let userSWOPAmount = getUserSWOPLocked(user)
+    let userLastInterest = getInteger(SWOPgovernanceAdr, (toString(user) + keyUserLastInterest))
+    let userLastInterestValue =     match userLastInterest {
+        case userLastInterest: Int => 
+            userLastInterest
+        case _ => 
+            lastInterest
+    }
+    (userLastInterestValue, userSWOPAmount)
+}
+
+func claimCalc(caller:Address) = {
+    let lastInterest = getLastInterestInfo()
+    let uifo = getUserInterestInfo(caller, lastInterest)
+    let userLastInterest = uifo._1
+    let userSWOPLocked = uifo._2
+    let claimAmount = fraction(userSWOPLocked, (lastInterest - userLastInterest), scaleValue)
+    let userNewInterest = lastInterest
+    (userNewInterest, claimAmount)
+}
+
+# END Part from 'https://github.com/swopfi/swopfi-smart-contracts/blob/master/dApps/SWOP/governance.ride'
+
+@Callable(i)
+func init() = if !isProtocolActive then throw("Protol stopped by admin") else {
+    if this.getString(keyOwner).isDefined() then throw("Automate already initialized") else
+    if i.payments.size() == 0 then # If user initialized without payment
+      [
+        StringEntry(keyOwner, i.caller.toString()),
+        BooleanEntry(keyIsDappActive, true)
+      ]
+    else if i.payments.size() == 1 then # If user initialized with SWOP payment
+        let (pmtAmount, pmtAssetId) = (i.payments[0].amount, i.payments[0].assetId)
+        if pmtAssetId != SWOP then 
+            throw("Only SWOP payment available in init()") 
+        else 
+          strict z = invoke(SWOPgovernanceAdr, "lockSWOP", [], [AttachedPayment(SWOP, pmtAmount)])
+          [
+            StringEntry(keyOwner, i.caller.toString()),
+            BooleanEntry(keyIsDappActive, true)
+          ]
+    else throw("Incorrect paymemt. You should attach SWOP or empty payment")
+}
+
+@Callable(i)
+func governanceLockSWOP() = if !(isProtocolActive && isDappActive) then throw("Protol stopped by admin") else {
+    let (pmtAmount, pmtAssetId) = (i.payments[0].amount, i.payments[0].assetId)
+    if pmtAssetId != SWOP then 
+        throw("Only SWOP payment available in governanceLockSWOP()") 
+    else 
+      strict z = invoke(SWOPgovernanceAdr, "lockSWOP", [], [AttachedPayment(SWOP, pmtAmount)])
+      []
+}
+
+@Callable(i)
+func governanceClaimAndStake(minSWOPreward: Int) =  if !(isProtocolActive && isDappActive) then throw("Protol stopped by admin") else {
+    if (i.caller != owner) && (!consumers.containsElement(i.caller.bytes.toBase58String())) then throw("Only owner or admin can call this function") else 
+    let claimAmount = claimCalc(this)._2
+    if (claimAmount < minSWOPreward) then throw("Amount to claim is less than minSWOPreward") else
+    let isFeeExtract = if i.caller == owner then false else true
+    strict z = invoke(SWOPgovernanceAdr, "claimAndStakeSWOP", [], [])
+    strict y = invoke(balance, "extractFee", [ownerStr,isFeeExtract], [])
+    []
+}
+
+@Callable(i)
+func governanceWithdraw(amtToWithdraw:Int)  =  if !(isProtocolActive && isDappActive) then throw("Protol stopped by admin") else {
+    if i.caller != owner then throw("Only owner can call this function") else
+      strict z = invoke(SWOPgovernanceAdr, "withdrawSWOP", [amtToWithdraw], [])
+      [
+        ScriptTransfer(i.caller, amtToWithdraw, SWOP)
+      ]
+}
+
+@Callable(i)
+func shutdownDapp() = if !(isProtocolActive && isDappActive) then throw("Protol stopped by admin") else {
+    if ![admin1, admin2, admin3, admin4, admin5, owner].containsElement(i.caller) && !consumers.containsElement(i.caller.bytes.toBase58String()) then
+        throw("Only admin can call this function")
+    else
+        [BooleanEntry("is_dapp_active", false)]
+}
+
+@Verifier(tx)
+func verify() = {
+    let admin1Signed = if admin1.getBoolean(tx.id.toBase58String()).valueOrElse(false) then 1 else 0
+    let admin2Signed = if admin2.getBoolean(tx.id.toBase58String()).valueOrElse(false) then 1 else 0
+    let admin3Signed = if admin3.getBoolean(tx.id.toBase58String()).valueOrElse(false) then 1 else 0
+    let admin4Signed = if admin4.getBoolean(tx.id.toBase58String()).valueOrElse(false) then 1 else 0
+    let admin5Signed = if admin5.getBoolean(tx.id.toBase58String()).valueOrElse(false) then 1 else 0
+    admin1Signed + admin2Signed + admin3Signed + admin4Signed + admin5Signed >= 3
+}

@@ -6,7 +6,13 @@ const ethereumNetworkCoingeckoPlatformsMap = {
   128: 'huobi-token',
   137: 'polygon-pos',
   250: 'fantom',
+  1285: 'moonriver',
   43114: 'avalanche',
+};
+
+const errorHandler = (e) => {
+  const { method, url } = e.config;
+  throw new Error(`coingecko ${method} ${url}: ${e}`);
 };
 
 const coingecko = {
@@ -54,9 +60,9 @@ const coingecko = {
       const normalizeIds = (Array.isArray(ids) ? ids : [ids]).join(',');
       const normalizeVsCurrencies = (Array.isArray(vsCurrencies) ? vsCurrencies : [vsCurrencies]).join(',');
 
-      const resp = await axios.get(
-        `${coingecko.apiUrl}/simple/price?ids=${normalizeIds}&vs_currencies=${normalizeVsCurrencies}`
-      );
+      const resp = await axios
+        .get(`${coingecko.apiUrl}/simple/price?ids=${normalizeIds}&vs_currencies=${normalizeVsCurrencies}`)
+        .catch(errorHandler);
 
       return resp.data;
     },
@@ -66,16 +72,18 @@ const coingecko = {
       ).join(',');
       const normalizeVsCurrencies = (Array.isArray(vsCurrencies) ? vsCurrencies : [vsCurrencies]).join(',');
 
-      const resp = await axios.get(
-        `${coingecko.apiUrl}/simple/token_price/${id}?contract_addresses=${normalizeContractAddresses}&vs_currencies=${normalizeVsCurrencies}`
-      );
+      const resp = await axios
+        .get(
+          `${coingecko.apiUrl}/simple/token_price/${id}?contract_addresses=${normalizeContractAddresses}&vs_currencies=${normalizeVsCurrencies}`
+        )
+        .catch(errorHandler);
 
       return resp.data;
     },
   },
   coins: {
     contract: async (id, contractAddress) => {
-      const resp = await axios.get(`${coingecko.apiUrl}/coins/${id}/contract/${contractAddress}`);
+      const resp = await axios.get(`${coingecko.apiUrl}/coins/${id}/contract/${contractAddress}`).catch(errorHandler);
 
       return resp.data;
     },
@@ -87,7 +95,7 @@ const coingecko = {
           ? date.format('DD-MM-YYYY')
           : dayjs(date).format('DD-MM-YYYY');
 
-      const resp = await axios.get(`${coingecko.apiUrl}/coins/${id}/history?date=${normalizeDate}`);
+      const resp = await axios.get(`${coingecko.apiUrl}/coins/${id}/history?date=${normalizeDate}`).catch(errorHandler);
 
       return resp.data;
     },

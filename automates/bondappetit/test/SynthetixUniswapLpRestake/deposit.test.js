@@ -29,7 +29,7 @@ describe('SynthetixUniswapLpRestake.deposit', function () {
     );
     automate = await Automate.deploy(storage.address);
     await automate.deployed();
-    await automate.init(staking.address, 600, 0);
+    await automate.init(staking.address, '0x0000000000000000000000000000000000000000', 600, 0);
     await stakingToken.transfer(automate.address, amount);
   });
 
@@ -54,8 +54,8 @@ describe('SynthetixUniswapLpRestake.deposit', function () {
 
     strictEqual(
       await stakingToken.allowance(automate.address, staking.address).then((res) => res.toString()),
-      new BN(2).pow(256).minus(1).minus(amount).toString(10),
-      'Invalid automate allowance start'
+      '0',
+      'Invalid automate allowance end'
     );
     strictEqual(
       await stakingToken.balanceOf(automate.address).then((res) => res.toString()),

@@ -21,7 +21,7 @@ describe('GaugeUniswapRestake.deposit', function () {
     );
     automate = await Automate.deploy(storage.address);
     await automate.deployed();
-    await automate.init(plainPoolGauge.address, usdc.address, 600, 0);
+    await automate.init(plainPoolGauge.address, '0x0000000000000000000000000000000000000000', usdc.address, 600, 0);
   });
 
   it('deposit: should stake all staking token', async function () {

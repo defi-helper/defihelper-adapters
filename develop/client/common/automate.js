@@ -23,7 +23,7 @@ export async function ethereumList() {
     .then((automates) => automates.map(({ protocol, contract }) => new Automate(protocol, contract)));
 }
 
-export async function load({ protocol, contract }, network) {
+export async function ethereumLoad({ protocol, contract }, network) {
   return fetch(`/automates/ethereum/${protocol}/${contract}/${network}`).then((res) => res.json());
 }
 
@@ -46,4 +46,14 @@ export function linkLibraries({ bytecode, linkReferences }, libraries) {
   });
 
   return bytecode;
+}
+
+export async function wavesList() {
+  return fetch('/automates/waves')
+    .then((res) => res.json())
+    .then((automates) => automates.map(({ protocol, contract }) => new Automate(protocol, contract)));
+}
+
+export async function wavesLoad({ protocol, contract }) {
+  return fetch(`/automates/waves/${protocol}/${contract}`).then((res) => res.json());
 }

@@ -1,6 +1,6 @@
 const { ethers, bn, ethersMulticall, dayjs } = require('../lib');
 const { ethereum, toFloat, tokens, coingecko } = require('../utils');
-const { getMasterChefStakingToken } = require('../utils/masterChef/masterChefStakingToken');
+const { getUniPairToken } = require('../utils/masterChef/masterChefStakingToken');
 const masterChefABI = require('./abi/masterChefABI.json');
 const masterChefSavedPools = require("./abi/masterChefPools.json");
 
@@ -67,7 +67,7 @@ module.exports = {
       stakingTokenDecimals
     );
 
-    const masterChiefStakingToken = await getMasterChefStakingToken(provider, stakingToken, network, blockTag, block);
+    const masterChiefStakingToken = await getUniPairToken(provider, stakingToken, network, blockTag, block);
 
     const tvl = new bn(totalLocked).multipliedBy(masterChiefStakingToken.getUSD());
 

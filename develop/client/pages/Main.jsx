@@ -17,14 +17,16 @@ function AdaptersList({ adapters }) {
   );
 }
 
-function EthereumAutomatesList({ automates }) {
+function AutomatesList({ blockchain, automates }) {
   if (automates === null) return <div>Loading...</div>;
 
   return (
     <ul>
       {automates.map(({ protocol, contract }) => (
         <li key={`${protocol}/${contract}`}>
-          <Link to={`/client/automate/ethereum/${protocol}`}>{protocol}</Link>
+          <Link to={`/client/automate/${blockchain}/${protocol}`}>
+            {protocol}
+          </Link>
         </li>
       ))}
     </ul>
@@ -33,22 +35,33 @@ function EthereumAutomatesList({ automates }) {
 
 export function Main() {
   const [adapters, setAdapters] = React.useState(null);
-  const [automates, setAutomates] = React.useState(null);
+  const [ethereumAutomates, setEthereumAutomates] = React.useState(null);
+  const [wavesAutomates, setWavesAutomates] = React.useState(null);
 
   React.useEffect(async () => {
     adaptersGateway.list().then(setAdapters);
-    automatesGateway.ethereumList().then(setAutomates);
+    automatesGateway.ethereumList().then(setEthereumAutomates);
+    automatesGateway.wavesList().then(setWavesAutomates);
   }, []);
 
   return (
-    <div>
-      <h2>Adapters</h2>
-      <div>
-        <AdaptersList adapters={adapters} />
+    <div className="row">
+      <div className="column">
+        <h2>Adapters</h2>
+        <div>
+          <AdaptersList adapters={adapters} />
+        </div>
       </div>
-      <h2>Automates</h2>
-      <div>
-        <EthereumAutomatesList automates={automates} />
+      <div className="column">
+        <h2>Automates</h2>
+        <h3>Ethereum</h3>
+        <div>
+          <AutomatesList blockchain="ethereum" automates={ethereumAutomates} />
+        </div>
+        <h3>Waves</h3>
+        <div>
+          <AutomatesList blockchain="waves" automates={wavesAutomates} />
+        </div>
       </div>
     </div>
   );

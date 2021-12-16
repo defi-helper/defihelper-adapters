@@ -57,6 +57,37 @@ app.get('/automates/ethereum', async (req, res) => {
     })
   );
 });
+app.get(/^\/automates\/waves\/([a-z0-9_-]+)\/([a-z0-9_]+)$/i, async (req, res) => {
+  const { 0: protocol, 1: contract } = req.params;
+  const contractBuildArtifactPath = path.resolve(
+    __dirname,
+    `../automates-public/waves/build/automates/${protocol}/${contract}.automate.ride/${contract}.automate.json`
+  );
+  try {
+    await fs.promises.access(contractBuildArtifactPath, fs.F_OK);
+    const buildArtifact = await fs.promises.readFile(contractBuildArtifactPath);
+    const { base64, size, complexity } = JSON.parse(buildArtifact.toString('utf-8'));
+
+    return res.json({
+      contractName: contract,
+      base64,
+      size,
+      complexity,
+    });
+  } catch (e) {
+    console.log(contractBuildArtifactPath, e.toString());
+    return res.status(404).send('Automate not found');
+  }
+});
+app.get('/automates/waves', async (req, res) => {
+  const automates = await glob(path.resolve(__dirname, '../automates-public/waves/build/automates/**/*.automate.ride'));
+  return res.json(
+    automates.map((automate) => {
+      const { name, dir } = path.parse(automate);
+      return { protocol: path.parse(dir).name, contract: path.parse(name).name };
+    })
+  );
+});
 app.get('/', async (req, res) => {
   const adapters = await glob(path.resolve(__dirname, '../adapters-public/*.js'));
   return res.json(adapters.map((adapter) => path.parse(adapter).name));

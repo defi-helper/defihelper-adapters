@@ -77,6 +77,13 @@
   },
   {
     "inputs": [],
+    "name": "emergencyWithdraw",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "info",
     "outputs": [
       {
@@ -93,6 +100,11 @@
       {
         "internalType": "address",
         "name": "_staking",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "_liquidityRouter",
         "type": "address"
       },
       {
@@ -114,6 +126,19 @@
     "name": "init",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "liquidityRouter",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {

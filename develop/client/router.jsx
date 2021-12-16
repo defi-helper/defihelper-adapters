@@ -1,6 +1,11 @@
 import React from "react";
 import { BrowserRouter, Switch, Route, Link } from "react-router-dom";
-import { Main, AdapterProtocol, EthereumAutomateProtocol } from "./pages";
+import {
+  Main,
+  AdapterProtocol,
+  EthereumAutomateProtocol,
+  WavesAutomateProtocol,
+} from "./pages";
 
 export function Router() {
   return (
@@ -22,6 +27,12 @@ export function Router() {
             path="/client/automate/ethereum/:protocol"
             render={({ match }) => (
               <EthereumAutomateProtocol protocol={match.params.protocol} />
+            )}
+          ></Route>
+          <Route
+            path="/client/automate/waves/:protocol"
+            render={({ match }) => (
+              <WavesAutomateProtocol protocol={match.params.protocol} />
             )}
           ></Route>
           <Route path="/client" component={Main}></Route>
