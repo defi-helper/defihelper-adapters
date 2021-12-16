@@ -11,8 +11,7 @@ interface IMasterChefFinnV2 {
     address lpToken;
     uint256 allocPoint;
     uint256 lastRewardTimestamp;
-    uint256 accFinnPerShare;
-    address rewarder;
+    uint256 accRewardPerShare;
   }
 
   function finn() external view returns (address);
@@ -21,15 +20,10 @@ interface IMasterChefFinnV2 {
 
   function userInfo(uint256 pool, address user) external view returns (UserInfo memory);
 
-  function pendingTokens(uint256 pool, address user)
+  function pendingReward(uint256 pool, address user)
     external
     view
-    returns (
-      uint256 pendingFinn,
-      address bonusTokenAddress,
-      string memory bonusTokenSymbol,
-      uint256 pendingBonusToken
-    );
+    returns (uint256);
 
   function deposit(uint256 pool, uint256 amount) external;
 
