@@ -250,7 +250,7 @@ module.exports = {
         const masterChiefContract = new ethers.Contract(masterChefAddress, masterChefABI, provider);
 
         const totalPools = await masterChiefContract.poolLength();
-        return await Promise.all((
+        return (await Promise.all((
           await Promise.all(new Array(totalPools.toNumber()).fill(1).map((_, i) => masterChiefContract.poolInfo(i)))
         ).map(async (p, i) => {
           let pair;
@@ -281,7 +281,7 @@ module.exports = {
             },
             link: '',
           };
-        }));
+        }))).filter(v => v);
       },
     },
     deploy: {
