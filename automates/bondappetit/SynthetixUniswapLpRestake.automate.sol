@@ -30,7 +30,15 @@ contract SynthetixUniswapLpRestake is Automate {
     uint16 _slippage,
     uint16 _deadline
   ) external initializer {
+    require(
+      !_initialized || address(staking) == _staking,
+      "SynthetixUniswapLpRestake::init: reinitialize staking address forbidden"
+    );
     staking = IStaking(_staking);
+    require(
+      !_initialized || liquidityRouter == _liquidityRouter,
+      "SynthetixUniswapLpRestake::init: reinitialize liquidity router address forbidden"
+    );
     liquidityRouter = _liquidityRouter;
     slippage = _slippage;
     deadline = _deadline;

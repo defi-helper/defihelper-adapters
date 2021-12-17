@@ -41,21 +41,31 @@ contract GaugeUniswapRestake is Automate {
     uint16 _slippage,
     uint16 _deadline
   ) external initializer {
-    IRegistry registry = IRegistry(_registry());
-
+    require(
+      !_initialized || address(staking) == _staking,
+      "GaugeUniswapRestake::init: reinitialize staking address forbidden"
+    );
     staking = IGauge(_staking);
+    require(
+      !_initialized || liquidityRouter == _liquidityRouter,
+      "GaugeUniswapRestake::init: reinitialize liquidity router address forbidden"
+    );
     liquidityRouter = _liquidityRouter;
     swapToken = _swapToken;
     slippage = _slippage;
     deadline = _deadline;
-    _lpToken = IERC20(staking.lp_token());
-    _pool = registry.get_pool_from_lp_token(address(_lpToken));
-    address[8] memory coins = registry.get_coins(_pool);
-    uint256 nCoinsPool = registry.get_n_coins(_pool);
 
-    for (; _swapTokenN <= nCoinsPool; _swapTokenN++) {
-      require(_swapTokenN < nCoinsPool, "GaugeUniswapRestake::init: invalid swap token address");
-      if (coins[_swapTokenN] == _swapToken) break;
+    if (!_initialized) {
+      IRegistry registry = IRegistry(_registry());
+      _lpToken = IERC20(staking.lp_token());
+      _pool = registry.get_pool_from_lp_token(address(_lpToken));
+      address[8] memory coins = registry.get_coins(_pool);
+      uint256 nCoinsPool = registry.get_n_coins(_pool);
+
+      for (; _swapTokenN <= nCoinsPool; _swapTokenN++) {
+        require(_swapTokenN < nCoinsPool, "GaugeUniswapRestake::init: invalid swap token address");
+        if (coins[_swapTokenN] == _swapToken) break;
+      }
     }
   }
 
@@ -103,7 +113,8 @@ contract GaugeUniswapRestake is Automate {
     _path[0] = path[0];
     _path[1] = path[1];
 
-    return IUniswapV2Router02(liquidityRouter).swapExactTokensForTokens(amount, minOut, _path, address(this), _deadline)[1];
+    return
+      IUniswapV2Router02(liquidityRouter).swapExactTokensForTokens(amount, minOut, _path, address(this), _deadline)[1];
   }
 
   function calcTokenAmount(uint256 amount) external view returns (uint256) {

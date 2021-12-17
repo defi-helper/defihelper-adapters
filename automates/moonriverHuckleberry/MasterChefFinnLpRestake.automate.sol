@@ -39,15 +39,26 @@ contract MasterChefFinnLpRestake is Automate {
     uint16 _slippage,
     uint16 _deadline
   ) external initializer {
+    require(
+      !_initialized || address(staking) == _staking,
+      "MasterChefFinnLpRestake::init: reinitialize staking address forbidden"
+    );
     staking = IMasterChefFinnV2(_staking);
+    require(
+      !_initialized || liquidityRouter == _liquidityRouter,
+      "MasterChefFinnLpRestake::init: reinitialize liquidity router address forbidden"
+    );
     liquidityRouter = _liquidityRouter;
+    require(!_initialized || pool == _pool, "MasterChefFinnLpRestake::init: reinitialize pool index forbidden");
     pool = _pool;
     slippage = _slippage;
     deadline = _deadline;
 
-    IMasterChefFinnV2.PoolInfo memory poolInfo = staking.poolInfo(pool);
-    stakingToken = IERC20(poolInfo.lpToken);
-    rewardToken = IERC20(staking.finn());
+    if (!_initialized) {
+      IMasterChefFinnV2.PoolInfo memory poolInfo = staking.poolInfo(pool);
+      stakingToken = IERC20(poolInfo.lpToken);
+      rewardToken = IERC20(staking.finn());
+    }
   }
 
   function deposit() external onlyOwner {

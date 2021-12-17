@@ -40,7 +40,7 @@ describe('Automate.pause', function () {
     const proxy1Tx = await (
       await proxyFactory.create(
         prototype.address,
-        new ethers.utils.Interface(AutomateABI).encodeFunctionData('init', [stakingAddress])
+        new ethers.utils.Interface(AutomateABI).encodeFunctionData('init', [stakingAddress, '1'])
       )
     ).wait();
     const proxy1CreatedEvent = proxy1Tx.events.find(({ event }) => event === 'ProxyCreated');
@@ -49,7 +49,7 @@ describe('Automate.pause', function () {
     const proxy2Tx = await (
       await proxyFactory.create(
         prototype.address,
-        new ethers.utils.Interface(AutomateABI).encodeFunctionData('init', [stakingAddress])
+        new ethers.utils.Interface(AutomateABI).encodeFunctionData('init', [stakingAddress, '1'])
       )
     ).wait();
     const proxy2CreatedEvent = proxy2Tx.events.find(({ event }) => event === 'ProxyCreated');
