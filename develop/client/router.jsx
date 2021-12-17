@@ -5,6 +5,7 @@ import {
   AdapterProtocol,
   EthereumAutomateProtocol,
   WavesAutomateProtocol,
+  ProtocolContractsResolver
 } from "./pages";
 
 export function Router() {
@@ -21,6 +22,12 @@ export function Router() {
             path="/client/adapter/:protocol"
             render={({ match }) => (
               <AdapterProtocol protocol={match.params.protocol} />
+            )}
+          ></Route>
+          <Route
+            path="/client/contracts-resolver/:protocol"
+            render={({ match }) => (
+              <ProtocolContractsResolver protocol={match.params.protocol} />
             )}
           ></Route>
           <Route

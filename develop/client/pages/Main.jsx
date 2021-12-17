@@ -11,6 +11,9 @@ function AdaptersList({ adapters }) {
       {adapters.map((protocol) => (
         <li key={protocol}>
           <Link to={`/client/adapter/${protocol}`}>{protocol}</Link>
+          <div>
+            <small> <Link to={`/client/contracts-resolver/${protocol}`}>contracts resolver</Link></small>
+          </div>
         </li>
       ))}
     </ul>
@@ -52,6 +55,7 @@ export function Main() {
           <AdaptersList adapters={adapters} />
         </div>
       </div>
+
       <div className="column">
         <h2>Automates</h2>
         <h3>Ethereum</h3>
