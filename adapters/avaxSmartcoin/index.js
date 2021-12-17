@@ -237,6 +237,53 @@ module.exports = {
     };
   },
   automates: {
+    contractsResolver: {
+      default: async (provider, initOptions = ethereum.defaultOptions()) => {
+        const options = {
+          ...ethereum.defaultOptions(),
+          ...initOptions,
+        };
+        const blockTag = options.blockNumber === 'latest' ? 'latest' : parseInt(options.blockNumber, 10);
+        const network = (await provider.detectNetwork()).chainId;
+        const block = await provider.getBlock(blockTag);
+
+        const masterChiefContract = new ethers.Contract(masterChefAddress, masterChefABI, provider);
+
+        const totalPools = await masterChiefContract.poolLength();
+        return await Promise.all((
+          await Promise.all(new Array(totalPools.toNumber()).fill(1).map((_, i) => masterChiefContract.poolInfo(i)))
+        ).map(async (p, i) => {
+          let pair;
+          try {
+            pair = await getUniPairToken(provider, p.lpToken, network, blockTag, block);
+          } catch {
+            return null;
+          }
+
+          const [token0, token1] = await Promise.all([
+            ethereum.erc20Info(provider, pair.token0),
+            ethereum.erc20Info(provider, pair.token1)
+          ]);
+
+          return {
+            poolIndex: i,
+            name: `SmartCoin ${token0.symbol}-${token1.symbol} LP`,
+            address: p.lpToken,
+            deployBlockNumber: pair.block.number,
+            blockchain: 'ethereum',
+            network: pair.network,
+            layout: 'stacking',
+            adapter: 'masterChef',
+            description: '',
+            automate: {
+              autorestakeAdapter: "MasterChefJoeLpRestake",
+              adapters: ["masterChef"],
+            },
+            link: '',
+          };
+        }));
+      },
+    },
     deploy: {
       MasterChefJoeLpRestake: async (signer, factoryAddress, prototypeAddress, contractAddress = undefined) => {
         let poolIndex = masterChefSavedPools[0].index.toString();

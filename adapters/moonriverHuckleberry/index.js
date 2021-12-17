@@ -237,6 +237,53 @@ module.exports = {
     };
   },
   automates: {
+    contractsResolver: {
+      default: async (provider, initOptions = ethereum.defaultOptions()) => {
+        const options = {
+          ...ethereum.defaultOptions(),
+          ...initOptions,
+        };
+        const blockTag = options.blockNumber === 'latest' ? 'latest' : parseInt(options.blockNumber, 10);
+        const network = (await provider.detectNetwork()).chainId;
+        const block = await provider.getBlock(blockTag);
+
+        const masterChiefContract = new ethers.Contract(masterChefAddress, masterChefABI, provider);
+
+        const totalPools = await masterChiefContract.poolLength();
+        return await Promise.all((
+          await Promise.all(new Array(totalPools.toNumber()).fill(1).map((_, i) => masterChiefContract.poolInfo(i)))
+        ).map(async (p, i) => {
+          let pair;
+          try {
+            pair = await getUniPairToken(provider, p.lpToken, network, blockTag, block);
+          } catch {
+            return null;
+          }
+
+          const [token0, token1] = await Promise.all([
+            ethereum.erc20Info(provider, pair.token0),
+            ethereum.erc20Info(provider, pair.token1)
+          ]);
+
+          return {
+            poolIndex: i,
+            name: `Huckleberry ${token0.symbol}-${token1.symbol} LP`,
+            address: p.lpToken,
+            deployBlockNumber: pair.block.number,
+            blockchain: 'ethereum',
+            network: pair.network,
+            layout: 'stacking',
+            adapter: 'masterChef',
+            description: '',
+            automate: {
+              autorestakeAdapter: "MasterChefFinnLpRestake",
+              adapters: ["masterChef"],
+            },
+            link: '',
+          };
+        }));
+      },
+    },
     deploy: {
       MasterChefFinnLpRestake: async (signer, factoryAddress, prototypeAddress, contractAddress = undefined) => {
         let poolIndex = masterChefSavedPools[0].index.toString();
@@ -402,7 +449,6 @@ module.exports = {
         const stakingMulticall = new ethersMulticall.Contract(stakingAddress, masterChefABI);
         const stakingTokenMulticall = new ethersMulticall.Contract(stakingTokenAddress, ethereum.uniswap.pairABI);
 
-        console.log('aaaa');
         const [
           routerAddress,
           slippagePercent,
@@ -423,16 +469,12 @@ module.exports = {
           stakingMulticall.poolInfo(poolId),
         ]);
 
-        console.log('bbbb');
-
         const earned = new bn(amount.toString())
           .multipliedBy(accRewardPerShare.toString())
          .div(new bn(10).pow(12))
          .minus(rewardDebt.toString());
         if (earned.toString(10) === '0') return new Error('No earned');
         const router = ethereum.uniswap.router(signer, routerAddress);
-
-        console.log('cccc');
 
         const slippage = 1 - slippagePercent / 10000;
         const token0AmountIn = new bn(earned.toString(10)).div(2).toFixed(0);
@@ -447,21 +489,14 @@ module.exports = {
           const [, amountOut] = await router.getAmountsOut(token1AmountIn, [rewardTokenAddress, token1Address]);
           token1Min = new bn(amountOut.toString()).multipliedBy(slippage).toFixed(0);
         }
-        console.log('gggg');
 
         const deadline = dayjs().add(deadlineSeconds, 'seconds').unix();
-
-        console.log('hhhh');
-
-        console.log(deadline, token0Min, token1Min);
 
         const gasLimit = new bn(
             await automate.estimateGas.run(0, deadline, [token0Min, token1Min]).then((v) => v.toString())
         )
         .multipliedBy(1.1)
          .toFixed(0);
-
-        console.log('ooo');
 
         const gasPrice = await signer.getGasPrice().then((v) => v.toString());
         const gasFee = new bn(gasLimit).multipliedBy(gasPrice).toFixed(0);
