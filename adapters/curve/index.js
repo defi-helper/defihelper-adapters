@@ -325,7 +325,7 @@ module.exports = {
             AutomateActions.tab(
               'Deploy',
               async () => ({
-                description: 'Deploy your automate contract',
+                description: 'Deploy your own contract',
                 inputs: [
                   AutomateActions.input({
                     placeholder: 'Target gauge',
@@ -386,7 +386,7 @@ module.exports = {
         AutomateActions.tab(
           'Transfer',
           async () => ({
-            description: 'Transfer your tokens to automate',
+            description: 'Transfer your tokens to your contract',
             inputs: [
               AutomateActions.input({
                 placeholder: 'amount',
@@ -414,7 +414,7 @@ module.exports = {
         AutomateActions.tab(
           'Deposit',
           async () => ({
-            description: 'Deposit tokens to staking',
+            description: 'Stake your tokens to the contract',
           }),
           async () => {
             const automateBalance = new bn(await stakingToken.balanceOf(automate.address).then((v) => v.toString()));
