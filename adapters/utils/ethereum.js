@@ -48,6 +48,42 @@ const ethereum = {
     storageKey: (k) => ethers.utils.keccak256(ethers.utils.toUtf8Bytes(k)),
   },
   uniswap: {
+    PairInfo: class {
+      constructor({
+        address,
+        token0,
+        token0Decimals,
+        reserve0,
+        token1,
+        token1Decimals,
+        reserve1,
+        totalSupply,
+        blockTimestampLast,
+      }) {
+        this.address = address;
+        this.token0 = token0;
+        this.token0Decimals = token0Decimals;
+        this.reserve0 = reserve0;
+        this.token1 = token1;
+        this.token1Decimals = token1Decimals;
+        this.reserve1 = reserve1;
+        this.totalSupply = totalSupply;
+        this.blockTimestampLast = blockTimestampLast;
+      }
+
+      expandBalance(balance) {
+        return {
+          token0: new bn(balance).multipliedBy(this.reserve0).div(this.totalSupply),
+          token1: new bn(balance).multipliedBy(this.reserve1).div(this.totalSupply),
+        };
+      }
+
+      calcPrice(token0Price, token1Price) {
+        const reserve0 = new bn(this.reserve0).multipliedBy(token0Price);
+        const reserve1 = new bn(this.reserve1).multipliedBy(token1Price);
+        return reserve0.plus(reserve1).div(this.totalSupply);
+      }
+    },
     pairDecimals: 18,
     pairABI: UniswapPairABI,
     pair: (provider, address) => new ethers.Contract(address, UniswapPairABI, provider),
@@ -72,7 +108,7 @@ const ethereum = {
       const reserve0 = new bn(reserves[0].toString()).div(new bn(10).pow(token0Decimals)).toString(10);
       const reserve1 = new bn(reserves[1].toString()).div(new bn(10).pow(token1Decimals)).toString(10);
 
-      return {
+      return new ethereum.uniswap.PairInfo({
         token0,
         token0Decimals,
         reserve0,
@@ -81,10 +117,19 @@ const ethereum = {
         reserve1,
         blockTimestampLast,
         totalSupply,
-      };
+      });
     },
     routerABI: UniswapRouterABI,
     router: (provider, address) => new ethers.Contract(address, UniswapRouterABI, provider),
+    getPrice: async (router, amountIn, path, options = ethereum.defaultOptions()) => {
+      try {
+        const amountsOut = await router.getAmountsOut(amountIn, path, { blockTag: options.blockNumber });
+
+        return amountsOut[amountsOut.length - 1];
+      } catch (e) {
+        throw new Error(`Resolver price "${JSON.stringify(path)}" by uniswap router error: ${e}`);
+      }
+    },
   },
 };
 
