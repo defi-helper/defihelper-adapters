@@ -119,7 +119,7 @@
   "settings": {
     "libraries": {
       "automates/utils/DFH/proxy/ERC1167.sol": {
-        "ERC1167": "0xbbaDa894933398c1Fca03bdd8B872bb444A483f2"
+        "ERC1167": "0x7ecFCbdeb6f195030B9Bf2ECc402f6d5433d116D"
       }
     },
     "optimizer": {
