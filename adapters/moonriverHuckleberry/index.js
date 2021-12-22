@@ -251,25 +251,42 @@ module.exports = {
             (
               await Promise.all(new Array(totalPools.toNumber()).fill(1).map((_, i) => masterChiefContract.poolInfo(i)))
             ).map(async (p, i) => {
-              let pair;
+              let stakingTokenPair;
               try {
-                pair = await getUniPairToken(provider, p.lpToken, network, blockTag, block);
+                stakingTokenPair = await ethereum.uniswap.pairInfo(provider, p.lpToken);
+
+                const token0Alias = bridgeTokens[stakingTokenPair.token0.toLowerCase()];
+                const token1Alias = bridgeTokens[stakingTokenPair.token1.toLowerCase()];
+
+                await Promise.all([
+                  coingecko.getPriceUSDByContract(
+                    token0Alias ? token0Alias.platform : coingecko.platformByEthereumNetwork(network),
+                    blockTag === 'latest',
+                    block,
+                    token0Alias ? token0Alias.token : stakingTokenPair.token0
+                  ),
+                  coingecko.getPriceUSDByContract(
+                    token1Alias ? token1Alias.platform : coingecko.platformByEthereumNetwork(network),
+                    blockTag === 'latest',
+                    block,
+                    token1Alias ? token1Alias.token : stakingTokenPair.token1
+                  ),
+                ]);
               } catch {
                 return null;
               }
 
               const [token0, token1] = await Promise.all([
-                ethereum.erc20Info(provider, pair.token0),
-                ethereum.erc20Info(provider, pair.token1),
+                ethereum.erc20Info(provider, stakingTokenPair.token0),
+                ethereum.erc20Info(provider, stakingTokenPair.token1),
               ]);
 
               return {
                 poolIndex: i,
                 name: `Huckleberry ${token0.symbol}-${token1.symbol} LP`,
                 address: p.lpToken,
-                deployBlockNumber: pair.block.number,
                 blockchain: 'ethereum',
-                network: pair.network,
+                network: stakingTokenPair.network,
                 layout: 'stacking',
                 adapter: 'masterChef',
                 description: '',
