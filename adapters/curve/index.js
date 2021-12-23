@@ -372,6 +372,77 @@ module.exports = {
           ],
         };
       },
+      GaugeUniswapClaim: async (signer, factoryAddress, prototypeAddress, contractAddress = undefined) => {
+        const signerAddress = await signer.getAddress();
+        const network = await signer.getChainId();
+        const multicall = new ethersMulticall.Provider(signer, network);
+        const pools = new PoolRegistry({ multicall, blockTag: 'latest' });
+        let gaugeInfo = await pools.findByGauge('0xbFcF63294aD7105dEa65aA58F8AE5BE2D9d0952A'); // 3pool default
+        let gauge = gaugeInfo.gauge;
+        let swapToken = gaugeInfo.coins[0].address;
+        if (contractAddress) {
+          gaugeInfo = await pools.findByGauge(contractAddress);
+          gauge = gaugeInfo.gauge;
+          swapToken = gaugeInfo.coins[0].address;
+        }
+
+        return {
+          deploy: [
+            AutomateActions.tab(
+              'Deploy',
+              async () => ({
+                description: 'Deploy your own contract',
+                inputs: [
+                  AutomateActions.input({
+                    placeholder: 'Target gauge',
+                    value: gauge,
+                  }),
+                  AutomateActions.input({
+                    placeholder: 'Liquidity pool router address',
+                    value: '0x7a250d5630b4cf539739df2c5dacb4c659f2488d',
+                  }),
+                  AutomateActions.input({
+                    placeholder: 'Swap token address',
+                    value: swapToken,
+                  }),
+                  AutomateActions.input({
+                    placeholder: 'Slippage percent',
+                    value: '1',
+                  }),
+                  AutomateActions.input({
+                    placeholder: 'Deadline (seconds)',
+                    value: '300',
+                  }),
+                  AutomateActions.input({
+                    placeholder: 'Recipient wallet address',
+                    value: signerAddress,
+                  }),
+                ],
+              }),
+              async (gauge, router, swapToken, slippage, deadlinem, recipient) => {
+                if (slippage < 0 || slippage > 100) return new Error('Invalid slippage percent');
+                if (deadline < 0) return new Error('Deadline has already passed');
+
+                return true;
+              },
+              async (gauge, router, swapToken, slippage, deadline, recipient) =>
+                AutomateActions.ethereum.proxyDeploy(
+                  signer,
+                  factoryAddress,
+                  prototypeAddress,
+                  new ethers.utils.Interface(gaugeUniswapRestakeABI).encodeFunctionData('init', [
+                    gauge,
+                    router,
+                    swapToken,
+                    Math.floor(slippage * 10),
+                    deadline,
+                    recipient,
+                  ])
+                )
+            ),
+          ],
+        };
+      },
     },
     GaugeUniswapRestake: async (signer, contractAddress) => {
       const signerAddress = await signer.getAddress();
@@ -503,6 +574,154 @@ module.exports = {
           gasPrice,
           gasLimit,
           calldata: [gasFee, deadline, swapOutMin, lpOutMin],
+        };
+      };
+      const run = async () => {
+        const { gasPrice, gasLimit, calldata } = await runParams();
+        return automate.run.apply(automate, [
+          ...calldata,
+          {
+            gasPrice,
+            gasLimit,
+          },
+        ]);
+      };
+
+      return {
+        contract: stakingAddress,
+        deposit,
+        refund,
+        migrate,
+        runParams,
+        run,
+      };
+    },
+    GaugeUniswapClaim: async (signer, contractAddress) => {
+      const signerAddress = await signer.getAddress();
+      const automate = new ethers.Contract(contractAddress, gaugeUniswapRestakeABI, signer);
+      const stakingAddress = await automate.staking();
+      const staking = new ethers.Contract(stakingAddress, gaugeABI, signer);
+      const stakingTokenAddress = await staking.lp_token();
+      const stakingToken = ethereum.erc20(signer, stakingTokenAddress);
+      const stakingTokenDecimals = await stakingToken.decimals().then((v) => v.toString());
+
+      const deposit = [
+        AutomateActions.tab(
+          'Transfer',
+          async () => ({
+            description: 'Transfer your tokens to your contract',
+            inputs: [
+              AutomateActions.input({
+                placeholder: 'amount',
+                value: new bn(await stakingToken.balanceOf(signerAddress).then((v) => v.toString()))
+                  .div(`1e${stakingTokenDecimals}`)
+                  .toString(10),
+              }),
+            ],
+          }),
+          async (amount) => {
+            const signerBalance = await stakingToken.balanceOf(signerAddress).then((v) => v.toString());
+            const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
+            if (amountInt.lte(0)) return Error('Invalid amount');
+            if (amountInt.gt(signerBalance)) return Error('Insufficient funds on the balance');
+
+            return true;
+          },
+          async (amount) => ({
+            tx: await stakingToken.transfer(
+              automate.address,
+              new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`).toFixed(0)
+            ),
+          })
+        ),
+        AutomateActions.tab(
+          'Deposit',
+          async () => ({
+            description: 'Stake your tokens to the contract',
+          }),
+          async () => {
+            const automateBalance = new bn(await stakingToken.balanceOf(automate.address).then((v) => v.toString()));
+            const automateOwner = await automate.owner();
+            if (automateBalance.lte(0)) return new Error('Insufficient funds on the automate contract balance');
+            if (signerAddress.toLowerCase() !== automateOwner.toLowerCase()) return new Error('Someone else contract');
+
+            return true;
+          },
+          async () => ({
+            tx: await automate.deposit(),
+          })
+        ),
+      ];
+      const refund = [
+        AutomateActions.tab(
+          'Refund',
+          async () => ({
+            description: 'Transfer your tokens from automate',
+          }),
+          async () => {
+            const automateOwner = await automate.owner();
+            if (signerAddress.toLowerCase() !== automateOwner.toLowerCase()) return new Error('Someone else contract');
+
+            return true;
+          },
+          async () => ({
+            tx: await automate.refund(),
+          })
+        ),
+      ];
+      const migrate = [
+        AutomateActions.tab(
+          'Withdraw',
+          async () => ({
+            description: 'Withdraw your tokens from staking',
+          }),
+          async () => {
+            const stakingBalance = new bn(await staking.balanceOf(signerAddress).then((v) => v.toString()));
+            if (stakingBalance.lte(0)) return new Error('Insufficient funds on the staking contract balance');
+
+            return true;
+          },
+          async () => {
+            const stakingBalance = await staking.balanceOf(signerAddress).then((v) => v.toString());
+            return {
+              tx: await staking.withdraw(stakingBalance),
+            };
+          }
+        ),
+        ...deposit,
+      ];
+      const runParams = async () => {
+        const multicall = new ethersMulticall.Provider(signer, await signer.getChainId());
+        const automateMulticall = new ethersMulticall.Contract(contractAddress, gaugeUniswapRestakeABI);
+        const stakingMulticall = new ethersMulticall.Contract(stakingAddress, gaugeABI);
+        const [routerAddress, slippagePercent, deadlineSeconds, swapTokenAddress, rewardTokenAddress] =
+          await multicall.all([
+            automateMulticall.liquidityRouter(),
+            automateMulticall.slippage(),
+            automateMulticall.deadline(),
+            automateMulticall.swapToken(),
+            stakingMulticall.crv_token(),
+          ]);
+        const earned = await staking.callStatic.claimable_tokens(contractAddress).then((v) => v.toString());
+        if (earned.toString() === '0') return new Error('No earned');
+        const router = ethereum.uniswap.router(signer, routerAddress);
+
+        const slippage = 1 - slippagePercent / 10000;
+        const [, swapAmountOut] = await router.getAmountsOut(earned.toString(), [rewardTokenAddress, swapTokenAddress]);
+        const swapOutMin = new bn(swapAmountOut.toString()).multipliedBy(slippage).toFixed(0);
+        const deadline = dayjs().add(deadlineSeconds, 'seconds').unix();
+
+        const gasLimit = new bn(await automate.estimateGas.run(0, deadline, swapOutMin).then((v) => v.toString()))
+          .multipliedBy(1.1)
+          .toFixed(0);
+        const gasPrice = await signer.getGasPrice();
+        const gasFee = new bn(gasLimit.toString()).multipliedBy(gasPrice.toString()).toFixed(0);
+
+        await automate.estimateGas.run(gasFee, deadline, swapOutMin);
+        return {
+          gasPrice,
+          gasLimit,
+          calldata: [gasFee, deadline, swapOutMin],
         };
       };
       const run = async () => {
