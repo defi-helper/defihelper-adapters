@@ -283,7 +283,7 @@ module.exports = {
 
               return {
                 poolIndex: i,
-                name: `Huckleberry ${token0.symbol}-${token1.symbol} LP`,
+                name: `${token0.symbol}-${token1.symbol}`,
                 address: p.lpToken,
                 blockchain: 'ethereum',
                 network: stakingTokenPair.network,
