@@ -463,28 +463,18 @@ module.exports = {
         const stakingMulticall = new ethersMulticall.Contract(stakingAddress, masterChefABI);
         const stakingTokenMulticall = new ethersMulticall.Contract(stakingTokenAddress, ethereum.uniswap.pairABI);
 
-        const [
-          routerAddress,
-          slippagePercent,
-          deadlineSeconds,
-          token0Address,
-          token1Address,
-          rewardTokenAddress,
-          { amount, rewardDebt },
-          { accRewardPerShare },
-        ] = await multicall.all([
-          automateMulticall.liquidityRouter(),
-          automateMulticall.slippage(),
-          automateMulticall.deadline(),
-          stakingTokenMulticall.token0(),
-          stakingTokenMulticall.token1(),
-          automateMulticall.rewardToken(),
-          stakingMulticall.userInfo(poolId, contractAddress),
-          stakingMulticall.poolInfo(poolId),
-        ]);
+        const [routerAddress, slippagePercent, deadlineSeconds, token0Address, token1Address, rewardTokenAddress] =
+          await multicall.all([
+            automateMulticall.liquidityRouter(),
+            automateMulticall.slippage(),
+            automateMulticall.deadline(),
+            stakingTokenMulticall.token0(),
+            stakingTokenMulticall.token1(),
+            automateMulticall.rewardToken(),
+          ]);
         const rewardToken = new ethers.Contract(rewardTokenAddress, ethereum.abi.ERC20ABI, provider);
         const rewardTokenBalance = await rewardToken.balanceOf(contractAddress).then((v) => v.toString());
-        const pendingReward = await staking.pendingReward(poolId, signerAddress).then((v) => v.toString());
+        const pendingReward = await staking.pendingReward(poolId, contractAddress).then((v) => v.toString());
 
         const earned = new bn(pendingReward).plus(rewardTokenBalance);
         if (earned.toString(10) === '0') return new Error('No earned');
