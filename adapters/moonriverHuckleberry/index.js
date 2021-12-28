@@ -98,14 +98,10 @@ module.exports = {
         aprYear: aprYear.toString(10),
       },
       wallet: async (walletAddress) => {
-        const { amount, rewardDebt } = await masterChiefContract.userInfo(pool.index, walletAddress);
+        const { amount } = await masterChiefContract.userInfo(pool.index, walletAddress);
         const balance = toFloat(amount, ethereum.uniswap.pairDecimals);
         const earned = toFloat(
-          new bn(amount.toString())
-            .multipliedBy(poolInfo.accRewardPerShare.toString())
-            .div(new bn(10).pow(12))
-            .minus(rewardDebt.toString())
-            .toString(10),
+          await masterChiefContract.pendingReward(pool.index, walletAddress).then((v) => v.toString()),
           rewardsTokenDecimals
         );
         const expandedBalance = stakingTokenPair.expandBalance(balance);
@@ -488,12 +484,11 @@ module.exports = {
         ]);
         const rewardToken = new ethers.Contract(rewardTokenAddress, ethereum.abi.ERC20ABI, provider);
         const rewardTokenBalance = await rewardToken.balanceOf(contractAddress).then((v) => v.toString());
+        const pendingReward = await masterChiefContract
+          .pendingReward(pool.index, walletAddress)
+          .then((v) => v.toString());
 
-        const earned = new bn(amount.toString())
-          .multipliedBy(accRewardPerShare.toString())
-          .div(new bn(10).pow(12))
-          .minus(rewardDebt.toString())
-          .plus(rewardTokenBalance);
+        const earned = new bn(pendingReward).plus(rewardTokenBalance);
         if (earned.toString(10) === '0') return new Error('No earned');
         const router = new ethersMulticall.Contract(routerAddress, ethereum.abi.UniswapRouterABI);
 
