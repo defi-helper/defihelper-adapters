@@ -482,7 +482,7 @@ module.exports = {
 
         const slippage = 1 - slippagePercent / 10000;
         const token0AmountIn = new bn(earned.toString(10)).div(2).toFixed(0);
-        const swap0 = { path: [], outMin: '0' };
+        const swap0 = { path: [rewardTokenAddress, token0Address], outMin: '0' };
         if (token0Address.toLowerCase() !== rewardTokenAddress.toLowerCase()) {
           const { path, amountOut } = await ethereum.uniswap.autoRoute(
             multicall,
@@ -496,7 +496,7 @@ module.exports = {
           swap0.outMin = new bn(amountOut.toString()).multipliedBy(slippage).toFixed(0);
         }
         const token1AmountIn = new bn(earned.toString(10)).minus(token0AmountIn).toFixed(0);
-        const swap1 = { path: [], outMin: '0' };
+        const swap1 = { path: [rewardTokenAddress, token1Address], outMin: '0' };
         if (token1Address.toLowerCase() !== rewardTokenAddress.toLowerCase()) {
           const { path, amountOut } = await ethereum.uniswap.autoRoute(
             multicall,
