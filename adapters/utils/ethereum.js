@@ -137,7 +137,6 @@ const ethereum = {
           return router.getAmountsOut(amountIn, [from, middle, to]);
         }),
       ]);
-      console.log(amountsOut.map((x) => x.map((y) => y.toString())));
 
       return amountsOut.reduce(
         (result, amountsOut, i) => {
