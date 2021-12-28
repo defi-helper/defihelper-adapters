@@ -484,7 +484,7 @@ module.exports = {
         ]);
         const rewardToken = new ethers.Contract(rewardTokenAddress, ethereum.abi.ERC20ABI, provider);
         const rewardTokenBalance = await rewardToken.balanceOf(contractAddress).then((v) => v.toString());
-        const pendingReward = await staking.pendingReward(pool.index, walletAddress).then((v) => v.toString());
+        const pendingReward = await staking.pendingReward(pool.index, signerAddress).then((v) => v.toString());
 
         const earned = new bn(pendingReward).plus(rewardTokenBalance);
         if (earned.toString(10) === '0') return new Error('No earned');
