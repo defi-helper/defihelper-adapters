@@ -482,7 +482,7 @@ module.exports = {
 
         const slippage = 1 - slippagePercent / 10000;
         const token0AmountIn = new bn(earned.toString(10)).div(2).toFixed(0);
-        const swap0 = { path: [rewardTokenAddress, token0Address], outMin: '0' };
+        const swap0 = [[rewardTokenAddress, token0Address], '0'];
         if (token0Address.toLowerCase() !== rewardTokenAddress.toLowerCase()) {
           const { path, amountOut } = await ethereum.uniswap.autoRoute(
             multicall,
@@ -492,11 +492,11 @@ module.exports = {
             token0Address,
             routeTokens
           );
-          swap0.path = path;
-          swap0.outMin = new bn(amountOut.toString()).multipliedBy(slippage).toFixed(0);
+          swap0[0] = path;
+          swap0[1] = new bn(amountOut.toString()).multipliedBy(slippage).toFixed(0);
         }
         const token1AmountIn = new bn(earned.toString(10)).minus(token0AmountIn).toFixed(0);
-        const swap1 = { path: [rewardTokenAddress, token1Address], outMin: '0' };
+        const swap1 = [[rewardTokenAddress, token1Address], '0'];
         if (token1Address.toLowerCase() !== rewardTokenAddress.toLowerCase()) {
           const { path, amountOut } = await ethereum.uniswap.autoRoute(
             multicall,
@@ -506,8 +506,8 @@ module.exports = {
             token1Address,
             routeTokens
           );
-          swap1.path = path;
-          swap1.outMin = new bn(amountOut.toString()).multipliedBy(slippage).toFixed(0);
+          swap1[0] = path;
+          swap1[1] = new bn(amountOut.toString()).multipliedBy(slippage).toFixed(0);
         }
 
         const deadline = dayjs().add(deadlineSeconds, 'seconds').unix();
