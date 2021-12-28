@@ -15,6 +15,11 @@ import {ERC20Tools} from "../utils/ERC20Tools.sol";
 contract MasterChefFinnLpRestake is Automate {
   using ERC20Tools for IERC20;
 
+  struct Swap {
+    address[] path;
+    uint256 outMin;
+  }
+
   IMasterChefFinnV2 public staking;
 
   address public liquidityRouter;
@@ -85,24 +90,20 @@ contract MasterChefFinnLpRestake is Automate {
   }
 
   function _swap(
-    address[2] memory path,
+    address[] memory path,
     uint256[2] memory amount,
     uint256 _deadline
   ) internal returns (uint256) {
-    if (path[0] == path[1]) return amount[0];
-
-    address[] memory _path = new address[](2);
-    _path[0] = path[0];
-    _path[1] = path[1];
+    if (path[0] == path[path.length - 1]) return amount[0];
 
     return
       IUniswapV2Router02(liquidityRouter).swapExactTokensForTokens(
         amount[0],
         amount[1],
-        _path,
+        path,
         address(this),
         _deadline
-      )[1];
+      )[path.length - 1];
   }
 
   function _addLiquidity(
@@ -129,7 +130,8 @@ contract MasterChefFinnLpRestake is Automate {
   function run(
     uint256 gasFee,
     uint256 _deadline,
-    uint256[2] memory _outMin
+    Swap memory swap0,
+    Swap memory swap1
   ) external bill(gasFee, "MoonriverHuckleberryMasterChefFinnLPRestake") {
     IMasterChefFinnV2 _staking = staking; // gas optimization
     uint256 pendingFinn = _staking.pendingReward(pool, address(this));
@@ -142,8 +144,8 @@ contract MasterChefFinnLpRestake is Automate {
     IUniswapV2Pair _stakingToken = IUniswapV2Pair(address(stakingToken));
     address[2] memory tokens = [_stakingToken.token0(), _stakingToken.token1()];
     uint256[2] memory amountIn = [
-      _swap([address(rewardToken), tokens[0]], [rewardAmount / 2, _outMin[0]], _deadline),
-      _swap([address(rewardToken), tokens[1]], [rewardAmount - rewardAmount / 2, _outMin[1]], _deadline)
+      _swap(swap0.path, [rewardAmount / 2, swap0.outMin], _deadline),
+      _swap(swap1.path, [rewardAmount - rewardAmount / 2, swap1.outMin], _deadline)
     ];
     uint256[2] memory amountOutMin = [uint256(0), uint256(0)];
 

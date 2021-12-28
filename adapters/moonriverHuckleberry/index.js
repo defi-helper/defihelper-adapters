@@ -8,6 +8,7 @@ const masterChefSavedPools = require('./abi/masterChefPools.json');
 const bridgeTokens = require('./abi/bridgeTokens.json');
 
 const masterChefAddress = '0x1f4b7660b6AdC3943b5038e3426B33c1c0e343E6';
+const routeTokens = ['0x98878B06940aE243284CA214f92Bb71a2b032B8A'];
 
 module.exports = {
   masterChef: async (provider, contractAddress, initOptions = ethereum.defaultOptions()) => {
@@ -485,44 +486,61 @@ module.exports = {
           stakingMulticall.userInfo(poolId, contractAddress),
           stakingMulticall.poolInfo(poolId),
         ]);
+        const rewardToken = new ethers.Contract(rewardTokenAddress, ethereum.abi.ERC20ABI, provider);
+        const rewardTokenBalance = await rewardToken.balanceOf(contractAddress).then((v) => v.toString());
 
         const earned = new bn(amount.toString())
           .multipliedBy(accRewardPerShare.toString())
           .div(new bn(10).pow(12))
-          .minus(rewardDebt.toString());
+          .minus(rewardDebt.toString())
+          .plus(rewardTokenBalance);
         if (earned.toString(10) === '0') return new Error('No earned');
-        const router = ethereum.uniswap.router(signer, routerAddress);
+        const router = new ethersMulticall.Contract(routerAddress, ethereum.abi.UniswapRouterABI);
 
         const slippage = 1 - slippagePercent / 10000;
         const token0AmountIn = new bn(earned.toString(10)).div(2).toFixed(0);
-        let token0Min = new bn(token0AmountIn).multipliedBy(slippage).toFixed(0);
+        const swap0 = { path: [], outMin: '0' };
         if (token0Address.toLowerCase() !== rewardTokenAddress.toLowerCase()) {
-          const [, amountOut] = await router.getAmountsOut(token0AmountIn, [rewardTokenAddress, token0Address]);
-          token0Min = new bn(amountOut.toString()).multipliedBy(slippage).toFixed(0);
+          const { path, amountOut } = await ethereum.uniswap.autoRoute(
+            multicall,
+            router,
+            token0AmountIn,
+            rewardTokenAddress,
+            token0Address,
+            routeTokens
+          );
+          swap0.path = path;
+          swap0.outMin = new bn(amountOut.toString()).multipliedBy(slippage).toFixed(0);
         }
         const token1AmountIn = new bn(earned.toString(10)).minus(token0AmountIn).toFixed(0);
-        let token1Min = new bn(token1AmountIn).multipliedBy(slippage).toFixed(0);
+        const swap1 = { path: [], outMin: '0' };
         if (token1Address.toLowerCase() !== rewardTokenAddress.toLowerCase()) {
-          const [, amountOut] = await router.getAmountsOut(token1AmountIn, [rewardTokenAddress, token1Address]);
-          token1Min = new bn(amountOut.toString()).multipliedBy(slippage).toFixed(0);
+          const { path, amountOut } = await ethereum.uniswap.autoRoute(
+            multicall,
+            router,
+            token1AmountIn,
+            rewardTokenAddress,
+            token1Address,
+            routeTokens
+          );
+          swap1.path = path;
+          swap1.outMin = new bn(amountOut.toString()).multipliedBy(slippage).toFixed(0);
         }
 
         const deadline = dayjs().add(deadlineSeconds, 'seconds').unix();
 
-        const gasLimit = new bn(
-          await automate.estimateGas.run(0, deadline, [token0Min, token1Min]).then((v) => v.toString())
-        )
+        const gasLimit = new bn(await automate.estimateGas.run(0, deadline, swap0, swap1).then((v) => v.toString()))
           .multipliedBy(1.1)
           .toFixed(0);
 
         const gasPrice = await signer.getGasPrice().then((v) => v.toString());
         const gasFee = new bn(gasLimit).multipliedBy(gasPrice).toFixed(0);
 
-        await automate.estimateGas.run(gasFee, deadline, [token0Min, token1Min]);
+        await automate.estimateGas.run(gasFee, deadline, swap0, swap1);
         return {
           gasPrice,
           gasLimit,
-          calldata: [gasFee, deadline, [token0Min, token1Min]],
+          calldata: [gasFee, deadline, swap0, swap1],
         };
       };
       const run = async () => {

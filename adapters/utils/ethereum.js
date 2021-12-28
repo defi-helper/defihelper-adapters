@@ -8,6 +8,7 @@ const ethereum = {
   abi: {
     ERC20ABI,
     UniswapPairABI,
+    UniswapRouterABI,
   },
   defaultOptions: () => ({
     blockNumber: 'latest',
@@ -119,7 +120,6 @@ const ethereum = {
         totalSupply,
       });
     },
-    routerABI: UniswapRouterABI,
     router: (provider, address) => new ethers.Contract(address, UniswapRouterABI, provider),
     getPrice: async (router, amountIn, path, options = ethereum.defaultOptions()) => {
       try {
@@ -129,6 +129,25 @@ const ethereum = {
       } catch (e) {
         throw new Error(`Resolver price "${JSON.stringify(path)}" by uniswap router error: ${e}`);
       }
+    },
+    autoRoute: async (multicall, router, amountIn, from, to, withTokens) => {
+      const amountsOut = await multicall.all([
+        router.getAmountsOut(amountIn, [from, to]),
+        ...withTokens.map((middle) => {
+          return router.getAmountsOut(amountIn, [from, middle, to]);
+        }),
+      ]);
+      console.log(amountsOut.map((x) => x.map((y) => y.toString())));
+
+      return amountsOut.reduce(
+        (result, amountsOut, i) => {
+          const amountOut = amountsOut[amountsOut.length - 1].toString();
+          if (new bn(result.amountOut).isGreaterThanOrEqualTo(amountOut)) return result;
+
+          return { path: [from, withTokens[i - 1], to], amountOut };
+        },
+        { path: [from, to], amountOut: amountsOut[0][1].toString() }
+      );
     },
   },
 };
