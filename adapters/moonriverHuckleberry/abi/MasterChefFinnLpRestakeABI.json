@@ -233,9 +233,38 @@
 				"type"        : "uint256"
 			},
 			{
-				"internalType": "uint256[2]",
-				"name"        : "_outMin",
-				"type"        : "uint256[2]"
+				"components"  : [
+					{
+						"internalType": "address[]",
+						"name"        : "path",
+						"type"        : "address[]"
+					},
+					{
+						"internalType": "uint256",
+						"name"        : "outMin",
+						"type"        : "uint256"
+					}
+				],
+				"internalType": "struct MasterChefFinnLpRestake.Swap",
+				"name"        : "swap0",
+				"type"        : "tuple"
+			},
+			{
+				"components"  : [
+					{
+						"internalType": "address[]",
+						"name"        : "path",
+						"type"        : "address[]"
+					},
+					{
+						"internalType": "uint256",
+						"name"        : "outMin",
+						"type"        : "uint256"
+					}
+				],
+				"internalType": "struct MasterChefFinnLpRestake.Swap",
+				"name"        : "swap1",
+				"type"        : "tuple"
 			}
 		],
 		"name"           : "run",
