@@ -272,7 +272,7 @@ module.exports = {
             deployBlockNumber: pair.block.number,
             blockchain: 'ethereum',
             network: pair.network,
-            layout: 'stacking',
+            layout: 'staking',
             adapter: 'masterChef',
             description: '',
             automate: {

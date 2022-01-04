@@ -284,7 +284,7 @@ module.exports = {
                 address: p.lpToken,
                 blockchain: 'ethereum',
                 network: stakingTokenPair.network,
-                layout: 'stacking',
+                layout: 'staking',
                 adapter: 'masterChef',
                 description: '',
                 automate: {
