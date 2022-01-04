@@ -133,9 +133,9 @@ const ethereum = {
     autoRoute: async (multicall, router, amountIn, from, to, withTokens) => {
       const amountsOut = await multicall.all([
         router.getAmountsOut(amountIn, [from, to]),
-        ...withTokens.map((middle) => {
-          return router.getAmountsOut(amountIn, [from, middle, to]);
-        }),
+        ...withTokens
+          .filter((middle) => from !== middle && middle !== to)
+          .map((middle) => router.getAmountsOut(amountIn, [from, middle, to])),
       ]);
 
       return amountsOut.reduce(

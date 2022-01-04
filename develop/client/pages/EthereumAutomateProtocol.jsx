@@ -4,7 +4,7 @@ import * as adaptersGateway from "../common/adapter";
 import ReactJson from "react-json-view";
 import { useProvider } from "../common/ether";
 import { AutomateSteps } from "../components";
-import networks from "../../../node_modules/@defihelper/networks/contracts.json";
+import networks from "@defihelper/networks/contracts.json";
 import { ethers } from "ethers";
 
 function txMinimal({ hash, type, from, data, r, s, v }) {
@@ -115,6 +115,19 @@ export function EthereumAutomateProtocol(props) {
   const [actionResult, setActionResult] = React.useState(null);
   const [actionSteps, setActionSteps] = React.useState([]);
 
+  function getNetwork(chainId) {
+    const networksId = Object.keys(networks);
+    if (!networksId.includes(chainId.toString())) {
+      throw new Error(
+        `Protocol contracts not found in @defihelper/network package for "${chainId}" chain. Only (${networksId.join(
+          ", "
+        )}) chains supported`
+      );
+    }
+
+    return networks[chainId.toString()];
+  }
+
   React.useEffect(() => {
     automatesGateway
       .ethereumList()
@@ -130,7 +143,7 @@ export function EthereumAutomateProtocol(props) {
     const { chainId } = await provider.getNetwork();
     setChainId(chainId);
 
-    const network = networks[chainId.toString()];
+    const network = getNetwork(chainId);
     setStorage(network ? network.Storage.address : "");
     setErc1167(network ? network.ERC1167.address : "");
   }, [provider]);
@@ -162,7 +175,7 @@ export function EthereumAutomateProtocol(props) {
     if (!provider || !chainId || automateArtifact === null || prototype === "")
       return;
 
-    const network = networks[chainId.toString()];
+    const network = getNetwork(chainId);
     setDeploySteps(
       await adapters.deploy[automateArtifact.contractName](
         signer,

@@ -93,35 +93,35 @@ contract MasterChefFinnLpRestake is Automate {
     address[] memory path,
     uint256[2] memory amount,
     uint256 _deadline
-  ) internal returns (uint256) {
-    if (path[0] == path[path.length - 1]) return amount[0];
+  ) internal {
+    if (path[0] == path[path.length - 1]) return;
 
-    return
-      IUniswapV2Router02(liquidityRouter).swapExactTokensForTokens(
-        amount[0],
-        amount[1],
-        path,
-        address(this),
-        _deadline
-      )[path.length - 1];
+    IUniswapV2Router02(liquidityRouter).swapExactTokensForTokensSupportingFeeOnTransferTokens(
+      amount[0],
+      amount[1],
+      path,
+      address(this),
+      _deadline
+    );
   }
 
   function _addLiquidity(
-    address[2] memory path,
-    uint256[2] memory amountIn,
-    uint256[2] memory amountOutMin,
+    address token0,
+    address token1,
     uint256 _deadline
   ) internal {
     address _liquidityRouter = liquidityRouter; // gas optimisation
-    IERC20(path[0]).safeApprove(_liquidityRouter, amountIn[0]);
-    IERC20(path[1]).safeApprove(_liquidityRouter, amountIn[1]);
+    uint256 amountIn0 = IERC20(token0).balanceOf(address(this));
+    uint256 amountIn1 = IERC20(token1).balanceOf(address(this));
+    IERC20(token0).safeApprove(_liquidityRouter, amountIn0);
+    IERC20(token1).safeApprove(_liquidityRouter, amountIn1);
     IUniswapV2Router02(_liquidityRouter).addLiquidity(
-      path[0],
-      path[1],
-      amountIn[0],
-      amountIn[1],
-      amountOutMin[0],
-      amountOutMin[1],
+      token0,
+      token1,
+      amountIn0,
+      amountIn1,
+      0,
+      0,
       address(this),
       _deadline
     );
@@ -140,16 +140,11 @@ contract MasterChefFinnLpRestake is Automate {
     _staking.deposit(pool, 0); // get all reward
     uint256 rewardAmount = rewardToken.balanceOf(address(this));
     rewardToken.safeApprove(liquidityRouter, rewardAmount);
+    _swap(swap0.path, [rewardAmount / 2, swap0.outMin], _deadline);
+    _swap(swap1.path, [rewardAmount - rewardAmount / 2, swap1.outMin], _deadline);
 
     IUniswapV2Pair _stakingToken = IUniswapV2Pair(address(stakingToken));
-    address[2] memory tokens = [_stakingToken.token0(), _stakingToken.token1()];
-    uint256[2] memory amountIn = [
-      _swap(swap0.path, [rewardAmount / 2, swap0.outMin], _deadline),
-      _swap(swap1.path, [rewardAmount - rewardAmount / 2, swap1.outMin], _deadline)
-    ];
-    uint256[2] memory amountOutMin = [uint256(0), uint256(0)];
-
-    _addLiquidity([tokens[0], tokens[1]], amountIn, amountOutMin, _deadline);
+    _addLiquidity(_stakingToken.token0(), _stakingToken.token1(), _deadline);
     uint256 stakingAmount = _stakingToken.balanceOf(address(this));
     stakingToken.safeApprove(address(_staking), stakingAmount);
     _staking.deposit(pool, stakingAmount);

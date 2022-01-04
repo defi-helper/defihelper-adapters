@@ -350,7 +350,7 @@ module.exports = {
                     masterChefAddress,
                     router,
                     pool,
-                    Math.floor(slippage * 10),
+                    Math.floor(slippage * 100),
                     deadline,
                   ])
                 )
