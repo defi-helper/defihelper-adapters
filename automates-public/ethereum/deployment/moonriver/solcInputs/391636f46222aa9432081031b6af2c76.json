@@ -120,11 +120,6 @@
     }
   },
   "settings": {
-    "libraries": {
-      "automates/utils/DFH/proxy/ERC1167.sol": {
-        "ERC1167": "0xd8C830401453796e043b35B628EF55A18817D9bD"
-      }
-    },
     "optimizer": {
       "enabled": true,
       "runs": 1000000
@@ -146,7 +141,9 @@
           "storageLayout",
           "evm.gasEstimates"
         ],
-        "": ["ast"]
+        "": [
+          "ast"
+        ]
       }
     }
   }
