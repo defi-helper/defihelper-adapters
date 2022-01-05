@@ -121,7 +121,7 @@ module.exports = {
                   new ethers.utils.Interface(SynthetixUniswapLpRestakeABI).encodeFunctionData('init', [
                     staking,
                     router,
-                    Math.floor(slippage * 10),
+                    Math.floor(slippage * 100),
                     deadline,
                   ])
                 )

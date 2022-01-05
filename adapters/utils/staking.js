@@ -3,6 +3,7 @@ const { ethereum } = require('./ethereum');
 const { coingecko } = require('./coingecko');
 const { toFloat } = require('./toFloat');
 const { tokens } = require('./tokens');
+const AutomateActions = require('./automate/actions');
 
 const stakingABI = require('./abi/stakingAbi.json');
 
