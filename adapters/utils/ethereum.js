@@ -43,6 +43,14 @@ const ethereum = {
       totalSupply: totalSupply.toString(),
     };
   },
+  erc20ApproveAll: async (erc20, owner, spender, value) => {
+    const allowance = await erc20.allowance(owner, spender).then((v) => v.toString());
+    if (new bn(allowance).isGreaterThanOrEqualTo(value)) return;
+    if (new bn(allowance).isGreaterThan(0)) {
+      await erc20.approve(spender, '0').then((tx) => tx.wait());
+    }
+    return erc20.approve(spender, new bn(2).pow(256).minus(1).toFixed(0)).then((tx) => tx.wait());
+  },
   dfh: {
     storageABI: DFHStorageABI,
     storage: (provider, address) => new ethers.Contract(address, DFHStorageABI, provider),

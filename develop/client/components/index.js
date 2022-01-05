@@ -1,1 +1,1 @@
-export { AutomateSteps } from './AutomateSteps';
+export { AdapterModalSteps } from './AdapterModalSteps';

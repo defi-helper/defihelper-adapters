@@ -2,6 +2,7 @@ import React from "react";
 import * as adaptersGateway from "../common/adapter";
 import { useProvider } from "../common/ether";
 import { createWavesProvider } from "../common/waves";
+import { AdapterModalSteps } from "../components";
 import ReactJson from "react-json-view";
 
 export function AdapterProtocol(props) {
@@ -16,10 +17,10 @@ export function AdapterProtocol(props) {
   const [walletReload, setWalletReload] = React.useState(false);
   const [walletMetrics, setWalletMetrics] = React.useState(null);
   const [actions, setActions] = React.useState(null);
-  const [actionsReload, setActionsReload] = React.useState(false);
-  const [currentAction, setCurrentAction] = React.useState("");
-  const [actionParams, setActionParams] = React.useState("[]");
+  const [currentAction, setCurrentAction] = React.useState("stake");
+  const [actionReload, setActionReload] = React.useState(false);
   const [actionResult, setActionResult] = React.useState(null);
+  const [actionSteps, setActionSteps] = React.useState([]);
 
   React.useEffect(async () => {
     const protocol = await adaptersGateway.load(props.protocol);
@@ -70,23 +71,18 @@ export function AdapterProtocol(props) {
     setWalletReload(false);
   };
 
-  const onAction = async (method) => {
-    if (currentAction === "") return;
+  const onAction = async () => {
+    if (!currentAction) return;
 
-    setActionsReload(true);
+    setActionReload(true);
+    setActionSteps([]);
     try {
-      const action = actions[currentAction];
-      const actionResult = await action[method].apply(
-        action,
-        JSON.parse(actionParams)
-      );
-      setActionResult(
-        actionResult instanceof Error ? actionResult.toString() : actionResult
-      );
+      setActionSteps(actions[currentAction]);
+      setActionResult(null);
     } catch (e) {
       console.error(e);
     }
-    setActionsReload(false);
+    setActionReload(false);
   };
 
   if (protocol === null) {
@@ -182,8 +178,9 @@ export function AdapterProtocol(props) {
           )}
           {!actions || (
             <div>
+              <h3>Action</h3>
               <div className="row">
-                <div className="column">
+                <div className="column column-90">
                   <label>Action: </label>
                   <select
                     value={currentAction}
@@ -196,32 +193,28 @@ export function AdapterProtocol(props) {
                     ))}
                   </select>
                 </div>
-                <div className="column">
+                <div className="column column-10">
                   <button
                     className="button"
-                    onClick={() => onAction("can")}
-                    disabled={actionsReload}
+                    onClick={onAction}
+                    disabled={actionReload}
                   >
-                    Can
-                  </button>{" "}
-                  <button
-                    className="button"
-                    onClick={() => onAction("send")}
-                    disabled={actionsReload}
-                  >
-                    Send
+                    Call
                   </button>
                 </div>
               </div>
-              <div>
-                <textarea
-                  value={actionParams}
-                  onChange={(e) => setActionParams(e.target.value)}
-                ></textarea>
-              </div>
-              {!actionResult || JSON.stringify(actionResult)}
             </div>
           )}
+          {!actionSteps.length || (
+            <div>
+              <h3>Action steps</h3>
+              <AdapterModalSteps
+                steps={actionSteps}
+                onAction={setActionResult}
+              />
+            </div>
+          )}
+          {actionResult !== null && <div>{JSON.stringify(actionResult)}</div>}
         </div>
       )}
     </div>
