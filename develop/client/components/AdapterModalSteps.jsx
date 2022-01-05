@@ -14,7 +14,7 @@ import React from "react";
  * 	onAction: (result: string | object) => void;
  * }} props
  */
-export function AutomateSteps({ steps, onAction }) {
+export function AdapterModalSteps({ steps, onAction }) {
   const [currentIndex, setCurrentIndex] = React.useState(0);
   const [info, setInfo] = React.useState(null);
   const [inputs, setInputs] = React.useState([]);

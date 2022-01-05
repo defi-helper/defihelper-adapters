@@ -166,65 +166,131 @@ module.exports = {
         const stakingContract = masterChiefContract.connect(signer);
 
         return {
-          stake: {
-            can: async (amount) => {
-              const balance = await stakingTokenContract.balanceOf(walletAddress);
-              if (new bn(amount).isGreaterThan(balance.toString())) {
-                return Error('Amount exceeds balance');
-              }
+          stake: [
+            AutomateActions.tab(
+              'Stake',
+              async () => ({
+                description: 'Stake your tokens to contract',
+                inputs: [
+                  AutomateActions.input({
+                    placeholder: 'amount',
+                    value: new bn(await stakingTokenContract.balanceOf(walletAddress).then((v) => v.toString()))
+                      .div(`1e${stakingTokenDecimals}`)
+                      .toString(10),
+                  }),
+                ],
+              }),
+              async (amount) => {
+                const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
+                if (amountInt.lte(0)) return Error('Invalid amount');
 
-              return true;
-            },
-            send: async (amount) => {
-              await stakingTokenContract.approve(masterChefAddress, amount);
-              await stakingContract.deposit(pool.index, amount);
-            },
-          },
-          unstake: {
-            can: async (amount) => {
-              const userInfo = await stakingContract.userInfo(pool.index, walletAddress);
-              if (new bn(amount).isGreaterThan(userInfo.amount.toString())) {
-                return Error('Amount exceeds balance');
-              }
+                const balance = await stakingTokenContract.balanceOf(walletAddress).then((v) => v.toString());
+                if (amountInt.gt(balance)) return Error('Insufficient funds on the balance');
 
-              return true;
-            },
-            send: async (amount) => {
-              await stakingContract.withdraw(pool.index, amount);
-            },
-          },
-          claim: {
-            can: async () => {
-              const { amount, rewardDebt } = await masterChiefContract.userInfo(pool.index, walletAddress);
-              const { accRewardPerShare } = await masterChiefContract.poolInfo(pool.index);
-              const earned = new bn(amount.toString())
-                .multipliedBy(accRewardPerShare.toString())
-                .div(new bn(10).pow(12))
-                .minus(rewardDebt.toString());
-              if (earned.isLessThanOrEqualTo(0)) {
-                return Error('No earnings');
-              }
-              return true;
-            },
-            send: async () => {
-              // https://github.com/sushiswap/sushiswap-interface/blob/05324660917f44e3c360dc7e2892b2f58e21647e/src/features/farm/useMasterChef.ts#L64
-              await stakingContract.deposit(pool.index, 0);
-            },
-          },
-          exit: {
-            can: async () => {
-              const userInfo = await stakingContract.userInfo(pool.index, walletAddress);
-              if (new bn(userInfo.amount.toString()).isLessThanOrEqualTo(0)) {
-                return Error('No LP in contract');
-              }
+                return true;
+              },
+              async (amount) => {
+                const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
+                await ethereum.erc20ApproveAll(
+                  stakingTokenContract,
+                  walletAddress,
+                  masterChefAddress,
+                  amountInt.toFixed(0)
+                );
 
-              return true;
-            },
-            send: async () => {
-              const userInfo = await stakingContract.userInfo(pool.index, walletAddress);
-              await stakingContract.withdraw(pool.index, userInfo.amount.toString());
-            },
-          },
+                return {
+                  tx: await stakingContract.deposit(pool.index, amountInt.toFixed(0)),
+                };
+              }
+            ),
+          ],
+          unstake: [
+            AutomateActions.tab(
+              'Unstake',
+              async () => {
+                const userInfo = await stakingContract.userInfo(pool.index, walletAddress);
+
+                return {
+                  description: 'Unstake your tokens from contract',
+                  inputs: [
+                    AutomateActions.input({
+                      placeholder: 'amount',
+                      value: new bn(userInfo.amount.toString()).div(`1e${stakingTokenDecimals}`).toString(10),
+                    }),
+                  ],
+                };
+              },
+              async (amount) => {
+                const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
+                if (amountInt.lte(0)) return Error('Invalid amount');
+
+                const userInfo = await stakingContract.userInfo(pool.index, walletAddress);
+                if (amountInt.isGreaterThan(userInfo.amount.toString())) {
+                  return Error('Amount exceeds balance');
+                }
+
+                return true;
+              },
+              async (amount) => {
+                const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
+
+                return {
+                  tx: await stakingContract.withdraw(pool.index, amountInt.toFixed(0)),
+                };
+              }
+            ),
+          ],
+          claim: [
+            AutomateActions.tab(
+              'Claim',
+              async () => ({
+                description: 'Claim your reward from contract',
+              }),
+              async () => {
+                const earned = await stakingContract.pendingReward(pool.index, walletAddress).then((v) => v.toString());
+                if (new bn(earned).isLessThanOrEqualTo(0)) {
+                  return Error('No earnings');
+                }
+
+                return true;
+              },
+              async () => ({
+                tx: await stakingContract.deposit(pool.index, 0),
+              })
+            ),
+          ],
+          exit: [
+            AutomateActions.tab(
+              'Exit',
+              async () => ({
+                description: 'Get all tokens from contract',
+              }),
+              async () => {
+                const earned = await masterChiefContract
+                  .pendingReward(pool.index, walletAddress)
+                  .then((v) => v.toString());
+                const userInfo = await stakingContract.userInfo(pool.index, walletAddress);
+                if (
+                  new bn(earned).isLessThanOrEqualTo(0) &&
+                  new bn(userInfo.amount.toString()).isLessThanOrEqualTo(0)
+                ) {
+                  return Error('No staked');
+                }
+
+                return true;
+              },
+              async () => {
+                const userInfo = await stakingContract.userInfo(pool.index, walletAddress);
+                if (new bn(userInfo.amount.toString()).isGreaterThan(0)) {
+                  await stakingContract.withdraw(pool.index, userInfo.amount.toString()).then((tx) => tx.wait());
+                }
+
+                return {
+                  tx: await stakingContract.deposit(pool.index, 0),
+                };
+              }
+            ),
+          ],
         };
       },
     };

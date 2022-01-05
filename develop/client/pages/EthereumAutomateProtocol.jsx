@@ -3,7 +3,7 @@ import * as automatesGateway from "../common/automate";
 import * as adaptersGateway from "../common/adapter";
 import ReactJson from "react-json-view";
 import { useProvider } from "../common/ether";
-import { AutomateSteps } from "../components";
+import { AdapterModalSteps } from "../components";
 import networks from "@defihelper/networks/contracts.json";
 import { ethers } from "ethers";
 
@@ -248,8 +248,6 @@ export function EthereumAutomateProtocol(props) {
         );
       } else {
         setActionSteps(actions[currentAction]);
-        const firstStep = actions[currentAction][0];
-        if (!firstStep) return;
         setActionResult(null);
       }
     } catch (e) {
@@ -355,7 +353,7 @@ export function EthereumAutomateProtocol(props) {
               </div>
             </div>
             {!deploySteps.length || (
-              <AutomateSteps
+              <AdapterModalSteps
                 steps={deploySteps}
                 onAction={setProxyDeployResult}
               />
@@ -418,7 +416,7 @@ export function EthereumAutomateProtocol(props) {
       {!actionSteps.length || (
         <div>
           <h3>Action steps</h3>
-          <AutomateSteps steps={actionSteps} onAction={setActionResult} />
+          <AdapterModalSteps steps={actionSteps} onAction={setActionResult} />
         </div>
       )}
       {actionResult !== null && <div>{JSON.stringify(actionResult)}</div>}
