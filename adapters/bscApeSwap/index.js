@@ -1,9 +1,10 @@
 const { ethers, bn, ethersMulticall, dayjs } = require('../lib');
-const { ethereum, toFloat, tokens, coingecko, staking } = require('../utils');
+const { ethereum, toFloat, tokens, coingecko } = require('../utils');
 const AutomateActions = require('../utils/automate/actions');
 const masterChefABI = require('./abi/masterChefABI.json');
 const apeRewardV4ABI = require('./abi/apeRewardV4.json');
 const masterChefSavedPools = require('./abi/masterChefPools.json');
+const stakingContracts = require('./abi/stakingContracts.json');
 const MasterChefSingleRestakeABI = require('./abi/MasterChefSingleRestakeABI.json');
 const MasterChefLpRestakeABI = require('./abi/MasterChefLpRestakeABI.json');
 const ApeRewardV4RestakeABI = require('./abi/ApeRewardV4RestakeABI.json');
