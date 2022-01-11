@@ -3,7 +3,7 @@ const { migration } = require('../utils');
 module.exports = migration(async ({ utils: { dfhNetwork, deploy } }) => {
   const { ERC1167, Storage } = dfhNetwork();
 
-  await deploy('bscApeRewardV4Restake', {
+  await deploy('bscApeSwapApeRewardV4Restake', {
     contract: 'automates/bscApeSwap/ApeRewardV4Restake.automate.sol:ApeRewardV4Restake',
     args: [Storage.address],
     libraries: {
