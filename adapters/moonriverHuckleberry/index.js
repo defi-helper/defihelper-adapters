@@ -162,7 +162,10 @@ module.exports = {
           throw new Error('Signer not found, use options.signer for use actions');
         }
         const { signer } = options;
+        const rewardTokenContract = ethereum.erc20(provider, rewardToken).connect(signer);
+        const rewardTokenSymbol = await rewardTokenContract.symbol();
         const stakingTokenContract = ethereum.erc20(provider, stakingToken).connect(signer);
+        const stakingTokenSymbol = await stakingTokenContract.symbol();
         const stakingContract = masterChiefContract.connect(signer);
 
         return {
@@ -170,7 +173,7 @@ module.exports = {
             AutomateActions.tab(
               'Stake',
               async () => ({
-                description: 'Stake your tokens to contract',
+                description: `Stake your [${stakingTokenSymbol}](https://moonriver.moonscan.io/address/${stakingToken}) tokens to contract`,
                 inputs: [
                   AutomateActions.input({
                     placeholder: 'amount',
@@ -211,7 +214,7 @@ module.exports = {
                 const userInfo = await stakingContract.userInfo(pool.index, walletAddress);
 
                 return {
-                  description: 'Unstake your tokens from contract',
+                  description: `Unstake your [${stakingTokenSymbol}](https://moonriver.moonscan.io/address/${stakingToken}) tokens from contract`,
                   inputs: [
                     AutomateActions.input({
                       placeholder: 'amount',
@@ -244,7 +247,7 @@ module.exports = {
             AutomateActions.tab(
               'Claim',
               async () => ({
-                description: 'Claim your reward from contract',
+                description: `Claim your [${rewardTokenSymbol}](https://moonriver.moonscan.io/address/${rewardToken}) reward from contract`,
               }),
               async () => {
                 const earned = await stakingContract.pendingReward(pool.index, walletAddress).then((v) => v.toString());

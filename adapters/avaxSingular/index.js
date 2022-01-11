@@ -163,7 +163,10 @@ module.exports = {
           throw new Error('Signer not found, use options.signer for use actions');
         }
         const { signer } = options;
+        const rewardTokenContract = ethereum.erc20(provider, rewardsToken).connect(signer);
+        const rewardTokenSymbol = await rewardTokenContract.symbol();
         const stakingTokenContract = ethereum.erc20(provider, stakingToken).connect(signer);
+        const stakingTokenSymbol = await stakingTokenContract.symbol();
         const stakingContract = masterChiefContract.connect(signer);
 
         return {
@@ -171,7 +174,7 @@ module.exports = {
             AutomateActions.tab(
               'Stake',
               async () => ({
-                description: 'Stake your tokens to contract',
+                description: `Stake your [${stakingTokenSymbol}](https://snowtrace.io/address/${stakingToken}) tokens to contract`,
                 inputs: [
                   AutomateActions.input({
                     placeholder: 'amount',
@@ -212,7 +215,7 @@ module.exports = {
                 const userInfo = await stakingContract.userInfo(poolIndex, walletAddress);
 
                 return {
-                  description: 'Unstake your tokens from contract',
+                  description: `Unstake your [${stakingTokenSymbol}](https://snowtrace.io/address/${stakingToken}) tokens from contract`,
                   inputs: [
                     AutomateActions.input({
                       placeholder: 'amount',
@@ -245,7 +248,7 @@ module.exports = {
             AutomateActions.tab(
               'Claim',
               async () => ({
-                description: 'Claim your reward from contract',
+                description: `Claim your [${rewardTokenSymbol}](https://snowtrace.io/address/${rewardsToken}) reward from contract`,
               }),
               async () => {
                 const earned = await stakingContract.pendingReward(poolIndex, walletAddress).then((v) => v.toString());

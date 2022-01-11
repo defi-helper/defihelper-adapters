@@ -169,7 +169,10 @@ module.exports = {
           throw new Error('Signer not found, use options.signer for use actions');
         }
         const { signer } = options;
+        const rewardTokenContract = ethereum.erc20(provider, rewardsToken).connect(signer);
+        const rewardTokenSymbol = await rewardTokenContract.symbol();
         const stakingTokenContract = ethereum.erc20(provider, stakingToken).connect(signer);
+        const stakingTokenSymbol = await stakingTokenContract.symbol();
         const stakingContract = masterChiefContract.connect(signer);
 
         return {
@@ -177,7 +180,7 @@ module.exports = {
             AutomateActions.tab(
               'Stake',
               async () => ({
-                description: 'Stake your tokens to contract',
+                description: `Stake your [${stakingTokenSymbol}](https://snowtrace.io/address/${stakingToken}) tokens to contract`,
                 inputs: [
                   AutomateActions.input({
                     placeholder: 'amount',
@@ -218,7 +221,7 @@ module.exports = {
                 const userInfo = await stakingContract.userInfo(poolIndex, walletAddress);
 
                 return {
-                  description: 'Unstake your tokens from contract',
+                  description: `Unstake your [${stakingTokenSymbol}](https://snowtrace.io/address/${stakingToken}) tokens from contract`,
                   inputs: [
                     AutomateActions.input({
                       placeholder: 'amount',
@@ -251,7 +254,7 @@ module.exports = {
             AutomateActions.tab(
               'Claim',
               async () => ({
-                description: 'Claim your reward from contract',
+                description: `Claim your [${rewardTokenSymbol}](https://snowtrace.io/address/${rewardsToken}) reward from contract`,
               }),
               async () => {
                 const earned = await stakingContract.pendingReward(poolIndex, walletAddress).then((v) => v.toString());
@@ -316,38 +319,42 @@ module.exports = {
         const masterChiefContract = new ethers.Contract(masterChefAddress, masterChefABI, provider);
 
         const totalPools = await masterChiefContract.poolLength();
-        return (await Promise.all((
-          await Promise.all(new Array(totalPools.toNumber()).fill(1).map((_, i) => masterChiefContract.poolInfo(i)))
-        ).map(async (p, i) => {
-          let pair;
-          try {
-            pair = await getUniPairToken(provider, p.lpToken, network, blockTag, block);
-          } catch {
-            return null;
-          }
+        return (
+          await Promise.all(
+            (
+              await Promise.all(new Array(totalPools.toNumber()).fill(1).map((_, i) => masterChiefContract.poolInfo(i)))
+            ).map(async (p, i) => {
+              let pair;
+              try {
+                pair = await getUniPairToken(provider, p.lpToken, network, blockTag, block);
+              } catch {
+                return null;
+              }
 
-          const [token0, token1] = await Promise.all([
-            ethereum.erc20Info(provider, pair.token0),
-            ethereum.erc20Info(provider, pair.token1)
-          ]);
+              const [token0, token1] = await Promise.all([
+                ethereum.erc20Info(provider, pair.token0),
+                ethereum.erc20Info(provider, pair.token1),
+              ]);
 
-          return {
-            poolIndex: i,
-            name: `SmartCoin ${token0.symbol}-${token1.symbol} LP`,
-            address: p.lpToken,
-            deployBlockNumber: pair.block.number,
-            blockchain: 'ethereum',
-            network: pair.network,
-            layout: 'staking',
-            adapter: 'masterChef',
-            description: '',
-            automate: {
-              autorestakeAdapter: "MasterChefJoeLpRestake",
-              adapters: ["masterChef"],
-            },
-            link: '',
-          };
-        }))).filter(v => v);
+              return {
+                poolIndex: i,
+                name: `SmartCoin ${token0.symbol}-${token1.symbol} LP`,
+                address: p.lpToken,
+                deployBlockNumber: pair.block.number,
+                blockchain: 'ethereum',
+                network: pair.network,
+                layout: 'staking',
+                adapter: 'masterChef',
+                description: '',
+                automate: {
+                  autorestakeAdapter: 'MasterChefJoeLpRestake',
+                  adapters: ['masterChef'],
+                },
+                link: '',
+              };
+            })
+          )
+        ).filter((v) => v);
       },
     },
     deploy: {

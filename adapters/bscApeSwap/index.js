@@ -13,82 +13,141 @@ const bridgeTokens = require('./abi/bridgeTokens.json');
 const masterChefAddress = '0x5c8D727b265DBAfaba67E050f2f739cAeEB4A6F9';
 const routeTokens = ['0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c'];
 
-function masterChefActionsFactory(stakingTokenContract, stakingContract, pool) {
+async function masterChefActionsFactory(rewardTokenContract, stakingTokenContract, stakingContract, pool) {
+  const rewardTokenSymbol = await rewardTokenContract.symbol();
+  const stakingTokenSymbol = await stakingTokenContract.symbol();
+  const stakingTokenDecimals = await stakingTokenContract.decimals().then((v) => v.toString());
+
   return async (walletAddress) => ({
-    stake: {
-      can: async (amount) => {
-        const balance = await stakingTokenContract.balanceOf(walletAddress);
-        if (new bn(amount).isGreaterThan(balance.toString())) {
-          return Error('Amount exceeds balance');
-        }
+    stake: [
+      AutomateActions.tab(
+        'Stake',
+        async () => ({
+          description: `Stake your [${stakingTokenSymbol}](https://bscscan.com/address/${stakingTokenContract.address}) tokens to contract`,
+          inputs: [
+            AutomateActions.input({
+              placeholder: 'amount',
+              value: new bn(await stakingTokenContract.balanceOf(walletAddress).then((v) => v.toString()))
+                .div(`1e${stakingTokenDecimals}`)
+                .toString(10),
+            }),
+          ],
+        }),
+        async (amount) => {
+          const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
+          if (amountInt.lte(0)) return Error('Invalid amount');
 
-        return true;
-      },
-      send: async (amount) => {
-        await stakingTokenContract.approve(masterChefAddress, amount);
-        if (pool.index === 0) {
-          await stakingContract.enterStaking(amount);
-        } else {
-          await stakingContract.deposit(pool.index, amount);
-        }
-      },
-    },
-    unstake: {
-      can: async (amount) => {
-        const userInfo = await stakingContract.userInfo(pool.index, walletAddress);
-        if (new bn(amount).isGreaterThan(userInfo.amount.toString())) {
-          return Error('Amount exceeds balance');
-        }
+          const balance = await stakingTokenContract.balanceOf(walletAddress).then((v) => v.toString());
+          if (amountInt.gt(balance)) return Error('Insufficient funds on the balance');
 
-        return true;
-      },
-      send: async (amount) => {
-        if (pool.index === 0) {
-          await stakingContract.leaveStaking(pool.index, amount);
-        } else {
-          await stakingContract.withdraw(pool.index, amount);
-        }
-      },
-    },
-    claim: {
-      can: async () => {
-        const { amount, rewardDebt } = await stakingContract.userInfo(pool.index, walletAddress);
-        const { accRewardPerShare } = await stakingContract.poolInfo(pool.index);
-        const earned = new bn(amount.toString())
-          .multipliedBy(accRewardPerShare.toString())
-          .div(new bn(10).pow(12))
-          .minus(rewardDebt.toString());
-        if (earned.isLessThanOrEqualTo(0)) {
-          return Error('No earnings');
-        }
-        return true;
-      },
-      send: async () => {
-        if (pool.index === 0) {
-          await stakingContract.enterStaking(0);
-        } else {
-          await stakingContract.deposit(pool.index, 0);
-        }
-      },
-    },
-    exit: {
-      can: async () => {
-        const userInfo = await stakingContract.userInfo(pool.index, walletAddress);
-        if (new bn(userInfo.amount.toString()).isLessThanOrEqualTo(0)) {
-          return Error('No LP in contract');
-        }
+          return true;
+        },
+        async (amount) => {
+          const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
+          await ethereum.erc20ApproveAll(stakingTokenContract, walletAddress, masterChefAddress, amountInt.toFixed(0));
 
-        return true;
-      },
-      send: async () => {
-        const userInfo = await stakingContract.userInfo(pool.index, walletAddress);
-        if (pool.index === 0) {
-          await stakingContract.leaveStaking(pool.index, userInfo.amount.toString());
-        } else {
-          await stakingContract.withdraw(pool.index, userInfo.amount.toString());
+          if (pool.index === 0) {
+            return { tx: await stakingContract.enterStaking(amountInt.toFixed(0)) };
+          } else {
+            return { tx: await stakingContract.deposit(pool.index, amountInt.toFixed(0)) };
+          }
         }
-      },
-    },
+      ),
+    ],
+    unstake: [
+      AutomateActions.tab(
+        'Unstake',
+        async () => {
+          const userInfo = await stakingContract.userInfo(pool.index, walletAddress);
+
+          return {
+            description: `Unstake your [${stakingTokenSymbol}](https://bscscan.com/address/${stakingTokenContract.address}) tokens from contract`,
+            inputs: [
+              AutomateActions.input({
+                placeholder: 'amount',
+                value: new bn(userInfo.amount.toString()).div(`1e${stakingTokenDecimals}`).toString(10),
+              }),
+            ],
+          };
+        },
+        async (amount) => {
+          const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
+          if (amountInt.lte(0)) return Error('Invalid amount');
+
+          const userInfo = await stakingContract.userInfo(pool.index, walletAddress);
+          if (amountInt.isGreaterThan(userInfo.amount.toString())) {
+            return Error('Amount exceeds balance');
+          }
+
+          return true;
+        },
+        async (amount) => {
+          const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
+
+          if (pool.index === 0) {
+            return { tx: await stakingContract.leaveStaking(pool.index, amountInt.toFixed(0)) };
+          } else {
+            return { tx: await stakingContract.withdraw(pool.index, amountInt.toFixed(0)) };
+          }
+        }
+      ),
+    ],
+    claim: [
+      AutomateActions.tab(
+        'Claim',
+        async () => ({
+          description: `Claim your [${rewardTokenSymbol}](https://bscscan.com/address/${rewardTokenContract.address}) reward from contract`,
+        }),
+        async () => {
+          const earned = await stakingContract.pendingCake(pool.index, walletAddress).then((v) => v.toString());
+          if (new bn(earned).isLessThanOrEqualTo(0)) {
+            return Error('No earnings');
+          }
+
+          return true;
+        },
+        async () => {
+          if (pool.index === 0) {
+            return { tx: await stakingContract.enterStaking(0) };
+          } else {
+            return { tx: await stakingContract.deposit(pool.index, 0) };
+          }
+        }
+      ),
+    ],
+    exit: [
+      AutomateActions.tab(
+        'Exit',
+        async () => ({
+          description: 'Get all tokens from contract',
+        }),
+        async () => {
+          const earned = await stakingContract.pendingCake(pool.index, walletAddress).then((v) => v.toString());
+          const userInfo = await stakingContract.userInfo(pool.index, walletAddress);
+          if (new bn(earned).isLessThanOrEqualTo(0) && new bn(userInfo.amount.toString()).isLessThanOrEqualTo(0)) {
+            return Error('No staked');
+          }
+
+          return true;
+        },
+        async () => {
+          const userInfo = await stakingContract.userInfo(pool.index, walletAddress);
+          if (new bn(userInfo.amount.toString()).isGreaterThan(0)) {
+            if (pool.index === 0) {
+              await stakingContract.leaveStaking(userInfo.amount.toString());
+            } else {
+              await stakingContract.withdraw(pool.index, userInfo.amount.toString());
+            }
+          }
+
+          if (pool.index === 0) {
+            return { tx: await stakingContract.enterStaking(0) };
+          } else {
+            return { tx: await stakingContract.deposit(pool.index, 0) };
+          }
+        }
+      ),
+    ],
   });
 }
 
@@ -247,10 +306,13 @@ module.exports = {
         }
         const { signer } = options;
 
-        return masterChefActionsFactory(
-          ethereum.erc20(provider, stakingToken).connect(signer),
-          masterChiefContract.connect(signer),
-          pool
+        return (
+          await masterChefActionsFactory(
+            ethereum.erc20(provider, rewardToken).connect(signer),
+            ethereum.erc20(provider, stakingToken).connect(signer),
+            masterChiefContract.connect(signer),
+            pool
+          )
         )(walletAddress);
       },
     };
@@ -388,10 +450,13 @@ module.exports = {
         }
         const { signer } = options;
 
-        return masterChefActionsFactory(
-          ethereum.erc20(provider, stakingToken).connect(signer),
-          masterChiefContract.connect(signer),
-          pool
+        return (
+          await masterChefActionsFactory(
+            ethereum.erc20(provider, rewardToken).connect(signer),
+            ethereum.erc20(provider, stakingToken).connect(signer),
+            masterChiefContract.connect(signer),
+            pool
+          )
         )(walletAddress);
       },
     };
@@ -511,57 +576,130 @@ module.exports = {
           throw new Error('Signer not found, use options.signer for use actions');
         }
         const { signer } = options;
+        const rewardTokenContract = ethereum.erc20(provider, rewardToken).connect(signer);
+        const rewardTokenSymbol = await rewardTokenContract.symbol();
         const stakingTokenContract = ethereum.erc20(provider, stakingToken).connect(signer);
+        const stakingTokenSymbol = await stakingTokenContract.symbol();
         const stakingContract = apeRewardContract.connect(signer);
 
         return {
-          stake: {
-            can: async (amount) => {
-              const balance = await stakingTokenContract.balanceOf(walletAddress);
-              if (new bn(amount).isGreaterThan(balance.toString())) {
-                return Error('Amount exceeds balance');
-              }
+          stake: [
+            AutomateActions.tab(
+              'Stake',
+              async () => ({
+                description: `Stake your [${stakingTokenSymbol}](https://bscscan.com/address/${stakingTokenContract.address}) tokens to contract`,
+                inputs: [
+                  AutomateActions.input({
+                    placeholder: 'amount',
+                    value: new bn(await stakingTokenContract.balanceOf(walletAddress).then((v) => v.toString()))
+                      .div(`1e${stakingTokenDecimals}`)
+                      .toString(10),
+                  }),
+                ],
+              }),
+              async (amount) => {
+                const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
+                if (amountInt.lte(0)) return Error('Invalid amount');
 
-              return true;
-            },
-            send: async (amount) => {
-              await stakingTokenContract.approve(contractAddress, amount);
-              await stakingContract.deposit(amount);
-            },
-          },
-          unstake: {
-            can: async (amount) => {
-              const userInfo = await stakingContract.userInfo(walletAddress);
-              if (new bn(amount).isGreaterThan(userInfo.amount.toString())) {
-                return Error('Amount exceeds balance');
-              }
+                const balance = await stakingTokenContract.balanceOf(walletAddress).then((v) => v.toString());
+                if (amountInt.gt(balance)) return Error('Insufficient funds on the balance');
 
-              return true;
-            },
-            send: async (amount) => {
-              await stakingContract.withdraw(amount);
-            },
-          },
-          claim: {
-            can: async () => true,
-            send: async () => {
-              await stakingContract.deposit(0);
-            },
-          },
-          exit: {
-            can: async () => {
-              const userInfo = await stakingContract.userInfo(walletAddress);
-              if (new bn(userInfo.amount.toString()).isLessThanOrEqualTo(0)) {
-                return Error('No token in contract');
-              }
+                return true;
+              },
+              async (amount) => {
+                const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
+                await ethereum.erc20ApproveAll(
+                  stakingTokenContract,
+                  walletAddress,
+                  stakingContract.address,
+                  amountInt.toFixed(0)
+                );
 
-              return true;
-            },
-            send: async () => {
-              const userInfo = await stakingContract.userInfo(walletAddress);
-              await stakingContract.withdraw(userInfo.amount.toString());
-            },
-          },
+                return { tx: await stakingContract.deposit(amountInt.toFixed(0)) };
+              }
+            ),
+          ],
+          unstake: [
+            AutomateActions.tab(
+              'Unstake',
+              async () => {
+                const userInfo = await stakingContract.userInfo(walletAddress);
+
+                return {
+                  description: `Unstake your [${stakingTokenSymbol}](https://bscscan.com/address/${stakingTokenContract.address}) tokens from contract`,
+                  inputs: [
+                    AutomateActions.input({
+                      placeholder: 'amount',
+                      value: new bn(userInfo.amount.toString()).div(`1e${stakingTokenDecimals}`).toString(10),
+                    }),
+                  ],
+                };
+              },
+              async (amount) => {
+                const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
+                if (amountInt.lte(0)) return Error('Invalid amount');
+
+                const userInfo = await stakingContract.userInfo(walletAddress);
+                if (amountInt.isGreaterThan(userInfo.amount.toString())) {
+                  return Error('Amount exceeds balance');
+                }
+
+                return true;
+              },
+              async (amount) => {
+                const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
+
+                return { tx: await stakingContract.withdraw(amountInt.toFixed(0)) };
+              }
+            ),
+          ],
+          claim: [
+            AutomateActions.tab(
+              'Claim',
+              async () => ({
+                description: `Claim your [${rewardTokenSymbol}](https://bscscan.com/address/${rewardTokenContract.address}) reward from contract`,
+              }),
+              async () => {
+                const earned = await stakingContract.pendingReward(walletAddress).then((v) => v.toString());
+                if (new bn(earned).isLessThanOrEqualTo(0)) {
+                  return Error('No earnings');
+                }
+
+                return true;
+              },
+              async () => {
+                return { tx: await stakingContract.deposit(0) };
+              }
+            ),
+          ],
+          exit: [
+            AutomateActions.tab(
+              'Exit',
+              async () => ({
+                description: 'Get all tokens from contract',
+              }),
+              async () => {
+                const earned = await stakingContract.pendingReward(walletAddress).then((v) => v.toString());
+                const userInfo = await stakingContract.userInfo(walletAddress);
+                if (
+                  new bn(earned).isLessThanOrEqualTo(0) &&
+                  new bn(userInfo.amount.toString()).isLessThanOrEqualTo(0)
+                ) {
+                  return Error('No staked');
+                }
+
+                return true;
+              },
+              async () => {
+                const userInfo = await stakingContract.userInfo(walletAddress);
+                if (new bn(userInfo.amount.toString()).isGreaterThan(0)) {
+                  await stakingContract.withdraw(userInfo.amount.toString());
+                }
+
+                return { tx: await stakingContract.deposit(0) };
+              }
+            ),
+          ],
         };
       },
     };

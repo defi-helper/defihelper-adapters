@@ -1,4 +1,6 @@
 import React from "react";
+import { Remarkable } from "remarkable";
+import RemarkableReactRenderer from "remarkable-react";
 
 /**
  * @param {{
@@ -18,6 +20,8 @@ export function AdapterModalSteps({ steps, onAction }) {
   const [currentIndex, setCurrentIndex] = React.useState(0);
   const [info, setInfo] = React.useState(null);
   const [inputs, setInputs] = React.useState([]);
+  const md = new Remarkable();
+  md.renderer = new RemarkableReactRenderer();
 
   const onInputChange = (inputIndex, newValue) => {
     setInputs(
@@ -76,7 +80,7 @@ export function AdapterModalSteps({ steps, onAction }) {
       </div>
       {info && (
         <div>
-          <p>{info.description}</p>
+          {md.render(info.description)}
           <div>
             {(info.inputs ?? []).map(({ placeholder }, i) => (
               <div key={i}>

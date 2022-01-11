@@ -238,6 +238,8 @@ function stakingAdapterFactory(poolABI) {
           throw new Error('Signer not found, use options.signer for use actions');
         }
         const { signer } = options;
+        const rewardTokenContract = ethereum.erc20(provider, crvToken).connect(signer);
+        const rewardTokenSymbol = await rewardTokenContract.symbol();
         const stakingTokenContract = ethereum.erc20(signer, pool.lpToken.address);
         const stakingContract = new ethers.Contract(pool.gauge.address, gaugeABI, signer);
         const minterContract = new ethers.Contract(minter.address, minterABI, signer);
@@ -247,7 +249,7 @@ function stakingAdapterFactory(poolABI) {
             AutomateActions.tab(
               'Stake',
               async () => ({
-                description: 'Stake your tokens to contract',
+                description: `Stake your [${stakingTokenSymbol}](etherscan.io/address/${stakingToken}) tokens to contract`,
                 inputs: [
                   AutomateActions.input({
                     placeholder: 'amount',
@@ -285,7 +287,7 @@ function stakingAdapterFactory(poolABI) {
             AutomateActions.tab(
               'Unstake',
               async () => ({
-                description: 'Unstake your tokens from contract',
+                description: `Unstake your [${stakingTokenSymbol}](etherscan.io/address/${stakingToken}) tokens from contract`,
                 inputs: [
                   AutomateActions.input({
                     placeholder: 'amount',
@@ -317,7 +319,7 @@ function stakingAdapterFactory(poolABI) {
             AutomateActions.tab(
               'Claim',
               async () => ({
-                description: 'Claim your reward from contract',
+                description: `Claim your [${rewardTokenSymbol}](etherscan.io/address/${rewardToken}) reward from contract`,
               }),
               async () => {
                 const earned = await minterContract.minted(walletAddress, pool.gauge.address).then((v) => v.toString());

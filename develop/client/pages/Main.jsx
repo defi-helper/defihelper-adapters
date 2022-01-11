@@ -12,7 +12,12 @@ function AdaptersList({ adapters }) {
         <li key={protocol}>
           <Link to={`/client/adapter/${protocol}`}>{protocol}</Link>
           <div>
-            <small> <Link to={`/client/contracts-resolver/${protocol}`}>contracts resolver</Link></small>
+            <small>
+              {" "}
+              <Link to={`/client/contracts-resolver/${protocol}`}>
+                contracts resolver
+              </Link>
+            </small>
           </div>
         </li>
       ))}
@@ -22,11 +27,12 @@ function AdaptersList({ adapters }) {
 
 function AutomatesList({ blockchain, automates }) {
   if (automates === null) return <div>Loading...</div>;
+  const protocols = [...new Set(automates.map(({ protocol }) => protocol))];
 
   return (
     <ul>
-      {automates.map(({ protocol, contract }) => (
-        <li key={`${protocol}/${contract}`}>
+      {protocols.map((protocol) => (
+        <li key={protocol}>
           <Link to={`/client/automate/${blockchain}/${protocol}`}>
             {protocol}
           </Link>
