@@ -26,7 +26,11 @@ function masterChefActionsFactory(stakingTokenContract, stakingContract, pool) {
       },
       send: async (amount) => {
         await stakingTokenContract.approve(masterChefAddress, amount);
-        await stakingContract.deposit(pool.index, amount);
+        if (pool.index === 0) {
+          await stakingContract.enterStaking(amount);
+        } else {
+          await stakingContract.deposit(pool.index, amount);
+        }
       },
     },
     unstake: {
@@ -39,7 +43,11 @@ function masterChefActionsFactory(stakingTokenContract, stakingContract, pool) {
         return true;
       },
       send: async (amount) => {
-        await stakingContract.withdraw(pool.index, amount);
+        if (pool.index === 0) {
+          await stakingContract.leaveStaking(pool.index, amount);
+        } else {
+          await stakingContract.withdraw(pool.index, amount);
+        }
       },
     },
     claim: {
@@ -56,7 +64,11 @@ function masterChefActionsFactory(stakingTokenContract, stakingContract, pool) {
         return true;
       },
       send: async () => {
-        await stakingContract.deposit(pool.index, 0);
+        if (pool.index === 0) {
+          await stakingContract.enterStaking(0);
+        } else {
+          await stakingContract.deposit(pool.index, 0);
+        }
       },
     },
     exit: {
@@ -70,7 +82,11 @@ function masterChefActionsFactory(stakingTokenContract, stakingContract, pool) {
       },
       send: async () => {
         const userInfo = await stakingContract.userInfo(pool.index, walletAddress);
-        await stakingContract.withdraw(pool.index, userInfo.amount.toString());
+        if (pool.index === 0) {
+          await stakingContract.leaveStaking(pool.index, userInfo.amount.toString());
+        } else {
+          await stakingContract.withdraw(pool.index, userInfo.amount.toString());
+        }
       },
     },
   });
@@ -859,9 +875,15 @@ module.exports = {
           },
           async () => {
             const userInfo = await staking.userInfo(poolId, signerAddress);
-            return {
-              tx: await staking.withdraw(poolId, userInfo.amount.toString()),
-            };
+            if (poolId === '0') {
+              return {
+                tx: await staking.leaveStaking(userInfo.amount.toString()),
+              };
+            } else {
+              return {
+                tx: await staking.withdraw(poolId, userInfo.amount.toString()),
+              };
+            }
           }
         ),
         ...deposit,
@@ -1044,9 +1066,15 @@ module.exports = {
           },
           async () => {
             const userInfo = await staking.userInfo(poolId, signerAddress);
-            return {
-              tx: await staking.withdraw(poolId, userInfo.amount.toString()),
-            };
+            if (poolId === '0') {
+              return {
+                tx: await staking.leaveStaking(userInfo.amount.toString()),
+              };
+            } else {
+              return {
+                tx: await staking.withdraw(poolId, userInfo.amount.toString()),
+              };
+            }
           }
         ),
         ...deposit,

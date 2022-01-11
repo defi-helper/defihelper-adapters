@@ -20,14 +20,15 @@ interface IMasterChef {
 
   function userInfo(uint256 pool, address user) external view returns (UserInfo memory);
 
-  function pendingCake(uint256 pool, address user)
-    external
-    view
-    returns (uint256);
+  function pendingCake(uint256 pool, address user) external view returns (uint256);
 
   function deposit(uint256 pool, uint256 amount) external;
 
+  function enterStaking(uint256 amount) external;
+
   function withdraw(uint256 pool, uint256 amount) external;
+
+  function leaveStaking(uint256 amount) external;
 
   function emergencyWithdraw(uint256 pool) external;
 }

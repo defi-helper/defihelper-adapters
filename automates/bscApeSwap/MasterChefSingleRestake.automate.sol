@@ -70,14 +70,22 @@ contract MasterChefSingleRestake is Automate {
     IERC20 _stakingToken = stakingToken; // gas optimisation
     uint256 balance = _stakingToken.balanceOf(address(this));
     _stakingToken.safeApprove(address(staking), balance);
-    staking.deposit(pool, balance);
+    if (pool == 0) {
+      staking.enterStaking(balance);
+    } else {
+      staking.deposit(pool, balance);
+    }
   }
 
   function refund() external onlyOwner {
     IMasterChef _staking = staking; // gas optimisation
     address __owner = owner(); // gas optimisation
     IMasterChef.UserInfo memory userInfo = _staking.userInfo(pool, address(this));
-    _staking.withdraw(pool, userInfo.amount);
+    if (pool == 0) {
+      _staking.leaveStaking(userInfo.amount);
+    } else {
+      _staking.withdraw(pool, userInfo.amount);
+    }
     stakingToken.transfer(__owner, stakingToken.balanceOf(address(this)));
     rewardToken.transfer(__owner, rewardToken.balanceOf(address(this)));
   }
@@ -108,13 +116,21 @@ contract MasterChefSingleRestake is Automate {
     IERC20 _stakingToken = stakingToken;
     require(_staking.pendingCake(pool, address(this)) > 0, "MasterChefSingleRestake::run: no earned");
 
-    _staking.deposit(pool, 0); // get all reward
+    if (pool == 0) {
+      _staking.enterStaking(0); // get all reward
+    } else {
+      _staking.deposit(pool, 0); // get all reward
+    }
     uint256 rewardAmount = rewardToken.balanceOf(address(this));
     rewardToken.safeApprove(liquidityRouter, rewardAmount);
     _swap(swap.path, [rewardAmount, swap.outMin], _deadline);
 
     uint256 stakingAmount = _stakingToken.balanceOf(address(this));
     _stakingToken.safeApprove(address(_staking), stakingAmount);
-    _staking.deposit(pool, stakingAmount);
+    if (pool == 0) {
+      _staking.enterStaking(stakingAmount);
+    } else {
+      _staking.deposit(pool, stakingAmount);
+    }
   }
 }
