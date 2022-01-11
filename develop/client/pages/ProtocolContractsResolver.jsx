@@ -8,15 +8,15 @@ export function ProtocolContractsResolver(props) {
   const [ethProvider, ethSigner] = useProvider();
   const [blockchain, setBlockchain] = React.useState("ethereum");
   const [protocol, setProtocol] = React.useState(null);
-  const [currentAdapter, setCurrentAdapter] = React.useState("");
   const [contractReload, setContractReload] = React.useState(false);
-  const [ currentOutput, setCurrentOutput ] = React.useState('[null]');
-  const [contractsResolversList, setContractsResolversList] = React.useState([]);
-  const [currentResolver, setCurrentResolver] = React.useState('default');
+  const [currentOutput, setCurrentOutput] = React.useState("[null]");
+  const [contractsResolversList, setContractsResolversList] = React.useState(
+    []
+  );
+  const [currentResolver, setCurrentResolver] = React.useState("default");
 
   React.useEffect(async () => {
     const protocol = await adaptersGateway.load(props.protocol);
-    setCurrentAdapter(Object.keys(protocol)[0]);
     setProtocol(protocol);
     setContractsResolversList(protocol.automates.contractsResolver || []);
   }, []);
@@ -36,7 +36,9 @@ export function ProtocolContractsResolver(props) {
             }
           : undefined;
 
-      const output = await protocol.automates.contractsResolver[currentResolver](bc, params);
+      const output = await protocol.automates.contractsResolver[
+        currentResolver
+      ](bc, params);
       setCurrentOutput(JSON.stringify(output));
     } catch (e) {
       console.error(e);
@@ -61,19 +63,6 @@ export function ProtocolContractsResolver(props) {
             {["ethereum", "waves"].map((bc) => (
               <option key={bc} value={bc}>
                 {bc}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="column">
-          <label>Adapter: </label>
-          <select
-            value={currentAdapter}
-            onChange={(e) => setCurrentAdapter(e.target.value)}
-          >
-            {Object.keys(protocol).map((adapterName) => (
-              <option key={adapterName} value={adapterName}>
-                {adapterName}
               </option>
             ))}
           </select>
@@ -104,10 +93,7 @@ export function ProtocolContractsResolver(props) {
 
       <div>
         <div>
-          <ReactJson
-            src={JSON.parse(currentOutput)}
-            collapsed={1}
-          />
+          <ReactJson src={JSON.parse(currentOutput)} collapsed={1} />
         </div>
       </div>
     </div>
