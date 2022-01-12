@@ -3,6 +3,7 @@ automates-public/ethereum/deployment/local
 public/dist
 .cache
 cache
+server/cache/*
 
 # dependencies
 /node_modules
