@@ -1,5 +1,8 @@
 const { ethers, axios, bn, ethersMulticall, dayjs } = require('../lib');
-const { ethereum, waves, toFloat, staking } = require('../utils');
+const { ethereum } = require('../utils/ethereum');
+const { waves } = require('../utils/waves');
+const { toFloat } = require('../utils/toFloat');
+const { synthetixStaking } = require('../utils/staking');
 const StakingABI = require('./abi/Staking.json');
 const SynthetixUniswapLpRestakeABI = require('./abi/SynthetixUniswapLpRestake.json');
 const AutomateActions = require('../utils/automate/actions');
@@ -9,7 +12,7 @@ const swopTokenId = 'Ehie5xYpeN8op1Cctc6aGUrqx8jq3jtf1DSjXDbfm7aT';
 
 module.exports = {
   // For instance: 0x969c70f75aecb0decbde0554fb570276c9a85751
-  staking: staking.synthetixStaking(),
+  staking: synthetixStaking(),
   swopfiStaking: async (provider, contractAddress, initOptions = waves.defaultOptions()) => {
     const options = {
       ...waves.defaultOptions(),
@@ -121,7 +124,7 @@ module.exports = {
                   new ethers.utils.Interface(SynthetixUniswapLpRestakeABI).encodeFunctionData('init', [
                     staking,
                     router,
-                    Math.floor(slippage * 10),
+                    Math.floor(slippage * 100),
                     deadline,
                   ])
                 )

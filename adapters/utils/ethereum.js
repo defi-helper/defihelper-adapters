@@ -8,6 +8,7 @@ const ethereum = {
   abi: {
     ERC20ABI,
     UniswapPairABI,
+    UniswapRouterABI,
   },
   defaultOptions: () => ({
     blockNumber: 'latest',
@@ -41,6 +42,14 @@ const ethereum = {
       decimals: decimals.toString(),
       totalSupply: totalSupply.toString(),
     };
+  },
+  erc20ApproveAll: async (erc20, owner, spender, value) => {
+    const allowance = await erc20.allowance(owner, spender).then((v) => v.toString());
+    if (new bn(allowance).isGreaterThanOrEqualTo(value)) return;
+    if (new bn(allowance).isGreaterThan(0)) {
+      await erc20.approve(spender, '0').then((tx) => tx.wait());
+    }
+    return erc20.approve(spender, new bn(2).pow(256).minus(1).toFixed(0)).then((tx) => tx.wait());
   },
   dfh: {
     storageABI: DFHStorageABI,
@@ -119,7 +128,6 @@ const ethereum = {
         totalSupply,
       });
     },
-    routerABI: UniswapRouterABI,
     router: (provider, address) => new ethers.Contract(address, UniswapRouterABI, provider),
     getPrice: async (router, amountIn, path, options = ethereum.defaultOptions()) => {
       try {
@@ -129,6 +137,24 @@ const ethereum = {
       } catch (e) {
         throw new Error(`Resolver price "${JSON.stringify(path)}" by uniswap router error: ${e}`);
       }
+    },
+    autoRoute: async (multicall, router, amountIn, from, to, withTokens) => {
+      const amountsOut = await multicall.all([
+        router.getAmountsOut(amountIn, [from, to]),
+        ...withTokens
+          .filter((middle) => from !== middle && middle !== to)
+          .map((middle) => router.getAmountsOut(amountIn, [from, middle, to])),
+      ]);
+
+      return amountsOut.reduce(
+        (result, amountsOut, i) => {
+          const amountOut = amountsOut[amountsOut.length - 1].toString();
+          if (new bn(result.amountOut).isGreaterThanOrEqualTo(amountOut)) return result;
+
+          return { path: [from, withTokens[i - 1], to], amountOut };
+        },
+        { path: [from, to], amountOut: amountsOut[0][1].toString() }
+      );
     },
   },
 };

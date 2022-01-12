@@ -1,4 +1,4 @@
-const { masterChef } = require('../utils');
+const { masterChef } = require('../utils/masterChef/masterChef');
 const masterChefV1 = require('./abi/masterChefV1ABI.json');
 const masterChefV1Pools = require('./abi/masterChiefV1Pools.json');
 
