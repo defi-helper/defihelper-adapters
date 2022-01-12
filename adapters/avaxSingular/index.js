@@ -1,9 +1,12 @@
-const { ethers, bn, ethersMulticall, dayjs } = require('../lib');
-const { ethereum, toFloat, tokens, coingecko } = require('../utils');
+const { ethers, bn, ethersMulticall } = require('../lib');
+const { ethereum } = require('../utils/ethereum');
+const { toFloat } = require('../utils/toFloat');
+const { tokens } = require('../utils/tokens');
+const { coingecko } = require('../utils/coingecko');
 const { getUniPairToken } = require('../utils/masterChef/masterChefStakingToken');
+const cache = require('../utils/cache');
 const AutomateActions = require('../utils/automate/actions');
 const masterChefABI = require('./abi/masterChefABI.json');
-const masterChefSavedPools = require('./abi/masterChefPools.json');
 
 const masterChefAddress = '0xF2599B0c7cA1e3c050209f3619F09b6daE002857';
 
@@ -13,6 +16,7 @@ module.exports = {
       ...ethereum.defaultOptions(),
       ...initOptions,
     };
+    const masterChefSavedPools = await cache.read('avaxSingular', 'masterChefPools');
     const blockTag = options.blockNumber === 'latest' ? 'latest' : parseInt(options.blockNumber, 10);
     const network = (await provider.detectNetwork()).chainId;
     const block = await provider.getBlock(blockTag);

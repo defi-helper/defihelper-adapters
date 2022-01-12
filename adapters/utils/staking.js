@@ -195,6 +195,8 @@ module.exports = {
           const rewardTokenContract = ethereum.erc20(provider, rewardsToken).connect(signer);
           const rewardTokenSymbol = await rewardTokenContract.symbol();
           const stakingTokenContract = ethereum.erc20(provider, stakingToken).connect(signer);
+          const stakingTokenSymbol = await stakingTokenContract.symbol();
+          const stakingTokenDecimals = await stakingTokenContract.decimals().then((v) => v.toString());
           const stakingContract = contract.connect(signer);
 
           return {
@@ -240,7 +242,7 @@ module.exports = {
               AutomateActions.tab(
                 'Unstake',
                 async () => ({
-                  description: `Unstake your [${stakingTokenSymbol}](etherscan.io/address/${stakingToken}) tokens from contract`,
+                  description: `Unstake your [${stakingTokenSymbol}](https://etherscan.io/address/${stakingToken}) tokens from contract`,
                   inputs: [
                     AutomateActions.input({
                       placeholder: 'amount',
@@ -274,7 +276,7 @@ module.exports = {
               AutomateActions.tab(
                 'Claim',
                 async () => ({
-                  description: `Claim your [${rewardTokenSymbol}](etherscan.io/address/${rewardsToken}) reward from contract`,
+                  description: `Claim your [${rewardTokenSymbol}](https://etherscan.io/address/${rewardsToken}) reward from contract`,
                 }),
                 async () => {
                   const earned = await stakingContract.earned(walletAddress).then((v) => v.toString());

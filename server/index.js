@@ -1,11 +1,25 @@
+require('dotenv').config();
 const hardhat = require('hardhat');
 const path = require('path');
 const Express = require('express');
+const { json } = require('body-parser');
 const glob = require('tiny-glob');
 const fs = require('fs');
 
 const app = Express();
 app.use(Express.static(path.resolve(__dirname, '../adapters-public')));
+app.use('/cache', [json()], Express.static(path.resolve(__dirname, './cache')));
+app.post(/^\/cache\/(.+)/i, async (req, res) => {
+  const auth = req.header('Auth');
+  if (auth !== process.env.CACHE_AUTH) return res.status(403).send('');
+
+  const { 0: key } = req.params;
+  const data = req.body;
+
+  await fs.promises.writeFile(path.resolve(__dirname, `./cache/${key}`), JSON.stringify(data, null, 4), { flag: 'w' });
+
+  return res.status(200).send('');
+});
 app.get(/^\/automates\/ethereum\/([a-z0-9_-]+)\/([a-z0-9_]+)\/([0-9]+)$/i, async (req, res) => {
   const { 0: protocol, 1: contract, 2: network } = req.params;
   const contractBuildArtifactPath = path.resolve(

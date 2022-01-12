@@ -1,10 +1,12 @@
 const { ethers, bn, ethersMulticall, dayjs } = require('../lib');
-const { ethereum, toFloat, tokens, coingecko } = require('../utils');
+const { ethereum } = require('../utils/ethereum');
+const { toFloat } = require('../utils/toFloat');
+const { tokens } = require('../utils/tokens');
+const { coingecko } = require('../utils/coingecko');
+const cache = require('../utils/cache');
 const AutomateActions = require('../utils/automate/actions');
 const masterChefABI = require('./abi/masterChefABI.json');
 const apeRewardV4ABI = require('./abi/apeRewardV4.json');
-const masterChefSavedPools = require('./abi/masterChefPools.json');
-const stakingContracts = require('./abi/stakingContracts.json');
 const MasterChefSingleRestakeABI = require('./abi/MasterChefSingleRestakeABI.json');
 const MasterChefLpRestakeABI = require('./abi/MasterChefLpRestakeABI.json');
 const ApeRewardV4RestakeABI = require('./abi/ApeRewardV4RestakeABI.json');
@@ -157,6 +159,7 @@ module.exports = {
       ...ethereum.defaultOptions(),
       ...initOptions,
     };
+    const masterChefSavedPools = await cache.read('bscApeSwap', 'masterChefPools');
     const blockTag = options.blockNumber === 'latest' ? 'latest' : parseInt(options.blockNumber, 10);
     const network = (await provider.detectNetwork()).chainId;
     const block = await provider.getBlock(blockTag);
@@ -322,6 +325,7 @@ module.exports = {
       ...ethereum.defaultOptions(),
       ...initOptions,
     };
+    const masterChefSavedPools = await cache.read('bscApeSwap', 'masterChefPools');
     const blockTag = options.blockNumber === 'latest' ? 'latest' : parseInt(options.blockNumber, 10);
     const network = (await provider.detectNetwork()).chainId;
     const block = await provider.getBlock(blockTag);
@@ -706,7 +710,7 @@ module.exports = {
   },
   automates: {
     contractsResolver: {
-      default: async (provider) => {
+      default: async (provider, options = {}) => {
         const multicall = new ethersMulticall.Provider(provider);
         await multicall.init();
 
@@ -717,10 +721,10 @@ module.exports = {
         const poolsStakingTokensSymbol = await multicall.all(
           poolsInfo.map(({ lpToken }) => new ethersMulticall.Contract(lpToken, ethereum.abi.ERC20ABI).symbol())
         );
-        return await Promise.all(
+
+        const pools = await Promise.all(
           poolsInfo.map(async (info, index) => {
             const stakingTokenSymbol = poolsStakingTokensSymbol[index];
-            console.log(index, stakingTokenSymbol);
             const isPair = stakingTokenSymbol === 'APE-LP';
 
             let token0Symbol, token1Symbol;
@@ -739,6 +743,7 @@ module.exports = {
 
             return {
               poolIndex: index,
+              stakingToken: info.lpToken,
               name: isPair ? `${token0Symbol}-${token1Symbol}` : stakingTokenSymbol,
               address: info.lpToken,
               blockchain: 'ethereum',
@@ -754,10 +759,25 @@ module.exports = {
             };
           })
         );
+        if (options.cacheAuth) {
+          cache.write(
+            options.cacheAuth,
+            'bscApeSwap',
+            'masterChefPools',
+            pools.map(({ poolIndex, stakingToken, adapter }) => ({
+              index: poolIndex,
+              stakingToken,
+              type: adapter === 'masterChefPair' ? 'lp' : 'single',
+            }))
+          );
+        }
+
+        return pools;
       },
     },
     deploy: {
       MasterChefLpRestake: async (signer, factoryAddress, prototypeAddress, contractAddress = undefined) => {
+        const masterChefSavedPools = await cache.read('bscApeSwap', 'masterChefPools');
         const firstPoolCandidate = masterChefSavedPools.find(({ type }) => type === 'lp');
         let poolIndex = firstPoolCandidate ? firstPoolCandidate.index.toString() : '';
         if (contractAddress) {
@@ -818,6 +838,7 @@ module.exports = {
         };
       },
       MasterChefSingleRestake: async (signer, factoryAddress, prototypeAddress, contractAddress = undefined) => {
+        const masterChefSavedPools = await cache.read('bscApeSwap', 'masterChefPools');
         const firstPoolCandidate = masterChefSavedPools.find(({ type }) => type === 'single');
         let poolIndex = firstPoolCandidate ? firstPoolCandidate.index.toString() : '';
         if (contractAddress) {
@@ -878,7 +899,8 @@ module.exports = {
         };
       },
       ApeRewardV4Restake: async (signer, factoryAddress, prototypeAddress, contractAddress = undefined) => {
-        const stakingContract = contractAddress ?? stakingContracts[0].stakingContract; // todo
+        const stakingContracts = await cache.read('bscApeSwap', 'apeRewardContracts');
+        const stakingContract = contractAddress ?? stakingContracts[0].stakingContract;
 
         return {
           deploy: [

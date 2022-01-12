@@ -1,10 +1,12 @@
 const { ethers, bn, ethersMulticall, dayjs } = require('../lib');
-const { ethereum, toFloat, tokens, coingecko, staking } = require('../utils');
-const { getUniPairToken } = require('../utils/masterChef/masterChefStakingToken');
+const { ethereum } = require('../utils/ethereum');
+const { toFloat } = require('../utils/toFloat');
+const { tokens } = require('../utils/tokens');
+const { coingecko } = require('../utils/coingecko');
+const cache = require('../utils/cache');
 const AutomateActions = require('../utils/automate/actions');
 const masterChefABI = require('./abi/masterChefABI.json');
 const MasterChefFinnLpRestakeABI = require('./abi/MasterChefFinnLpRestakeABI.json');
-const masterChefSavedPools = require('./abi/masterChefPools.json');
 const bridgeTokens = require('./abi/bridgeTokens.json');
 
 const masterChefAddress = '0x1f4b7660b6AdC3943b5038e3426B33c1c0e343E6';
@@ -16,6 +18,7 @@ module.exports = {
       ...ethereum.defaultOptions(),
       ...initOptions,
     };
+    const masterChefSavedPools = await cache.read('moonriverHuckleberry', 'masterChefPools');
     const blockTag = options.blockNumber === 'latest' ? 'latest' : parseInt(options.blockNumber, 10);
     const network = (await provider.detectNetwork()).chainId;
     const block = await provider.getBlock(blockTag);
@@ -300,19 +303,15 @@ module.exports = {
   },
   automates: {
     contractsResolver: {
-      default: async (provider, initOptions = ethereum.defaultOptions()) => {
-        const options = {
-          ...ethereum.defaultOptions(),
-          ...initOptions,
-        };
-        const blockTag = options.blockNumber === 'latest' ? 'latest' : parseInt(options.blockNumber, 10);
+      default: async (provider, options = {}) => {
+        const blockTag = 'latest';
         const network = (await provider.detectNetwork()).chainId;
         const block = await provider.getBlock(blockTag);
 
         const masterChiefContract = new ethers.Contract(masterChefAddress, masterChefABI, provider);
 
         const totalPools = await masterChiefContract.poolLength();
-        return (
+        const pools = (
           await Promise.all(
             (
               await Promise.all(new Array(totalPools.toNumber()).fill(1).map((_, i) => masterChiefContract.poolInfo(i)))
@@ -349,6 +348,7 @@ module.exports = {
 
               return {
                 poolIndex: i,
+                stakingToken: p.lpToken,
                 name: `${token0.symbol}-${token1.symbol}`,
                 address: p.lpToken,
                 blockchain: 'ethereum',
@@ -365,10 +365,24 @@ module.exports = {
             })
           )
         ).filter((v) => v);
+        if (options.cacheAuth) {
+          cache.write(
+            options.cacheAuth,
+            'moonriverHuckleberry',
+            'masterChefPools',
+            pools.map(({ poolIndex, stakingToken }) => ({
+              index: poolIndex,
+              stakingToken,
+            }))
+          );
+        }
+
+        return pools;
       },
     },
     deploy: {
       MasterChefFinnLpRestake: async (signer, factoryAddress, prototypeAddress, contractAddress = undefined) => {
+        const masterChefSavedPools = await cache.read('moonriverHuckleberry', 'masterChefPools');
         let poolIndex = masterChefSavedPools[0].index.toString();
         if (contractAddress) {
           poolIndex =

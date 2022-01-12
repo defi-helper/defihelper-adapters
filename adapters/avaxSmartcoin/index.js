@@ -1,9 +1,12 @@
 const { ethers, bn, ethersMulticall, dayjs } = require('../lib');
-const { ethereum, toFloat, tokens, coingecko } = require('../utils');
+const { ethereum } = require('../utils/ethereum');
+const { toFloat } = require('../utils/toFloat');
+const { tokens } = require('../utils/tokens');
+const { coingecko } = require('../utils/coingecko');
 const { getUniPairToken } = require('../utils/masterChef/masterChefStakingToken');
+const cache = require('../utils/cache');
 const AutomateActions = require('../utils/automate/actions');
 const masterChefABI = require('./abi/masterChefABI.json');
-const masterChefSavedPools = require('./abi/masterChefPools.json');
 const MasterChefJoeLpRestakeABI = require('./abi/MasterChefJoeLpRestakeABI.json');
 
 const masterChefAddress = '0x1495b7e8d7E9700Bd0726F1705E864265724f6e2';
@@ -14,10 +17,10 @@ module.exports = {
       ...ethereum.defaultOptions(),
       ...initOptions,
     };
+    const masterChefSavedPools = await cache.read('avaxSmartcoin', 'masterChefPools');
     const blockTag = options.blockNumber === 'latest' ? 'latest' : parseInt(options.blockNumber, 10);
     const network = (await provider.detectNetwork()).chainId;
     const block = await provider.getBlock(blockTag);
-    const blockNumber = block.number;
     const rewardTokenFunctionName = 'joe';
 
     const masterChiefContract = new ethers.Contract(masterChefAddress, masterChefABI, provider);
@@ -359,6 +362,7 @@ module.exports = {
     },
     deploy: {
       MasterChefJoeLpRestake: async (signer, factoryAddress, prototypeAddress, contractAddress = undefined) => {
+        const masterChefSavedPools = await cache.read('avaxSmartcoin', 'masterChefPools');
         let poolIndex = masterChefSavedPools[0].index.toString();
         if (contractAddress) {
           poolIndex =
