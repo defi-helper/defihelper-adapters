@@ -286,7 +286,7 @@ module.exports = {
                 name: `Huckleberry ${token0.symbol}-${token1.symbol} LP`,
                 address: p.lpToken,
                 blockchain: 'ethereum',
-                network: stakingTokenPair.network,
+                network: network.toString(),
                 layout: 'stacking',
                 adapter: 'masterChef',
                 description: '',
