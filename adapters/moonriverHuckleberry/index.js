@@ -353,7 +353,7 @@ module.exports = {
                 address: p.lpToken,
                 blockchain: 'ethereum',
                 network: network.toString(),
-                layout: 'stacking',
+                layout: 'staking',
                 adapter: 'masterChef',
                 description: '',
                 automate: {
