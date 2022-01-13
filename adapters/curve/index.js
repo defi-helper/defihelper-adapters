@@ -10,6 +10,7 @@ const gaugeControllerABI = require('./abi/gaugeControllerABI.json');
 const gaugeUniswapRestakeABI = require('./abi/gaugeUniswapRestakeABI.json');
 const { tokens } = require('../utils');
 const AutomateActions = require('../utils/automate/actions');
+const aliasTokens = require('./abi/aliasTokens.json');
 
 class Pool {
   constructor(connect, info) {
@@ -23,7 +24,9 @@ class Pool {
   async balances() {
     const { multicall, blockTag } = this.connect;
     const balances = await multicall.all(
-      this.info.coins.map((coin, i) => this.pool.balances(i)),
+      this.info.coins.map((coin, i) => {
+        return this.pool.balances(i);
+      }),
       { blockTag }
     );
 
@@ -112,7 +115,8 @@ async function getUnderlyingBalance(pools, getPriceUSD, pool, amount) {
       ];
     }
     const balance = new bn(balances[i]).div(Number(`1e${decimals}`)).toString(10);
-    const priceUSD = await getPriceUSD(address);
+    const alias = aliasTokens[address.toLowerCase()];
+    const priceUSD = await getPriceUSD(alias ? alias.token : address);
 
     return [
       ...result,
