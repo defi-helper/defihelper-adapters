@@ -246,7 +246,7 @@ module.exports = {
                   inputs: [
                     AutomateActions.input({
                       placeholder: 'amount',
-                      value: new bn(stakingContract.balanceOf(walletAddress).then((v) => v.toString()))
+                      value: new bn(await stakingContract.balanceOf(walletAddress).then((v) => v.toString()))
                         .div(`1e${stakingTokenDecimals}`)
                         .toString(10),
                     }),
