@@ -352,7 +352,7 @@ module.exports = {
                 name: `${token0.symbol}-${token1.symbol}`,
                 address: p.lpToken,
                 blockchain: 'ethereum',
-                network: stakingTokenPair.network,
+                network: network.toString(),
                 layout: 'staking',
                 adapter: 'masterChef',
                 description: '',
