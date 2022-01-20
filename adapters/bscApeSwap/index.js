@@ -173,7 +173,7 @@ module.exports = {
     }
 
     const masterChiefContract = new ethers.Contract(masterChefAddress, masterChefABI, provider);
-    const poolInfo = await masterChiefContract.poolInfo(pool.index);
+    const poolInfo = await masterChiefContract.poolInfo(pool.index, { blockTag });
 
     const rewardToken = (await masterChiefContract[rewardTokenFunctionName]()).toLowerCase();
     const rewardsTokenDecimals = 18;
@@ -184,8 +184,8 @@ module.exports = {
       rewardToken
     );
     const [rewardTokenPerBlock, totalAllocPoint] = await Promise.all([
-      await masterChiefContract[`${rewardTokenFunctionName}PerBlock`](),
-      await masterChiefContract.totalAllocPoint(),
+      await masterChiefContract[`${rewardTokenFunctionName}PerBlock`]({ blockTag }),
+      await masterChiefContract.totalAllocPoint({ blockTag }),
     ]);
     const rewardPerBlock = toFloat(
       new bn(poolInfo.allocPoint.toString())
@@ -196,7 +196,7 @@ module.exports = {
 
     const stakingToken = contractAddress.toLowerCase();
     const stakingTokenDecimals = 18;
-    const stakingTokenPair = await ethereum.uniswap.pairInfo(provider, stakingToken);
+    const stakingTokenPair = await ethereum.uniswap.pairInfo(provider, stakingToken, options);
     const token0Alias = bridgeTokens[stakingTokenPair.token0.toLowerCase()];
     const token1Alias = bridgeTokens[stakingTokenPair.token1.toLowerCase()];
     const token0PriceUSD = await coingecko.getPriceUSDByContract(
@@ -214,7 +214,7 @@ module.exports = {
     const stakingTokenPriceUSD = stakingTokenPair.calcPrice(token0PriceUSD, token1PriceUSD);
 
     const totalLocked = toFloat(
-      await ethereum.erc20(provider, contractAddress).balanceOf(masterChefAddress),
+      await ethereum.erc20(provider, contractAddress).balanceOf(masterChefAddress, { blockTag }),
       stakingTokenDecimals
     );
     const tvl = new bn(totalLocked).multipliedBy(stakingTokenPriceUSD);
@@ -245,10 +245,10 @@ module.exports = {
         aprYear: aprYear.toString(10),
       },
       wallet: async (walletAddress) => {
-        const { amount } = await masterChiefContract.userInfo(pool.index, walletAddress);
+        const { amount } = await masterChiefContract.userInfo(pool.index, walletAddress, { blockTag });
         const balance = toFloat(amount, stakingTokenDecimals);
         const earned = new bn(
-          await masterChiefContract.pendingCake(pool.index, walletAddress).then((v) => v.toString())
+          await masterChiefContract.pendingCake(pool.index, walletAddress, { blockTag }).then((v) => v.toString())
         ).div(`1e${rewardsTokenDecimals}`);
         const expandedBalance = stakingTokenPair.expandBalance(balance);
         const reviewedBalance = [
@@ -339,7 +339,7 @@ module.exports = {
     }
 
     const masterChiefContract = new ethers.Contract(masterChefAddress, masterChefABI, provider);
-    const poolInfo = await masterChiefContract.poolInfo(pool.index);
+    const poolInfo = await masterChiefContract.poolInfo(pool.index, { blockTag });
 
     const rewardToken = (await masterChiefContract[rewardTokenFunctionName]()).toLowerCase();
     const rewardsTokenDecimals = 18;
@@ -350,8 +350,8 @@ module.exports = {
       rewardToken
     );
     const [rewardTokenPerBlock, totalAllocPoint] = await Promise.all([
-      await masterChiefContract[`${rewardTokenFunctionName}PerBlock`](),
-      await masterChiefContract.totalAllocPoint(),
+      await masterChiefContract[`${rewardTokenFunctionName}PerBlock`]({ blockTag }),
+      await masterChiefContract.totalAllocPoint({ blockTag }),
     ]);
     const rewardPerBlock = toFloat(
       new bn(poolInfo.allocPoint.toString())
@@ -373,7 +373,7 @@ module.exports = {
     );
 
     const totalLocked = toFloat(
-      await ethereum.erc20(provider, contractAddress).balanceOf(masterChefAddress),
+      await ethereum.erc20(provider, contractAddress).balanceOf(masterChefAddress, { blockTag }),
       stakingTokenDecimals
     );
     const tvl = new bn(totalLocked).multipliedBy(stakingTokenPriceUSD);
@@ -404,10 +404,10 @@ module.exports = {
         aprYear: aprYear.toString(10),
       },
       wallet: async (walletAddress) => {
-        const { amount } = await masterChiefContract.userInfo(pool.index, walletAddress);
+        const { amount } = await masterChiefContract.userInfo(pool.index, walletAddress, { blockTag });
         const balance = toFloat(amount, stakingTokenDecimals);
         const earned = new bn(
-          await masterChiefContract.pendingCake(pool.index, walletAddress).then((v) => v.toString())
+          await masterChiefContract.pendingCake(pool.index, walletAddress, { blockTag }).then((v) => v.toString())
         ).div(`1e${rewardsTokenDecimals}`);
         const earnedUSD = earned.multipliedBy(rewardTokenPriceUSD);
 
@@ -489,7 +489,7 @@ module.exports = {
       rewardToken
     );
     const rewardTokenPerBlock = await apeRewardContract
-      .rewardPerBlock()
+      .rewardPerBlock({ blockTag })
       .then((v) => toFloat(new bn(v.toString()), rewardsTokenDecimals));
 
     const stakingToken = await apeRewardContract.STAKE_TOKEN().then((v) => v.toLowerCase());
@@ -504,7 +504,10 @@ module.exports = {
       stakingToken
     );
 
-    const totalLocked = toFloat(await apeRewardContract.totalStaked().then((v) => v.toString()), stakingTokenDecimals);
+    const totalLocked = toFloat(
+      await apeRewardContract.totalStaked({ blockTag }).then((v) => v.toString()),
+      stakingTokenDecimals
+    );
     const tvl = new bn(totalLocked).multipliedBy(stakingTokenPriceUSD);
 
     let aprBlock = rewardTokenPerBlock.multipliedBy(rewardTokenPriceUSD).div(tvl);
@@ -533,9 +536,12 @@ module.exports = {
         aprYear: aprYear.toString(10),
       },
       wallet: async (walletAddress) => {
-        const { amount } = await apeRewardContract.userInfo(walletAddress);
+        const { amount } = await apeRewardContract.userInfo(walletAddress, { blockTag });
         const balance = toFloat(amount, stakingTokenDecimals);
-        const earned = toFloat(await apeRewardContract.pendingReward(walletAddress), rewardsTokenDecimals);
+        const earned = toFloat(
+          await apeRewardContract.pendingReward(walletAddress, { blockTag }),
+          rewardsTokenDecimals
+        );
         const earnedUSD = earned.multipliedBy(rewardTokenPriceUSD);
 
         return {
