@@ -245,6 +245,7 @@ function stakingAdapterFactory(poolABI) {
         const rewardTokenContract = ethereum.erc20(provider, crvToken).connect(signer);
         const rewardTokenSymbol = await rewardTokenContract.symbol();
         const stakingTokenContract = ethereum.erc20(signer, pool.lpToken.address);
+        const stakingTokenSymbol = await stakingTokenContract.symbol();
         const stakingContract = new ethers.Contract(pool.gauge.address, gaugeABI, signer);
         const minterContract = new ethers.Contract(minter.address, minterABI, signer);
 
@@ -253,7 +254,7 @@ function stakingAdapterFactory(poolABI) {
             AutomateActions.tab(
               'Stake',
               async () => ({
-                description: `Stake your [${stakingTokenSymbol}](etherscan.io/address/${stakingToken}) tokens to contract`,
+                description: `Stake your [${stakingTokenSymbol}](etherscan.io/address/${pool.lpToken.address}) tokens to contract`,
                 inputs: [
                   AutomateActions.input({
                     placeholder: 'amount',
@@ -291,7 +292,7 @@ function stakingAdapterFactory(poolABI) {
             AutomateActions.tab(
               'Unstake',
               async () => ({
-                description: `Unstake your [${stakingTokenSymbol}](etherscan.io/address/${stakingToken}) tokens from contract`,
+                description: `Unstake your [${stakingTokenSymbol}](etherscan.io/address/${pool.lpToken.address}) tokens from contract`,
                 inputs: [
                   AutomateActions.input({
                     placeholder: 'amount',
