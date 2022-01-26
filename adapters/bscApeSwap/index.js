@@ -831,7 +831,7 @@ module.exports = {
                   signer,
                   factoryAddress,
                   prototypeAddress,
-                  new ethers.utils.Interface(MasterChefSingleRestakeABI).encodeFunctionData('init', [
+                  new ethers.utils.Interface(MasterChefLpRestakeABI).encodeFunctionData('init', [
                     masterChefAddress,
                     router,
                     pool,
@@ -1474,7 +1474,7 @@ module.exports = {
       };
 
       return {
-        contract: stakingTokenAddress,
+        contract: contractAddress,
         deposit,
         refund,
         migrate,
