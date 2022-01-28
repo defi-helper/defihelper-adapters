@@ -74,10 +74,10 @@ module.exports = {
       ]);
 
       const [rewardTokenPerBlock, totalAllocPoint] = await Promise.all([
-        await (masterChiefContract[`${rewardTokenFunctionName}PerBlock`]
+        (masterChiefContract[`${rewardTokenFunctionName}PerBlock`]
           ? masterChiefContract[`${rewardTokenFunctionName}PerBlock`]
           : masterChiefContract[`${rewardTokenFunctionName}PerSec`])(),
-        await masterChiefContract.totalAllocPoint(),
+        masterChiefContract.totalAllocPoint(),
       ]);
 
       const rewardPerBlock = toFloat(

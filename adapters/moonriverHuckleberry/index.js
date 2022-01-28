@@ -41,8 +41,8 @@ module.exports = {
       rewardToken
     );
     const [rewardTokenPerSec, totalAllocPoint] = await Promise.all([
-      await masterChiefContract[`${rewardTokenFunctionName}PerSecond`](),
-      await masterChiefContract.totalAllocPoint(),
+      masterChiefContract[`${rewardTokenFunctionName}PerSecond`](),
+      masterChiefContract.totalAllocPoint(),
     ]);
     const rewardPerSec = toFloat(
       new bn(poolInfo.allocPoint.toString())

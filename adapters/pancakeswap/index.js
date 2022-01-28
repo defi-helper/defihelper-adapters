@@ -163,8 +163,8 @@ module.exports = {
       rewardToken
     );
     const [rewardTokenPerBlock, totalAllocPoint] = await Promise.all([
-      await masterChiefContract.cakePerBlock({ blockTag }),
-      await masterChiefContract.totalAllocPoint({ blockTag }),
+      masterChiefContract.cakePerBlock({ blockTag }),
+      masterChiefContract.totalAllocPoint({ blockTag }),
     ]);
     const rewardPerBlock = new bn(poolInfo.allocPoint.toString())
       .multipliedBy(rewardTokenPerBlock.toString())

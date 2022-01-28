@@ -31,8 +31,8 @@ module.exports = {
     const rewardsToken = stakingToken;
 
     const [cakePerBlock, totalAllocPoint] = await Promise.all([
-      await masterChiefContract.cakePerBlock(),
-      await masterChiefContract.totalAllocPoint(),
+      masterChiefContract.cakePerBlock(),
+      masterChiefContract.totalAllocPoint(),
     ]);
 
     const rewardPerBlock = toFloat(
