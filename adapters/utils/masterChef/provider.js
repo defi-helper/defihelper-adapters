@@ -157,10 +157,10 @@ function buildMasterChefProvider(
       return pendingReward.call(this, poolIndex, wallet);
     },
     deposit(poolIndex, amount) {
-      return deposit.call(this, poolIndex, wallet);
+      return deposit.call(this, poolIndex, amount);
     },
     withdraw(poolIndex, amount) {
-      return withdraw.call(this, poolIndex, wallet);
+      return withdraw.call(this, poolIndex, amount);
     },
   };
 }
@@ -249,7 +249,7 @@ async function buildMasterChefActions(masterChefProvider, { poolIndex, poolInfo,
           const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
           if (amountInt.lte(0)) return Error('Invalid amount');
 
-          const userInfo = await stakingContract.userInfo(poolIndex, walletAddress);
+          const userInfo = await masterChefProvider.userInfo(poolIndex, walletAddress);
           if (amountInt.isGreaterThan(userInfo.amount)) {
             return Error('Amount exceeds balance');
           }
