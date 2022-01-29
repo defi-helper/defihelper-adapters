@@ -657,7 +657,7 @@ module.exports = {
             options.cacheAuth,
             'avaxTraderjoe',
             'masterChefV3Pools',
-            poolsV2.map(({ poolIndex, stakingToken, adapter }) => ({
+            poolsV3.map(({ poolIndex, stakingToken, adapter }) => ({
               index: poolIndex,
               stakingToken,
               type: adapter === 'masterChefV3Pair' ? 'lp' : 'single',
