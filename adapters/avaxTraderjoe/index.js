@@ -16,6 +16,20 @@ const masterChefV2Address = '0xd6a4F121CA35509aF06A0Be99093d08462f53052';
 const masterChefV3Address = '0x188bED1968b795d5c9022F6a0bb5931Ac4c18F00';
 const routeTokens = ['0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7'];
 
+async function priceFeed(tokenAddress, { provider, blockTag, platform, block }) {
+  if (tokenAddress.toLowerCase() === '0x57319d41f71e81f3c65f2a47ca4e001ebafd4f33') {
+    const joeAddress = '0x6e84a6216eA6dACC71eE8E6b0a5B7322EEbC0fDd';
+    const [xJoeTotalSupply, joeBalance, joePriceUSD] = await Promise.all([
+      new ethers.Contract(tokenAddress, provider).totalSupply({ blockTag }).then((v) => new bn(v.toString())),
+      new ethers.Contract(joeAddress, provider).balanceOf(tokenAddress, { blockTag }).then((v) => new bn(v.toString())),
+      coingecko.getPriceUSDByContract(platform, blockTag === 'latest', block, joeAddress),
+    ]);
+    return joeBalance.div(xJoeTotalSupply).multipliedBy(joePriceUSD);
+  }
+
+  return coingecko.getPriceUSDByContract(platform, isCurrent, block, tokenAddress);
+}
+
 module.exports = {
   masterChefV2Pair: async (provider, contractAddress, initOptions = ethereum.defaultOptions()) => {
     const options = {
@@ -255,12 +269,34 @@ module.exports = {
       .erc20(provider, stakingToken)
       .decimals()
       .then((v) => Number(v.toString()));
-    const stakingTokenPriceUSD = await coingecko.getPriceUSDByContract(
-      coingecko.platformByEthereumNetwork(network),
-      blockTag === 'latest',
-      block,
-      stakingToken
-    );
+    let stakingTokenPriceUSD = 0;
+    // xJoe price feed
+    if (stakingToken.toLowerCase() === '0x57319d41f71e81f3c65f2a47ca4e001ebafd4f33') {
+      const [xJoeTotalSupply, joeBalance, joePriceUSD] = await Promise.all([
+        ethereum
+          .erc20(provider, stakingToken)
+          .totalSupply({ blockTag })
+          .then((v) => new bn(v.toString())),
+        ethereum
+          .erc20(provider, rewardToken)
+          .balanceOf(stakingToken, { blockTag })
+          .then((v) => new bn(v.toString())),
+        coingecko.getPriceUSDByContract(
+          coingecko.platformByEthereumNetwork(network),
+          blockTag === 'latest',
+          block,
+          rewardToken
+        ),
+      ]);
+      stakingTokenPriceUSD = joeBalance.div(xJoeTotalSupply).multipliedBy(joePriceUSD);
+    } else {
+      stakingTokenPriceUSD = await coingecko.getPriceUSDByContract(
+        coingecko.platformByEthereumNetwork(network),
+        blockTag === 'latest',
+        block,
+        stakingToken
+      );
+    }
 
     const totalLocked = await masterChefProvider.totalLocked(poolInfo).then((v) => v.div(`1e${stakingTokenDecimals}`));
     const tvl = new bn(totalLocked).multipliedBy(stakingTokenPriceUSD);
@@ -587,6 +623,15 @@ module.exports = {
               token1Symbol = pairSymbols[1];
             }
 
+            let autorestakeAdapter = undefined;
+            if (isPair) {
+              autorestakeAdapter = 'MasterChefV2LpRestake';
+            }
+            // Skip xJoe autorestake
+            else if (info.lpToken.toLowerCase() !== '0x57319d41f71e81f3c65f2a47ca4e001ebafd4f33') {
+              autorestakeAdapter = 'MasterChefV2SingleRestake';
+            }
+
             return {
               poolIndex: index,
               stakingToken: info.lpToken,
@@ -598,7 +643,7 @@ module.exports = {
               adapter: isPair ? 'masterChefV2Pair' : 'masterChefV2Single',
               description: '',
               automate: {
-                autorestakeAdapter: isPair ? 'MasterChefV2LpRestake' : 'MasterChefV2SingleRestake',
+                autorestakeAdapter,
                 adapters: isPair ? ['masterChefV2Pair'] : ['masterChefV2Single'],
               },
               link: `https://traderjoexyz.com/farm/${info.lpToken}-${masterChefV2Address}`,
