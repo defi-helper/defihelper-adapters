@@ -1,10 +1,10 @@
 {
   "0xf20d962a6c8f70c731bd838a3a388d7d48fa6e15": {
     "platform": "ethereum",
-    "token": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+    "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
   },
   "0x260bbf5698121eb85e7a74f2e45e16ce762ebe11": {
     "platform": "binance-smart-chain",
-    "token": "0x23396cf899ca06c4472205fc903bdb4de249d6fc"
+    "address": "0x23396cf899ca06c4472205fc903bdb4de249d6fc"
   }
 }

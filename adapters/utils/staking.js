@@ -1,6 +1,6 @@
 const { ethers, bn, ethersMulticall } = require('../lib');
 const { ethereum } = require('./ethereum');
-const { coingecko } = require('./coingecko');
+const { CoingeckoProvider } = require('./coingecko');
 const { toFloat } = require('./toFloat');
 const { tokens } = require('./tokens');
 const AutomateActions = require('./automate/actions');
@@ -34,6 +34,7 @@ module.exports = {
       const network = (await provider.detectNetwork()).chainId;
       const block = await provider.getBlock(blockTag);
       const blockNumber = block.number;
+      const priceFeed = new CoingeckoProvider({ block, blockTag }).initPlatform(network);
       const avgBlockTime = await ethereum.getAvgBlockTime(provider, blockNumber);
       const blocksPerDay = new bn((1000 * 60 * 60 * 24) / avgBlockTime);
 
@@ -62,12 +63,7 @@ module.exports = {
       totalSupply = toFloat(totalSupply, ethereum.uniswap.pairDecimals);
       stakingToken = stakingToken.toLowerCase();
       rewardsToken = rewardsToken.toLowerCase();
-      const rewardTokenUSD = await coingecko.getPriceUSDByContract(
-        coingecko.platformByEthereumNetwork(network),
-        blockTag === 'latest',
-        block,
-        rewardsToken
-      );
+      const rewardTokenUSD = await priceFeed.contractPrice(rewardsToken);
       const {
         token0,
         reserve0,
@@ -75,18 +71,8 @@ module.exports = {
         reserve1,
         totalSupply: lpTotalSupply,
       } = await ethereum.uniswap.pairInfo(provider, stakingToken);
-      const token0Usd = await coingecko.getPriceUSDByContract(
-        coingecko.platformByEthereumNetwork(network),
-        blockTag === 'latest',
-        block,
-        token0
-      );
-      const token1Usd = await coingecko.getPriceUSDByContract(
-        coingecko.platformByEthereumNetwork(network),
-        blockTag === 'latest',
-        block,
-        token1
-      );
+      const token0Usd = await priceFeed.contractPrice(token0);
+      const token1Usd = await priceFeed.contractPrice(token1);
       let stakingTokenUSD = new bn(reserve0)
         .multipliedBy(token0Usd)
         .plus(new bn(reserve1).multipliedBy(token1Usd))

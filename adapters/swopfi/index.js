@@ -2,7 +2,7 @@ const { axios, bn, wavesTransaction } = require('../lib');
 const { waves } = require('../utils/ethereum');
 const { toFloat } = require('../utils/toFloat');
 const { tokens } = require('../utils/tokens');
-const { coingecko } = require('../utils/coingecko');
+const { coingecko, CoingeckoProvider } = require('../utils/coingecko');
 const AutomateActions = require('../utils/automate/actions');
 
 const swopTokenId = 'Ehie5xYpeN8op1Cctc6aGUrqx8jq3jtf1DSjXDbfm7aT';
@@ -18,7 +18,7 @@ const mainTokensToCoingeckoId = {
 };
 
 const convertFromTokenToUsd = async (tokenId, amount) => {
-  const usdPrice = await coingecko.getPriceUSD(true, undefined, tokenId);
+  const usdPrice = await new CoingeckoProvider({ block: { timestamp: 0 }, blockTag: 'latest' }).price(tokenId);
   return amount.multipliedBy(usdPrice);
 };
 

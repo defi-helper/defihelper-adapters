@@ -1,7 +1,7 @@
 const { ethers, bn, ethersMulticall, dayjs } = require('../lib');
 const { ethereum } = require('../utils/ethereum');
 const { tokens } = require('../utils/tokens');
-const { coingecko } = require('../utils/coingecko');
+const { bridgeWrapperBuild } = require('../utils/coingecko');
 const { buildMasterChefProvider, toBN, buildMasterChefActions } = require('../utils/masterChef/provider');
 const cache = require('../utils/cache');
 const AutomateActions = require('../utils/automate/actions');
@@ -16,20 +16,6 @@ const masterChefV2Address = '0xd6a4F121CA35509aF06A0Be99093d08462f53052';
 const masterChefV3Address = '0x188bED1968b795d5c9022F6a0bb5931Ac4c18F00';
 const routeTokens = ['0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7'];
 
-async function priceFeed(tokenAddress, { provider, blockTag, platform, block }) {
-  if (tokenAddress.toLowerCase() === '0x57319d41f71e81f3c65f2a47ca4e001ebafd4f33') {
-    const joeAddress = '0x6e84a6216eA6dACC71eE8E6b0a5B7322EEbC0fDd';
-    const [xJoeTotalSupply, joeBalance, joePriceUSD] = await Promise.all([
-      new ethers.Contract(tokenAddress, provider).totalSupply({ blockTag }).then((v) => new bn(v.toString())),
-      new ethers.Contract(joeAddress, provider).balanceOf(tokenAddress, { blockTag }).then((v) => new bn(v.toString())),
-      coingecko.getPriceUSDByContract(platform, blockTag === 'latest', block, joeAddress),
-    ]);
-    return joeBalance.div(xJoeTotalSupply).multipliedBy(joePriceUSD);
-  }
-
-  return coingecko.getPriceUSDByContract(platform, isCurrent, block, tokenAddress);
-}
-
 module.exports = {
   masterChefV2Pair: async (provider, contractAddress, initOptions = ethereum.defaultOptions()) => {
     const options = {
@@ -40,6 +26,7 @@ module.exports = {
     const blockTag = options.blockNumber === 'latest' ? 'latest' : parseInt(options.blockNumber, 10);
     const network = (await provider.detectNetwork()).chainId;
     const block = await provider.getBlock(blockTag);
+    const priceFeed = bridgeWrapperBuild(bridgeTokens, blockTag, block, network);
 
     const pool = masterChefSavedPools.find((p) => p.stakingToken.toLowerCase() === contractAddress.toLowerCase());
     if (!pool) {
@@ -74,30 +61,13 @@ module.exports = {
 
     const rewardToken = await masterChefProvider.rewardToken();
     const rewardTokenDecimals = 18;
-    const rewardTokenPriceUSD = await coingecko.getPriceUSDByContract(
-      coingecko.platformByEthereumNetwork(network),
-      blockTag === 'latest',
-      block,
-      rewardToken
-    );
+    const rewardTokenPriceUSD = await priceFeed(rewardToken);
 
     const stakingToken = await masterChefProvider.stakingToken(poolInfo);
     const stakingTokenDecimals = 18;
     const stakingTokenPair = await ethereum.uniswap.pairInfo(provider, stakingToken, options);
-    const token0Alias = bridgeTokens[stakingTokenPair.token0.toLowerCase()];
-    const token1Alias = bridgeTokens[stakingTokenPair.token1.toLowerCase()];
-    const token0PriceUSD = await coingecko.getPriceUSDByContract(
-      token0Alias ? token0Alias.platform : coingecko.platformByEthereumNetwork(network),
-      blockTag === 'latest',
-      block,
-      token0Alias ? token0Alias.token : stakingTokenPair.token0
-    );
-    const token1PriceUSD = await coingecko.getPriceUSDByContract(
-      token1Alias ? token1Alias.platform : coingecko.platformByEthereumNetwork(network),
-      blockTag === 'latest',
-      block,
-      token1Alias ? token1Alias.token : stakingTokenPair.token1
-    );
+    const token0PriceUSD = await priceFeed(stakingTokenPair.token0);
+    const token1PriceUSD = await priceFeed(stakingTokenPair.token1);
     const stakingTokenPriceUSD = stakingTokenPair.calcPrice(token0PriceUSD, token1PriceUSD);
 
     const totalLocked = await masterChefProvider.totalLocked(poolInfo).then((v) => v.div(`1e${stakingTokenDecimals}`));
@@ -223,6 +193,7 @@ module.exports = {
     const blockTag = options.blockNumber === 'latest' ? 'latest' : parseInt(options.blockNumber, 10);
     const network = (await provider.detectNetwork()).chainId;
     const block = await provider.getBlock(blockTag);
+    const priceFeed = bridgeWrapperBuild(bridgeTokens, blockTag, block, network);
 
     const pool = masterChefSavedPools.find((p) => p.stakingToken.toLowerCase() === contractAddress.toLowerCase());
     if (!pool) {
@@ -257,19 +228,14 @@ module.exports = {
 
     const rewardToken = await masterChefProvider.rewardToken();
     const rewardTokenDecimals = 18;
-    const rewardTokenPriceUSD = await coingecko.getPriceUSDByContract(
-      coingecko.platformByEthereumNetwork(network),
-      blockTag === 'latest',
-      block,
-      rewardToken
-    );
+    const rewardTokenPriceUSD = await priceFeed(rewardToken);
 
     const stakingToken = await masterChefProvider.stakingToken(poolInfo);
     const stakingTokenDecimals = await ethereum
       .erc20(provider, stakingToken)
       .decimals()
       .then((v) => Number(v.toString()));
-    let stakingTokenPriceUSD = 0;
+    let stakingTokenPriceUSD = '0';
     // xJoe price feed
     if (stakingToken.toLowerCase() === '0x57319d41f71e81f3c65f2a47ca4e001ebafd4f33') {
       const [xJoeTotalSupply, joeBalance, joePriceUSD] = await Promise.all([
@@ -281,21 +247,11 @@ module.exports = {
           .erc20(provider, rewardToken)
           .balanceOf(stakingToken, { blockTag })
           .then((v) => new bn(v.toString())),
-        coingecko.getPriceUSDByContract(
-          coingecko.platformByEthereumNetwork(network),
-          blockTag === 'latest',
-          block,
-          rewardToken
-        ),
+        priceFeed(rewardToken),
       ]);
-      stakingTokenPriceUSD = joeBalance.div(xJoeTotalSupply).multipliedBy(joePriceUSD);
+      stakingTokenPriceUSD = joeBalance.div(xJoeTotalSupply).multipliedBy(joePriceUSD).toString(10);
     } else {
-      stakingTokenPriceUSD = await coingecko.getPriceUSDByContract(
-        coingecko.platformByEthereumNetwork(network),
-        blockTag === 'latest',
-        block,
-        stakingToken
-      );
+      stakingTokenPriceUSD = await priceFeed(stakingToken);
     }
 
     const totalLocked = await masterChefProvider.totalLocked(poolInfo).then((v) => v.div(`1e${stakingTokenDecimals}`));
@@ -408,6 +364,7 @@ module.exports = {
     const blockTag = options.blockNumber === 'latest' ? 'latest' : parseInt(options.blockNumber, 10);
     const network = (await provider.detectNetwork()).chainId;
     const block = await provider.getBlock(blockTag);
+    const priceFeed = bridgeWrapperBuild(bridgeTokens, blockTag, block, network);
 
     const pool = masterChefSavedPools.find((p) => p.stakingToken.toLowerCase() === contractAddress.toLowerCase());
     if (!pool) {
@@ -442,30 +399,13 @@ module.exports = {
 
     const rewardToken = await masterChefProvider.rewardToken();
     const rewardTokenDecimals = 18;
-    const rewardTokenPriceUSD = await coingecko.getPriceUSDByContract(
-      coingecko.platformByEthereumNetwork(network),
-      blockTag === 'latest',
-      block,
-      rewardToken
-    );
+    const rewardTokenPriceUSD = await priceFeed(rewardToken);
 
     const stakingToken = await masterChefProvider.stakingToken(poolInfo);
     const stakingTokenDecimals = 18;
     const stakingTokenPair = await ethereum.uniswap.pairInfo(provider, stakingToken, options);
-    const token0Alias = bridgeTokens[stakingTokenPair.token0.toLowerCase()];
-    const token1Alias = bridgeTokens[stakingTokenPair.token1.toLowerCase()];
-    const token0PriceUSD = await coingecko.getPriceUSDByContract(
-      token0Alias ? token0Alias.platform : coingecko.platformByEthereumNetwork(network),
-      blockTag === 'latest',
-      block,
-      token0Alias ? token0Alias.token : stakingTokenPair.token0
-    );
-    const token1PriceUSD = await coingecko.getPriceUSDByContract(
-      token1Alias ? token1Alias.platform : coingecko.platformByEthereumNetwork(network),
-      blockTag === 'latest',
-      block,
-      token1Alias ? token1Alias.token : stakingTokenPair.token1
-    );
+    const token0PriceUSD = await priceFeed(stakingTokenPair.token0);
+    const token1PriceUSD = await priceFeed(stakingTokenPair.token1);
     const stakingTokenPriceUSD = stakingTokenPair.calcPrice(token0PriceUSD, token1PriceUSD);
 
     const totalLocked = await masterChefProvider.totalLocked(poolInfo).then((v) => v.div(`1e${stakingTokenDecimals}`));

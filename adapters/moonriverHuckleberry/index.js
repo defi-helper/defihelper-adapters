@@ -2,7 +2,7 @@ const { ethers, bn, ethersMulticall, dayjs } = require('../lib');
 const { ethereum } = require('../utils/ethereum');
 const { toFloat } = require('../utils/toFloat');
 const { tokens } = require('../utils/tokens');
-const { coingecko } = require('../utils/coingecko');
+const { bridgeWrapperBuild } = require('../utils/coingecko');
 const cache = require('../utils/cache');
 const AutomateActions = require('../utils/automate/actions');
 const masterChefABI = require('./abi/masterChefABI.json');
@@ -22,6 +22,7 @@ module.exports = {
     const blockTag = options.blockNumber === 'latest' ? 'latest' : parseInt(options.blockNumber, 10);
     const network = (await provider.detectNetwork()).chainId;
     const block = await provider.getBlock(blockTag);
+    const priceFeed = bridgeWrapperBuild(bridgeTokens, blockTag, block, network);
     const rewardTokenFunctionName = 'finn';
 
     const pool = masterChefSavedPools.find((p) => p.stakingToken.toLowerCase() === contractAddress.toLowerCase());
@@ -34,12 +35,7 @@ module.exports = {
 
     const rewardToken = (await masterChiefContract[rewardTokenFunctionName]()).toLowerCase();
     const rewardsTokenDecimals = 18;
-    const rewardTokenPriceUSD = await coingecko.getPriceUSDByContract(
-      coingecko.platformByEthereumNetwork(network),
-      blockTag === 'latest',
-      block,
-      rewardToken
-    );
+    const rewardTokenPriceUSD = await priceFeed(rewardToken);
     const [rewardTokenPerSec, totalAllocPoint] = await Promise.all([
       masterChiefContract[`${rewardTokenFunctionName}PerSecond`](),
       masterChiefContract.totalAllocPoint(),
@@ -54,20 +50,8 @@ module.exports = {
     const stakingToken = contractAddress.toLowerCase();
     const stakingTokenDecimals = 18;
     const stakingTokenPair = await ethereum.uniswap.pairInfo(provider, stakingToken);
-    const token0Alias = bridgeTokens[stakingTokenPair.token0.toLowerCase()];
-    const token1Alias = bridgeTokens[stakingTokenPair.token1.toLowerCase()];
-    const token0PriceUSD = await coingecko.getPriceUSDByContract(
-      token0Alias ? token0Alias.platform : coingecko.platformByEthereumNetwork(network),
-      blockTag === 'latest',
-      block,
-      token0Alias ? token0Alias.token : stakingTokenPair.token0
-    );
-    const token1PriceUSD = await coingecko.getPriceUSDByContract(
-      token1Alias ? token1Alias.platform : coingecko.platformByEthereumNetwork(network),
-      blockTag === 'latest',
-      block,
-      token1Alias ? token1Alias.token : stakingTokenPair.token1
-    );
+    const token0PriceUSD = await priceFeed(stakingTokenPair.token0);
+    const token1PriceUSD = await priceFeed(stakingTokenPair.token1);
     const stakingTokenPriceUSD = stakingTokenPair.calcPrice(token0PriceUSD, token1PriceUSD);
 
     const totalLocked = toFloat(
@@ -307,6 +291,7 @@ module.exports = {
         const blockTag = 'latest';
         const network = (await provider.detectNetwork()).chainId;
         const block = await provider.getBlock(blockTag);
+        const priceFeed = bridgeWrapperBuild(bridgeTokens, blockTag, block, network);
 
         const masterChiefContract = new ethers.Contract(masterChefAddress, masterChefABI, provider);
 
@@ -320,22 +305,9 @@ module.exports = {
               try {
                 stakingTokenPair = await ethereum.uniswap.pairInfo(provider, p.lpToken);
 
-                const token0Alias = bridgeTokens[stakingTokenPair.token0.toLowerCase()];
-                const token1Alias = bridgeTokens[stakingTokenPair.token1.toLowerCase()];
-
                 await Promise.all([
-                  coingecko.getPriceUSDByContract(
-                    token0Alias ? token0Alias.platform : coingecko.platformByEthereumNetwork(network),
-                    blockTag === 'latest',
-                    block,
-                    token0Alias ? token0Alias.token : stakingTokenPair.token0
-                  ),
-                  coingecko.getPriceUSDByContract(
-                    token1Alias ? token1Alias.platform : coingecko.platformByEthereumNetwork(network),
-                    blockTag === 'latest',
-                    block,
-                    token1Alias ? token1Alias.token : stakingTokenPair.token1
-                  ),
+                  priceFeed(stakingTokenPair.token0),
+                  priceFeed(stakingTokenPair.token1),
                 ]);
               } catch {
                 return null;

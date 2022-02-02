@@ -1,112 +1,147 @@
 const { dayjs, axios } = require('../lib');
 
-const ethereumNetworkCoingeckoPlatformsMap = {
-  1: 'ethereum',
-  56: 'binance-smart-chain',
-  128: 'huobi-token',
-  137: 'polygon-pos',
-  250: 'fantom',
-  1285: 'moonriver',
-  43114: 'avalanche',
-};
-
 const errorHandler = (e) => {
   const { method, url } = e.config;
   throw new Error(`coingecko ${method} ${url}: ${e}`);
 };
 
-const coingecko = {
-  apiUrl: 'https://coingecko.defihelper.io/api/v3',
-  getPriceUSD: async (isCurrent, block, tokenId) => {
-    let priceUSD = '0';
-    if (isCurrent) {
-      const currentPrice = await coingecko.simple.price(tokenId, 'usd');
-      if (currentPrice[tokenId].usd === undefined) return priceUSD;
+class CoingeckoProvider {
+  static platformMap = {
+    1: 'ethereum',
+    56: 'binance-smart-chain',
+    128: 'huobi-token',
+    137: 'polygon-pos',
+    250: 'fantom',
+    1285: 'moonriver',
+    43114: 'avalanche',
+  };
 
-      priceUSD = currentPrice[tokenId].usd;
-    } else {
-      const historyPrice = await coingecko.coins.history(tokenId, dayjs.unix(block.timestamp));
-      if (historyPrice.market_data === undefined || historyPrice.market_data.current_price === undefined)
-        return priceUSD;
+  static defaultApiURL = 'https://coingecko.defihelper.io/api/v3';
 
-      priceUSD = historyPrice.market_data.current_price.usd;
-    }
+  /**
+   * @param {{
+   *  block: {
+   *   timestamp: number;
+   *  };
+   *  blockTag: 'latest' | number;
+   *  platform?: string;
+   * }} network
+   * @param {string} apiURL;
+   */
+  constructor(
+    { block, blockTag, platform = CoingeckoProvider.platformMap[1] },
+    apiURL = CoingeckoProvider.defaultApiURL
+  ) {
+    this.network = {
+      block,
+      blockTag,
+      platform,
+    };
+    this.apiURL = apiURL;
+  }
 
-    return priceUSD;
-  },
-  getPriceUSDByContract: async (platform, isCurrent, block, tokenAddress) => {
-    let priceUSD = '0';
-    if (isCurrent) {
-      const currentPrice = await coingecko.simple.tokenPrice(platform, tokenAddress, 'usd');
-      if (
-        currentPrice[tokenAddress.toLowerCase()] === undefined ||
-        currentPrice[tokenAddress.toLowerCase()].usd === undefined
-      ) {
-        throw new Error(`Coingecko not resolve USD price for token "${tokenAddress}"`);
+  /**
+   *
+   * @param {number} chainId
+   *
+   * @returns {CoingeckoProvider}
+   */
+  initPlatform(chainId) {
+    this.network.platform = CoingeckoProvider.platformMap[chainId];
+
+    return this;
+  }
+
+  /**
+   *
+   * @param {string} id
+   * @returns {Promise<string>}
+   */
+  async price(id) {
+    if (this.network.blockTag === 'latest') {
+      const { data } = await axios.get(`${this.apiURL}/simple/price?ids=${id}&vs_currencies=usd`).catch(errorHandler);
+      if (typeof data[id] !== 'object' || data[id].usd === undefined) {
+        throw new Error(`Price for "coingecko:${id}" not resolved`);
       }
 
-      priceUSD = currentPrice[tokenAddress.toLowerCase()].usd;
+      return data[id].usd;
     } else {
-      const coingeckoContractInfo = await coingecko.coins.contract(platform, tokenAddress);
-      const historyPrice = await coingecko.coins.history(coingeckoContractInfo.id, dayjs.unix(block.timestamp));
-      if (historyPrice.market_data === undefined || historyPrice.market_data.current_price === undefined)
-        return priceUSD;
+      const date = dayjs(this.network.block.timestamp).format('DD-MM-YYYY');
+      const { data } = await axios.get(`${this.apiURL}/coins/${id}/history?date=${date}`).catch(errorHandler);
+      if (
+        data.market_data === undefined ||
+        data.market_data.current_price === undefined ||
+        data.market_data.current_price.usd === undefined
+      ) {
+        throw new Error(`Price for "coingecko:${id}" not resolved`);
+      }
 
-      priceUSD = historyPrice.market_data.current_price.usd;
+      return data.market_data.current_price.usd;
     }
+  }
 
-    return priceUSD;
-  },
-  simple: {
-    price: async (ids, vsCurrencies) => {
-      const normalizeIds = (Array.isArray(ids) ? ids : [ids]).join(',');
-      const normalizeVsCurrencies = (Array.isArray(vsCurrencies) ? vsCurrencies : [vsCurrencies]).join(',');
+  /**
+   *
+   * @param {string} address
+   * @returns {Promise<string>}
+   */
+  async contractPrice(address) {
+    address = address.toLowerCase();
 
-      const resp = await axios
-        .get(`${coingecko.apiUrl}/simple/price?ids=${normalizeIds}&vs_currencies=${normalizeVsCurrencies}`)
-        .catch(errorHandler);
-
-      return resp.data;
-    },
-    tokenPrice: async (id, contractAddresses, vsCurrencies) => {
-      const normalizeContractAddresses = (
-        Array.isArray(contractAddresses) ? contractAddresses : [contractAddresses]
-      ).join(',');
-      const normalizeVsCurrencies = (Array.isArray(vsCurrencies) ? vsCurrencies : [vsCurrencies]).join(',');
-
-      const resp = await axios
+    if (this.network.blockTag === 'latest') {
+      const { data } = await axios
         .get(
-          `${coingecko.apiUrl}/simple/token_price/${id}?contract_addresses=${normalizeContractAddresses}&vs_currencies=${normalizeVsCurrencies}`
+          `${this.apiURL}/simple/token_price/${this.network.platform}?contract_addresses=${address}&vs_currencies=usd`
         )
         .catch(errorHandler);
+      if (typeof data !== 'object' || data[address] === undefined || data[address].usd === undefined) {
+        throw new Error(`Price for "coingecko:${address}" not resolved`);
+      }
 
-      return resp.data;
-    },
-  },
-  coins: {
-    contract: async (id, contractAddress) => {
-      const resp = await axios.get(`${coingecko.apiUrl}/coins/${id}/contract/${contractAddress}`).catch(errorHandler);
+      return data[address].usd;
+    } else {
+      const { data: contractInfo } = await axios
+        .get(`${this.apiURL}/coins/${this.network.platform}/contract/${address}`)
+        .catch(errorHandler);
+      if (typeof contractInfo !== 'object' || contractInfo.id === undefined) {
+        throw new Error(`Contract id for "coingecko:${address}" not resolved`);
+      }
 
-      return resp.data;
-    },
-    history: async (id, date) => {
-      const normalizeDate =
-        typeof date === 'string'
-          ? date
-          : dayjs.isDayjs(date)
-          ? date.format('DD-MM-YYYY')
-          : dayjs(date).format('DD-MM-YYYY');
+      return this.price(contractInfo.id);
+    }
+  }
+}
 
-      const resp = await axios.get(`${coingecko.apiUrl}/coins/${id}/history?date=${normalizeDate}`).catch(errorHandler);
+/**
+ * @param {{
+ *   [address: string]:
+ *     {
+ *       platform: string;
+ *       address: string;
+ *     }
+ *     | {
+ *       id: string;
+ *     }
+ * }} aliases
+ * @param {string | number} blockTag
+ * @param {{timestamp: number}} block
+ * @param {number} network
+ * @returns {Promise<string>}
+ */
+function bridgeWrapperBuild(aliases, blockTag, block, network) {
+  return (address) => {
+    const alias = aliases[address.toLowerCase()];
+    if (typeof alias === 'object') {
+      return typeof alias.id === 'string'
+        ? new CoingeckoProvider({ block, blockTag }).price(alias.id)
+        : new CoingeckoProvider({ block, blockTag, platform: alias.platform }).contractPrice(alias.address);
+    }
 
-      return resp.data;
-    },
-  },
-  platformByEthereumNetwork(network) {
-    return ethereumNetworkCoingeckoPlatformsMap[network.toString()];
-  },
-};
+    return new CoingeckoProvider({ block, blockTag }).initPlatform(network).contractPrice(address);
+  };
+}
 
 module.exports = {
-  coingecko,
+  CoingeckoProvider,
+  bridgeWrapperBuild,
 };

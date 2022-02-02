@@ -2,7 +2,7 @@ const { ethers, bn, ethersMulticall, dayjs } = require('../lib');
 const { ethereum } = require('../utils/ethereum');
 const { toFloat } = require('../utils/toFloat');
 const { tokens } = require('../utils/tokens');
-const { coingecko } = require('../utils/coingecko');
+const { bridgeWrapperBuild } = require('../utils/coingecko');
 const cache = require('../utils/cache');
 const AutomateActions = require('../utils/automate/actions');
 const masterChefABI = require('./abi/masterChefABI.json');
@@ -164,6 +164,7 @@ module.exports = {
     const network = (await provider.detectNetwork()).chainId;
     const block = await provider.getBlock(blockTag);
     const blockNumber = block.number;
+    const priceFeed = bridgeWrapperBuild(bridgeTokens, blockTag, block, network);
     const avgBlockTime = await ethereum.getAvgBlockTime(provider, blockNumber);
     const rewardTokenFunctionName = 'cake';
 
@@ -177,12 +178,7 @@ module.exports = {
 
     const rewardToken = (await masterChiefContract[rewardTokenFunctionName]()).toLowerCase();
     const rewardsTokenDecimals = 18;
-    const rewardTokenPriceUSD = await coingecko.getPriceUSDByContract(
-      coingecko.platformByEthereumNetwork(network),
-      blockTag === 'latest',
-      block,
-      rewardToken
-    );
+    const rewardTokenPriceUSD = await priceFeed(rewardToken);
     const [rewardTokenPerBlock, totalAllocPoint] = await Promise.all([
       masterChiefContract[`${rewardTokenFunctionName}PerBlock`]({ blockTag }),
       masterChiefContract.totalAllocPoint({ blockTag }),
@@ -197,20 +193,8 @@ module.exports = {
     const stakingToken = contractAddress.toLowerCase();
     const stakingTokenDecimals = 18;
     const stakingTokenPair = await ethereum.uniswap.pairInfo(provider, stakingToken, options);
-    const token0Alias = bridgeTokens[stakingTokenPair.token0.toLowerCase()];
-    const token1Alias = bridgeTokens[stakingTokenPair.token1.toLowerCase()];
-    const token0PriceUSD = await coingecko.getPriceUSDByContract(
-      token0Alias ? token0Alias.platform : coingecko.platformByEthereumNetwork(network),
-      blockTag === 'latest',
-      block,
-      token0Alias ? token0Alias.token : stakingTokenPair.token0
-    );
-    const token1PriceUSD = await coingecko.getPriceUSDByContract(
-      token1Alias ? token1Alias.platform : coingecko.platformByEthereumNetwork(network),
-      blockTag === 'latest',
-      block,
-      token1Alias ? token1Alias.token : stakingTokenPair.token1
-    );
+    const token0PriceUSD = await priceFeed(stakingTokenPair.token0);
+    const token1PriceUSD = await priceFeed(stakingTokenPair.token1);
     const stakingTokenPriceUSD = stakingTokenPair.calcPrice(token0PriceUSD, token1PriceUSD);
 
     const totalLocked = toFloat(
@@ -330,6 +314,7 @@ module.exports = {
     const network = (await provider.detectNetwork()).chainId;
     const block = await provider.getBlock(blockTag);
     const blockNumber = block.number;
+    const priceFeed = bridgeWrapperBuild(bridgeTokens, blockTag, block, network);
     const avgBlockTime = await ethereum.getAvgBlockTime(provider, blockNumber);
     const rewardTokenFunctionName = 'cake';
 
@@ -343,12 +328,7 @@ module.exports = {
 
     const rewardToken = (await masterChiefContract[rewardTokenFunctionName]()).toLowerCase();
     const rewardsTokenDecimals = 18;
-    const rewardTokenPriceUSD = await coingecko.getPriceUSDByContract(
-      coingecko.platformByEthereumNetwork(network),
-      blockTag === 'latest',
-      block,
-      rewardToken
-    );
+    const rewardTokenPriceUSD = await priceFeed(rewardToken);
     const [rewardTokenPerBlock, totalAllocPoint] = await Promise.all([
       masterChiefContract[`${rewardTokenFunctionName}PerBlock`]({ blockTag }),
       masterChiefContract.totalAllocPoint({ blockTag }),
@@ -365,12 +345,7 @@ module.exports = {
       .erc20(provider, stakingToken)
       .decimals()
       .then((v) => Number(v.toString()));
-    const stakingTokenPriceUSD = await coingecko.getPriceUSDByContract(
-      coingecko.platformByEthereumNetwork(network),
-      blockTag === 'latest',
-      block,
-      stakingToken
-    );
+    const stakingTokenPriceUSD = await priceFeed(stakingToken);
 
     const totalLocked = toFloat(
       await ethereum.erc20(provider, contractAddress).balanceOf(masterChefAddress, { blockTag }),
@@ -474,6 +449,7 @@ module.exports = {
     const network = (await provider.detectNetwork()).chainId;
     const block = await provider.getBlock(blockTag);
     const blockNumber = block.number;
+    const priceFeed = bridgeWrapperBuild(bridgeTokens, blockTag, block, network);
     const avgBlockTime = await ethereum.getAvgBlockTime(provider, blockNumber);
 
     const apeRewardContract = new ethers.Contract(contractAddress, apeRewardV4ABI, provider);
@@ -482,12 +458,7 @@ module.exports = {
       .erc20(provider, rewardToken)
       .decimals()
       .then((v) => Number(v.toString()));
-    const rewardTokenPriceUSD = await coingecko.getPriceUSDByContract(
-      coingecko.platformByEthereumNetwork(network),
-      blockTag === 'latest',
-      block,
-      rewardToken
-    );
+    const rewardTokenPriceUSD = await priceFeed(rewardToken);
     const rewardTokenPerBlock = await apeRewardContract
       .rewardPerBlock({ blockTag })
       .then((v) => toFloat(new bn(v.toString()), rewardsTokenDecimals));
@@ -497,12 +468,7 @@ module.exports = {
       .erc20(provider, stakingToken)
       .decimals()
       .then((v) => Number(v.toString()));
-    const stakingTokenPriceUSD = await coingecko.getPriceUSDByContract(
-      coingecko.platformByEthereumNetwork(network),
-      blockTag === 'latest',
-      block,
-      stakingToken
-    );
+    const stakingTokenPriceUSD = await priceFeed(stakingToken);
 
     const totalLocked = toFloat(
       await apeRewardContract.totalStaked({ blockTag }).then((v) => v.toString()),

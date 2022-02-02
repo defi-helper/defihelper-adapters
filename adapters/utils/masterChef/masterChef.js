@@ -1,5 +1,5 @@
 const { ethers, bn } = require('../../lib');
-const { coingecko } = require('../coingecko');
+const { bridgeWrapperBuild } = require('../coingecko');
 const { ethereum } = require('../ethereum');
 const { toFloat } = require('../toFloat');
 const { tokens } = require('../tokens');
@@ -31,6 +31,7 @@ module.exports = {
       const network = (await provider.detectNetwork()).chainId;
       const block = await provider.getBlock(blockTag);
       const blockNumber = block.number;
+      const priceFeed = bridgeWrapperBuild({}, blockTag, block, network);
       const avgBlockTime = await ethereum.getAvgBlockTime(provider, blockNumber);
 
       const masterChiefContract = new ethers.Contract(masterChefAddress, masterChefABI, provider);
@@ -86,13 +87,7 @@ module.exports = {
           .dividedBy(totalAllocPoint.toString()),
         rewardsTokenDecimals
       );
-
-      const rewardTokenUSD = await coingecko.getPriceUSDByContract(
-        coingecko.platformByEthereumNetwork(network),
-        blockTag === 'latest',
-        block,
-        rewardsToken
-      );
+      const rewardTokenUSD = await priceFeed(rewardsToken);
 
       const totalLocked = toFloat(
         await ethereum.erc20(provider, contractAddress).balanceOf(masterChefAddress),

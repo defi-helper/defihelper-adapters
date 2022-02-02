@@ -1,5 +1,8 @@
 const { ethers, bn } = require('../lib');
-const { coingecko, ethereum, toFloat, tokens } = require('../utils');
+const { ethereum } = require('../utils/ethereum');
+const { toFloat } = require('../utils/toFloat');
+const { tokens } = require('../utils/tokens');
+const { bridgeWrapperBuild } = require('../utils/coingecko');
 const masterChef = require('./abi/masterChefABI.json');
 
 const masterChefAddress = '0x73feaa1ee314f8c655e354234017be2193c9e24e';
@@ -19,6 +22,7 @@ module.exports = {
     const network = (await provider.detectNetwork()).chainId;
     const block = await provider.getBlock(blockTag);
     const blockNumber = block.number;
+    const priceFeed = bridgeWrapperBuild({}, blockTag, block, network);
     const avgBlockTime = await ethereum.getAvgBlockTime(provider, blockNumber);
 
     const masterChiefContract = new ethers.Contract(masterChefAddress, masterChef, provider);
@@ -50,14 +54,7 @@ module.exports = {
     );
     const totalLocked = totalRawLocked.minus(totalValutLocked);
 
-    let tokenUSD = new bn(
-      await coingecko.getPriceUSDByContract(
-        coingecko.platformByEthereumNetwork(network),
-        blockTag === 'latest',
-        block,
-        stakingToken
-      )
-    );
+    let tokenUSD = new bn(await priceFeed(stakingToken));
 
     if (!tokenUSD.isFinite()) tokenUSD = new bn(0);
 

@@ -1,6 +1,6 @@
 const { bn, ethers, ethersMulticall } = require('../lib');
 const { ethereum } = require('../utils/ethereum');
-const { coingecko } = require('../utils/coingecko');
+const { coingecko, bridgeWrapperBuild } = require('../utils/coingecko');
 const registryABI = require('./abi/registryABI.json');
 const gaugeABI = require('./abi/gaugeABI.json');
 const poolABI = require('./abi/poolABI.json');
@@ -10,7 +10,7 @@ const gaugeControllerABI = require('./abi/gaugeControllerABI.json');
 const gaugeUniswapRestakeABI = require('./abi/gaugeUniswapRestakeABI.json');
 const { tokens } = require('../utils');
 const AutomateActions = require('../utils/automate/actions');
-const aliasTokens = require('./abi/aliasTokens.json');
+const bridgeTokens = require('./abi/bridgeTokens.json');
 
 class Pool {
   constructor(connect, info) {
@@ -96,7 +96,7 @@ class PoolRegistry {
   }
 }
 
-async function getUnderlyingBalance(pools, getPriceUSD, pool, amount) {
+async function getUnderlyingBalance(pools, priceFeed, pool, amount) {
   const balances = await pool.underlyingBalance(amount);
 
   return pool.info.coins.reduce(async (resultPromise, { address, decimals }, i) => {
@@ -108,15 +108,14 @@ async function getUnderlyingBalance(pools, getPriceUSD, pool, amount) {
         ...result,
         await getUnderlyingBalance(
           pools,
-          getPriceUSD,
+          priceFeed,
           new Pool(pool.connect, { ...subpoolInfo, abi: pool.info.abi }),
           balances[i]
         ),
       ];
     }
     const balance = new bn(balances[i]).div(Number(`1e${decimals}`)).toString(10);
-    const alias = aliasTokens[address.toLowerCase()];
-    const priceUSD = await getPriceUSD(alias ? alias.token : address);
+    const priceUSD = await priceFeed(address);
 
     return [
       ...result,
@@ -144,18 +143,13 @@ function stakingAdapterFactory(poolABI) {
     const network = (await provider.detectNetwork()).chainId;
     const block = await provider.getBlock(blockTag);
     const multicall = new ethersMulticall.Provider(provider, network);
-    const getPriceUSD = coingecko.getPriceUSDByContract.bind(
-      coingecko,
-      coingecko.platformByEthereumNetwork(network),
-      blockTag === 'latest',
-      block
-    );
+    const priceFeed = bridgeWrapperBuild(bridgeTokens, blockTag, block, network);
     const gaugeController = new ethersMulticall.Contract(
       '0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB',
       gaugeControllerABI
     );
     const crvToken = '0xD533a949740bb3306d119CC777fa900bA034cd52';
-    const crvPriceUSD = await getPriceUSD(crvToken);
+    const crvPriceUSD = await priceFeed(crvToken);
     const minter = new ethersMulticall.Contract('0xd061D61a4d941c39E5453435B6345Dc261C2fcE0', minterABI);
     const pools = new PoolRegistry({ multicall, blockTag });
 
@@ -170,7 +164,7 @@ function stakingAdapterFactory(poolABI) {
     ]);
     const stakingTokenDecimals = 18;
 
-    const totalSupplyTokens = await getUnderlyingBalance(pools, getPriceUSD, pool, stakedTotalSupply.toString());
+    const totalSupplyTokens = await getUnderlyingBalance(pools, priceFeed, pool, stakedTotalSupply.toString());
     const tvl = totalSupplyTokens.flat(Infinity).reduce((sum, { balanceUSD }) => sum.plus(balanceUSD), new bn(0));
 
     const aprDay = new bn(e18(inflationRate))
@@ -193,7 +187,7 @@ function stakingAdapterFactory(poolABI) {
         const [staked] = await multicall.all([pool.gauge.balanceOf(walletAddress)]);
         const gauge = new ethers.Contract(pool.info.gauge, gaugeABI, provider);
         const earned = await gauge.callStatic.claimable_tokens(walletAddress).then((v) => v.toString());
-        const stakedTokens = (await getUnderlyingBalance(pools, getPriceUSD, pool, staked.toString())).flat(Infinity);
+        const stakedTokens = (await getUnderlyingBalance(pools, priceFeed, pool, staked.toString())).flat(Infinity);
         const earnedNormalize = new bn(earned.toString()).div(1e18).toString(10);
         const earnedUSD = new bn(earnedNormalize).multipliedBy(crvPriceUSD).toString(10);
 

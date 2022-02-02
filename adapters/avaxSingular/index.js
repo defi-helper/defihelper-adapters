@@ -2,7 +2,7 @@ const { ethers, bn, ethersMulticall } = require('../lib');
 const { ethereum } = require('../utils/ethereum');
 const { toFloat } = require('../utils/toFloat');
 const { tokens } = require('../utils/tokens');
-const { coingecko } = require('../utils/coingecko');
+const { CoingeckoProvider } = require('../utils/coingecko');
 const { getUniPairToken } = require('../utils/masterChef/masterChefStakingToken');
 const cache = require('../utils/cache');
 const AutomateActions = require('../utils/automate/actions');
@@ -21,6 +21,7 @@ module.exports = {
     const network = (await provider.detectNetwork()).chainId;
     const block = await provider.getBlock(blockTag);
     const blockNumber = block.number;
+    const priceFeed = new CoingeckoProvider({ block, blockTag }).initPlatform(network);
     const avgBlockTime = await ethereum.getAvgBlockTime(provider, blockNumber);
     const multicall = new ethersMulticall.Provider(provider, network);
     const rewardTokenFunctionName = 'sing';
@@ -59,13 +60,7 @@ module.exports = {
         .dividedBy(totalAllocPoint.toString()),
       rewardsTokenDecimals
     );
-
-    const rewardTokenUSD = await coingecko.getPriceUSDByContract(
-      coingecko.platformByEthereumNetwork(network),
-      blockTag === 'latest',
-      block,
-      rewardsToken
-    );
+    const rewardTokenUSD = await priceFeed.contractPrice(rewardsToken);
 
     const totalLocked = toFloat(
       await ethereum.erc20(provider, contractAddress).balanceOf(masterChefAddress),
