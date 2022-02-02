@@ -1,12 +1,13 @@
 import React from "react";
 import * as adaptersGateway from "../common/adapter";
-import { useProvider } from "../common/ether";
-import { createWavesProvider } from "../common/waves";
+import { useProvider as useEthProvider } from "../common/ether";
+import { useProvider as useWavesProvider } from "../common/waves";
 import { AdapterModalSteps } from "../components";
 import ReactJson from "react-json-view";
 
 export function AdapterProtocol(props) {
-  const [ethProvider, ethSigner] = useProvider();
+  const [ethProvider, ethSigner] = useEthProvider();
+  const [wavesProvider, wavesSigner] = useWavesProvider();
   const [blockchain, setBlockchain] = React.useState("ethereum");
   const [protocol, setProtocol] = React.useState(null);
   const [currentAdapter, setCurrentAdapter] = React.useState("");
@@ -34,16 +35,24 @@ export function AdapterProtocol(props) {
 
     setContractReload(true);
     try {
-      const bc =
-        blockchain === "ethereum" ? ethProvider : await createWavesProvider();
-      const params =
-        blockchain === "ethereum"
-          ? {
-              blockNumber: "latest",
-              signer: ethSigner,
-            }
-          : undefined;
-      const metrics = await protocol[currentAdapter](bc, contract, params);
+      let metrics = {};
+      switch (blockchain) {
+        case "ethereum":
+          metrics = await protocol[currentAdapter](ethProvider, contract, {
+            blockNumber: "latest",
+            signer: ethSigner,
+          });
+          break;
+        case "waves":
+          metrics = await protocol[currentAdapter](wavesProvider, contract, {
+            node: await wavesProvider
+              .publicState()
+              .then(({ network: { server } }) => server),
+          });
+          break;
+        default:
+          throw new Error(`Undefined blockchain "${blockchain}"`);
+      }
       setContractMetrics(metrics);
     } catch (e) {
       console.error(e);
