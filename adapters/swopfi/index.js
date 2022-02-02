@@ -1,8 +1,8 @@
 const { axios, bn, wavesTransaction } = require('../lib');
-const { waves } = require('../utils/ethereum');
+const { waves } = require('../utils/waves');
 const { toFloat } = require('../utils/toFloat');
 const { tokens } = require('../utils/tokens');
-const { coingecko, CoingeckoProvider } = require('../utils/coingecko');
+const { CoingeckoProvider } = require('../utils/coingecko');
 const AutomateActions = require('../utils/automate/actions');
 
 const swopTokenId = 'Ehie5xYpeN8op1Cctc6aGUrqx8jq3jtf1DSjXDbfm7aT';
