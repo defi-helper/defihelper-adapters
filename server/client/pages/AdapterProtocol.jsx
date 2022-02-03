@@ -5,16 +5,24 @@ import { useProvider as useWavesProvider } from "../common/waves";
 import { AdapterModalSteps } from "../components";
 import ReactJson from "react-json-view";
 
+const searchParams = new URLSearchParams(new URL(window.location).searchParams);
+
 export function AdapterProtocol(props) {
   const [ethProvider, ethSigner] = useEthProvider();
   const [wavesProvider, wavesSigner] = useWavesProvider();
-  const [blockchain, setBlockchain] = React.useState("ethereum");
+  const [blockchain, setBlockchain] = React.useState(
+    searchParams.get("blockchain") ?? "ethereum"
+  );
   const [protocol, setProtocol] = React.useState(null);
-  const [currentAdapter, setCurrentAdapter] = React.useState("");
-  const [contract, setContract] = React.useState("");
+  const [currentAdapter, setCurrentAdapter] = React.useState(
+    searchParams.get("adapter") ?? ""
+  );
+  const [contract, setContract] = React.useState(
+    searchParams.get("contract") ?? ""
+  );
   const [contractReload, setContractReload] = React.useState(false);
   const [contractMetrics, setContractMetrics] = React.useState(null);
-  const [wallet, setWallet] = React.useState("");
+  const [wallet, setWallet] = React.useState(searchParams.get("wallet") ?? "");
   const [walletReload, setWalletReload] = React.useState(false);
   const [walletMetrics, setWalletMetrics] = React.useState(null);
   const [actions, setActions] = React.useState(null);
@@ -25,7 +33,9 @@ export function AdapterProtocol(props) {
 
   React.useEffect(async () => {
     const protocol = await adaptersGateway.load(props.protocol);
-    setCurrentAdapter(Object.keys(protocol)[0]);
+    if (currentAdapter === "") {
+      setCurrentAdapter(Object.keys(protocol)[0]);
+    }
     setProtocol(protocol);
   }, []);
 
@@ -48,6 +58,7 @@ export function AdapterProtocol(props) {
             node: await wavesProvider
               .publicState()
               .then(({ network: { server } }) => server),
+            signer: wavesSigner,
           });
           break;
         default:

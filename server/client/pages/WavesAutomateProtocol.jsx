@@ -3,7 +3,7 @@ import * as automatesGateway from "../common/automate";
 import * as adaptersGateway from "../common/adapter";
 import ReactJson from "react-json-view";
 import { useProvider } from "../common/waves";
-import { AutomateSteps } from "../components";
+import { AdapterModalSteps } from "../components";
 
 function AutomateArtifactSelector({ automates, onReload }) {
   const [current, setCurrent] = React.useState(automates[0]);
@@ -227,6 +227,7 @@ export function WavesAutomateProtocol(props) {
         <div>
           <h3>Action steps</h3>
           <AutomateSteps steps={actionSteps} onAction={setActionResult} />
+          <AdapterModalSteps steps={actionSteps} onAction={setActionResult} />
         </div>
       )}
       {actionResult !== null && <div>{JSON.stringify(actionResult)}</div>}

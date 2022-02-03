@@ -22,24 +22,6 @@ const convertFromTokenToUsd = async (tokenId, amount) => {
   return amount.multipliedBy(usdPrice);
 };
 
-const prepareContractCall = (dApp, fnName, args = [], payment = []) => {
-  return {
-    type: 16,
-    data: {
-      dApp,
-      call: {
-        function: fnName,
-        args,
-      },
-      fee: {
-        tokens: '0.005',
-        assetId: 'WAVES',
-      },
-      payment,
-    },
-  };
-};
-
 const getUsdPriceOfToken = async (assetAddress) => {
   if (mainTokensToCoingeckoId[assetAddress]) {
     return convertFromTokenToUsd(mainTokensToCoingeckoId[assetAddress], new bn(1));
@@ -59,12 +41,37 @@ const getUsdPriceOfToken = async (assetAddress) => {
   throw new Error(`Unable to find USD price for ${assetAddress}`);
 };
 
+const getBalance = (assetId, walletAddress) => {
+  return axios
+    .get(`https://nodes.swop.fi/assets/balance/${walletAddress}`)
+    .then(({ data: { balances } }) => new bn(balances.find((asset) => asset.assetId === assetId)?.balance || 0));
+};
+
+const getStaked = (contractAddress, walletAddress) => {
+  return axios
+    .get(`https://backend.swop.fi/farming/${walletAddress}`)
+    .then(
+      ({ data: { data } }) =>
+        new bn(data.find(({ key }) => key === `${contractAddress}_${walletAddress}_share_tokens_locked`)?.value || 0)
+    );
+};
+
+const getGovStaked = (walletAddress) => {
+  return axios
+    .get(`https://backend.swop.fi/governance/${walletAddress}`)
+    .then(({ data: { data } }) => new bn(data.find(({ key }) => key === `${walletAddress}_SWOP_amount`)?.value || 0));
+};
+
 /*
   contractAddress = '3PH8Np6jwuoikvkHL2qmdpFEHBR4UV5vwSq';
   walletAddress = '3P9s27vtTw9Sux3T2qLSQ6ccx4PuQTYffiu';
  */
 module.exports = {
   governanceStaking: async (provider, contractAddress, initOptions = waves.defaultOptions()) => {
+    const options = {
+      ...waves.defaultOptions(),
+      ...initOptions,
+    };
     const assets = (await axios.get('https://backend.swop.fi/assets')).data.data;
     const apr = new bn((await axios.get('https://backend.swop.fi/governance/apy/week')).data.data.apy).div(100);
 
@@ -141,74 +148,176 @@ module.exports = {
         };
       },
       actions: async (walletAddress) => {
-        const governance = (await axios.get(`https://backend.swop.fi/governance/${walletAddress}`)).data.data;
-        const balances = (await axios.get(`https://nodes.swop.fi/assets/balance/${walletAddress}`)).data.balances;
-
-        const staked = new bn(governance.find((g) => g.key === `${walletAddress}_SWOP_amount`)?.value || '0');
-        const swopBalance = new bn(balances.find((a) => a.assetId === swopToken.id)?.balance || 0);
-
-        const lockedInVoting = new bn(0); // TODO: Support locked SWOP
+        if (options.signer === null) {
+          throw new Error('Signer not found, use options.signer for use actions');
+        }
+        const { signer } = options;
+        const stakingToken = swopToken;
 
         return {
-          stake: {
-            can: async (amount) => {
-              if (new bn(amount).isGreaterThan(swopBalance.toString())) {
-                return Error('Amount exceeds balance');
-              }
+          stake: [
+            AutomateActions.tab(
+              'Stake',
+              async () => {
+                const balance = await getBalance(stakingToken.id, walletAddress);
 
-              return true;
-            },
-            send: async (amount) => {
-              await provider.signAndPublishTransaction(
-                prepareContractCall(
-                  stakingContract,
-                  'lockSWOP',
-                  [],
-                  [{ assetId: swopToken.id, tokens: toFloat(amount, swopToken.precision).toNumber() }]
-                )
-              );
-            },
-          },
-          unstake: {
-            can: async (amount) => {
-              if (new bn(amount).isGreaterThan(staked.minus(lockedInVoting).toString())) {
-                return Error('Amount exceeds balance');
-              }
+                return {
+                  description: `Stake your [${stakingToken.name}](https://wavesexplorer.com/assets/${stakingToken.id}) tokens to contract`,
+                  inputs: [
+                    AutomateActions.input({
+                      placeholder: 'amount',
+                      value: balance.div(`1e${stakingToken.precision}`).toString(10),
+                    }),
+                  ],
+                };
+              },
+              async (amount) => {
+                const amountInt = new bn(amount).multipliedBy(`1e${stakingToken.precision}`);
+                if (amountInt.lte(0)) return Error('Invalid amount');
 
-              return true;
-            },
-            send: async (amount) => {
-              await provider.signAndPublishTransaction(
-                prepareContractCall(stakingContract, 'withdrawSWOP', [
-                  { type: 'integer', value: Math.round(new bn(amount).toNumber()) },
-                ])
-              );
-            },
-          },
-          claim: {
-            can: async () => {
-              return true;
-            },
-            send: async () => {
-              await provider.signAndPublishTransaction(prepareContractCall(stakingContract, 'claimAndStakeSWOP', []));
-            },
-          },
-          exit: {
-            can: async () => {
-              if (new bn(staked).isLessThanOrEqualTo(0)) {
-                return Error('No SWOP locked in contract');
-              }
+                const balance = await getBalance(stakingToken.id, walletAddress);
+                if (amountInt.gt(balance.toString())) {
+                  return Error('Amount exceeds balance');
+                }
 
-              return true;
-            },
-            send: async () => {
-              await provider.signAndPublishTransaction(
-                prepareContractCall(stakingContract, 'withdrawSWOP', [
-                  { type: 'integer', value: Math.round(new bn(staked).toNumber()) },
-                ])
-              );
-            },
-          },
+                return true;
+              },
+              async (amount) => {
+                const amountInt = new bn(amount).multipliedBy(`1e${stakingToken.precision}`);
+                const tx = await signer
+                  .invoke({
+                    dApp: stakingContract,
+                    fee: 5000000,
+                    payment: [
+                      {
+                        assetId: stakingToken.id,
+                        amount: amountInt.toFixed(0),
+                      },
+                    ],
+                    call: {
+                      function: 'lockSWOP',
+                      args: [],
+                    },
+                  })
+                  .broadcast();
+
+                return {
+                  tx,
+                  wait: () => signer.waitTxConfirm(tx, 1),
+                };
+              }
+            ),
+          ],
+          unstake: [
+            AutomateActions.tab(
+              'Unstake',
+              async () => {
+                const staked = await getGovStaked(walletAddress);
+
+                return {
+                  description: `Unstake your [${stakingToken.name}](https://wavesexplorer.com/assets/${stakingToken.id}) tokens from contract`,
+                  inputs: [
+                    AutomateActions.input({
+                      placeholder: 'amount',
+                      value: staked.div(`1e${stakingToken.precision}`).toString(10),
+                    }),
+                  ],
+                };
+              },
+              async (amount) => {
+                const amountInt = new bn(amount).multipliedBy(`1e${stakingToken.precision}`);
+                if (amountInt.lte(0)) return Error('Invalid amount');
+
+                const staked = await getGovStaked(walletAddress);
+                if (amountInt.isGreaterThan(staked)) {
+                  return Error('Amount exceeds balance');
+                }
+
+                return true;
+              },
+              async (amount) => {
+                const amountInt = new bn(amount).multipliedBy(`1e${stakingToken.precision}`);
+                const tx = await signer
+                  .invoke({
+                    dApp: stakingContract,
+                    fee: 5000000,
+                    payment: [],
+                    call: {
+                      function: 'withdrawSWOP',
+                      args: [{ type: 'integer', value: amountInt.toFixed(0) }],
+                    },
+                  })
+                  .broadcast();
+
+                return {
+                  tx,
+                  wait: () => signer.waitTxConfirm(tx, 1),
+                };
+              }
+            ),
+          ],
+          claim: [
+            AutomateActions.tab(
+              'Claim',
+              async () => ({
+                description: `Claim and restake your [SWOP](https://wavesexplorer.com/assets/Ehie5xYpeN8op1Cctc6aGUrqx8jq3jtf1DSjXDbfm7aT) reward from contract`,
+              }),
+              async () => true,
+              async () => {
+                const tx = await signer
+                  .invoke({
+                    dApp: stakingContract,
+                    fee: 5000000,
+                    payment: [],
+                    call: {
+                      function: 'claimAndStakeSWOP',
+                      args: [],
+                    },
+                  })
+                  .broadcast();
+
+                return {
+                  tx,
+                  wait: () => signer.waitTxConfirm(tx, 1),
+                };
+              }
+            ),
+          ],
+          exit: [
+            AutomateActions.tab(
+              'Exit',
+              async () => ({
+                description: 'Get all tokens from contract',
+              }),
+              async () => {
+                const staked = await getGovStaked(walletAddress);
+                if (amountInt.isGreaterThan(staked)) {
+                  return Error('Amount exceeds balance');
+                }
+
+                return true;
+              },
+              async () => {
+                const staked = await getGovStaked(walletAddress);
+                const tx = await signer
+                  .invoke({
+                    dApp: stakingContract,
+                    fee: 5000000,
+                    payment: [],
+                    call: {
+                      function: 'withdrawSWOP',
+                      args: [{ type: 'integer', value: staked.toFixed(0) }],
+                    },
+                  })
+                  .broadcast();
+
+                return {
+                  tx,
+                  wait: () => signer.waitTxConfirm(tx, 1),
+                };
+              }
+            ),
+          ],
         };
       },
     };
@@ -378,81 +487,185 @@ module.exports = {
         };
       },
       actions: async (walletAddress) => {
-        const assets = (await axios.get('https://backend.swop.fi/assets')).data.data;
-        const exchanger = (await axios.get('https://backend.swop.fi/exchangers/data')).data.data;
-        const balances = (await axios.get(`https://nodes.swop.fi/assets/balance/${walletAddress}`)).data.balances;
-        const walletFarmingData = (await axios.get(`https://backend.swop.fi/farming/${walletAddress}`)).data.data;
+        if (options.signer === null) {
+          throw new Error('Signer not found, use options.signer for use actions');
+        }
+        const { signer } = options;
 
+        const assets = await axios.get('https://backend.swop.fi/assets').then((res) => res.data.data);
+        const exchanger = await axios.get('https://backend.swop.fi/exchangers/data').then((res) => res.data.data);
         const stakingToken = assets[exchanger[contractAddress].share_asset_id];
-        const stakingBalance = new bn(balances.find((a) => a.assetId === contractAddress)?.balance || 0);
-        const totalStakingLocked = new bn(
-          walletFarmingData.find((w) => w.key === `${contractAddress}_${walletAddress}_share_tokens_locked`)?.value || 0
-        );
 
         return {
-          stake: {
-            can: async (amount) => {
-              if (new bn(amount).isGreaterThan(stakingBalance.toString())) {
-                return Error('Amount exceeds balance');
-              }
+          stake: [
+            AutomateActions.tab(
+              'Stake',
+              async () => {
+                const balance = await getBalance(stakingToken.id, walletAddress);
 
-              return true;
-            },
-            send: async (amount) => {
-              await provider.signAndPublishTransaction(
-                prepareContractCall(
-                  farmingContract,
-                  'lockShareTokens',
-                  [{ type: 'string', value: contractAddress }],
-                  [{ assetId: stakingToken.id, tokens: toFloat(amount, stakingToken.precision).toNumber() }]
-                )
-              );
-            },
-          },
-          unstake: {
-            can: async (amount) => {
-              if (new bn(amount).isGreaterThan(totalStakingLocked.toString())) {
-                return Error('Amount exceeds balance');
-              }
+                return {
+                  description: `Stake your [${stakingToken.name}](https://wavesexplorer.com/assets/${stakingToken.id}) tokens to contract`,
+                  inputs: [
+                    AutomateActions.input({
+                      placeholder: 'amount',
+                      value: balance.div(`1e${stakingToken.precision}`).toString(10),
+                    }),
+                  ],
+                };
+              },
+              async (amount) => {
+                const amountInt = new bn(amount).multipliedBy(`1e${stakingToken.precision}`);
+                if (amountInt.lte(0)) return Error('Invalid amount');
 
-              return true;
-            },
-            send: async (amount) => {
-              await provider.signAndPublishTransaction(
-                prepareContractCall(farmingContract, 'withdrawShareTokens', [
-                  { type: 'string', value: contractAddress },
-                  { type: 'integer', value: Math.round(new bn(amount).toNumber()) },
-                ])
-              );
-            },
-          },
-          claim: {
-            can: async () => {
-              return true;
-            },
-            send: async () => {
-              await provider.signAndPublishTransaction(
-                prepareContractCall(farmingContract, 'claim', [{ type: 'string', value: contractAddress }])
-              );
-            },
-          },
-          exit: {
-            can: async () => {
-              if (new bn(totalStakingLocked).isLessThanOrEqualTo(0)) {
-                return Error('No LP in contract');
-              }
+                const balance = await getBalance(stakingToken.id, walletAddress);
+                if (amountInt.gt(balance.toString())) {
+                  return Error('Amount exceeds balance');
+                }
 
-              return true;
-            },
-            send: async () => {
-              await provider.signAndPublishTransaction(
-                prepareContractCall(farmingContract, 'withdrawShareTokens', [
-                  { type: 'string', value: contractAddress },
-                  { type: 'integer', value: Math.round(new bn(totalStakingLocked).toNumber()) },
-                ])
-              );
-            },
-          },
+                return true;
+              },
+              async (amount) => {
+                const amountInt = new bn(amount).multipliedBy(`1e${stakingToken.precision}`);
+                const tx = await signer
+                  .invoke({
+                    dApp: farmingContract,
+                    fee: 5000000,
+                    payment: [
+                      {
+                        assetId: stakingToken.id,
+                        amount: amountInt.toFixed(0),
+                      },
+                    ],
+                    call: {
+                      function: 'lockShareTokens',
+                      args: [{ type: 'string', value: contractAddress }],
+                    },
+                  })
+                  .broadcast();
+
+                return {
+                  tx,
+                  wait: () => signer.waitTxConfirm(tx, 1),
+                };
+              }
+            ),
+          ],
+          unstake: [
+            AutomateActions.tab(
+              'Unstake',
+              async () => {
+                const staked = await getStaked(contractAddress, walletAddress);
+
+                return {
+                  description: `Unstake your [${stakingToken.name}](https://wavesexplorer.com/assets/${stakingToken.id}) tokens from contract`,
+                  inputs: [
+                    AutomateActions.input({
+                      placeholder: 'amount',
+                      value: staked.div(`1e${stakingToken.precision}`).toString(10),
+                    }),
+                  ],
+                };
+              },
+              async (amount) => {
+                const amountInt = new bn(amount).multipliedBy(`1e${stakingToken.precision}`);
+                if (amountInt.lte(0)) return Error('Invalid amount');
+
+                const staked = await getStaked(contractAddress, walletAddress);
+                if (amountInt.isGreaterThan(staked)) {
+                  return Error('Amount exceeds balance');
+                }
+
+                return true;
+              },
+              async (amount) => {
+                const amountInt = new bn(amount).multipliedBy(`1e${stakingToken.precision}`);
+                const tx = await signer
+                  .invoke({
+                    dApp: farmingContract,
+                    fee: 5000000,
+                    payment: [],
+                    call: {
+                      function: 'withdrawShareTokens',
+                      args: [
+                        { type: 'string', value: contractAddress },
+                        { type: 'integer', value: amountInt.toFixed(0) },
+                      ],
+                    },
+                  })
+                  .broadcast();
+
+                return {
+                  tx,
+                  wait: () => signer.waitTxConfirm(tx, 1),
+                };
+              }
+            ),
+          ],
+          claim: [
+            AutomateActions.tab(
+              'Claim',
+              async () => ({
+                description: `Claim your [SWOP](https://wavesexplorer.com/assets/Ehie5xYpeN8op1Cctc6aGUrqx8jq3jtf1DSjXDbfm7aT) reward from contract`,
+              }),
+              async () => true,
+              async () => {
+                const tx = await signer
+                  .invoke({
+                    dApp: farmingContract,
+                    fee: 5000000,
+                    payment: [],
+                    call: {
+                      function: 'claim',
+                      args: [{ type: 'string', value: contractAddress }],
+                    },
+                  })
+                  .broadcast();
+
+                return {
+                  tx,
+                  wait: () => signer.waitTxConfirm(tx, 1),
+                };
+              }
+            ),
+          ],
+          exit: [
+            AutomateActions.tab(
+              'Exit',
+              async () => ({
+                description: 'Get all tokens from contract',
+              }),
+              async () => {
+                const staked = await getStaked(contractAddress, walletAddress);
+                if (amountInt.isGreaterThan(staked)) {
+                  return Error('Amount exceeds balance');
+                }
+
+                return true;
+              },
+              async () => {
+                const staked = await getStaked(contractAddress, walletAddress);
+                const tx = await signer
+                  .invoke({
+                    dApp: farmingContract,
+                    fee: 5000000,
+                    payment: [],
+                    call: {
+                      function: 'withdrawShareTokens',
+                      args: [
+                        { type: 'string', value: contractAddress },
+                        { type: 'integer', value: staked.toFixed(0) },
+                      ],
+                    },
+                  })
+                  .broadcast();
+
+                return {
+                  tx,
+                  wait: () => signer.waitTxConfirm(tx, 1),
+                };
+              }
+            ),
+          ],
         };
       },
     };
@@ -533,9 +746,7 @@ module.exports = {
             return true;
           },
           async (amount) => {
-            const tx = await signer.invokeScript({
-
-            }).broadcast();
+            const tx = await signer.invokeScript({}).broadcast();
 
             /*
             const tx = invokeScript(
