@@ -1,5 +1,8 @@
-const { axios, bn, wavesTransaction, wavesSigner, wavesSeedProvider } = require('../lib');
-const { waves, toFloat, coingecko, tokens } = require('../utils');
+const { axios, bn, wavesTransaction } = require('../lib');
+const { waves } = require('../utils/waves');
+const { toFloat } = require('../utils/toFloat');
+const { tokens } = require('../utils/tokens');
+const { CoingeckoProvider } = require('../utils/coingecko');
 const AutomateActions = require('../utils/automate/actions');
 
 const swopTokenId = 'Ehie5xYpeN8op1Cctc6aGUrqx8jq3jtf1DSjXDbfm7aT';
@@ -15,7 +18,7 @@ const mainTokensToCoingeckoId = {
 };
 
 const convertFromTokenToUsd = async (tokenId, amount) => {
-  const usdPrice = await coingecko.getPriceUSD(true, undefined, tokenId);
+  const usdPrice = await new CoingeckoProvider({ block: { timestamp: 0 }, blockTag: 'latest' }).price(tokenId);
   return amount.multipliedBy(usdPrice);
 };
 
@@ -489,7 +492,7 @@ module.exports = {
             AutomateActions.tab(
               'Deploy',
               async () => ({
-                description: 'Deploy your automate contract',
+                description: 'Deploy your own contract',
               }),
               async () => {
                 return true;
@@ -518,7 +521,7 @@ module.exports = {
         AutomateActions.tab(
           'Transfer',
           async () => ({
-            description: 'Transfer your tokens to automate',
+            description: 'Transfer your tokens to your contract',
             inputs: [
               AutomateActions.input({
                 placeholder: 'amount',
@@ -561,7 +564,7 @@ module.exports = {
         AutomateActions.tab(
           'Deposit',
           async () => ({
-            description: 'Deposit tokens to staking',
+            description: 'Stake your tokens to the contract',
           }),
           async () => {
             return true;

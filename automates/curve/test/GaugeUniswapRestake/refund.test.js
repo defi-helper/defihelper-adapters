@@ -25,7 +25,7 @@ describe('GaugeUniswapRestake.refund', function () {
     );
     automate = await Automate.deploy(storage.address);
     await automate.deployed();
-    await automate.init(plainPoolGauge.address, usdc.address, 600, 0);
+    await automate.init(plainPoolGauge.address, '0x0000000000000000000000000000000000000000', usdc.address, 600, 0);
     await plainPoolLP.transfer(automate.address, stakingTokenAmount);
     await automate.deposit();
     await crvToken.transfer(minter.address, rewardTokenAmount);

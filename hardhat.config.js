@@ -46,8 +46,8 @@ module.exports = {
     main: {
       url: process.env.ETH_MAIN_NODE || 'http://127.0.0.1:8545',
       chainId: 1,
-      gasPrice: 12_000_000_000,
-      blockGasLimit: 6_000_000,
+      gasPrice: 60_000_000_000,
+      blockGasLimit: 2_000_000,
       accounts: [...maybeAccount(process.env.ETH_MAIN_DEPLOYER)],
     },
     ropsten: {
@@ -84,6 +84,20 @@ module.exports = {
       gasPrice: 25_000_000_000,
       blockGasLimit: 8_000_000,
       accounts: [...maybeAccount(process.env.AVALANCHE_TEST_DEPLOYER)],
+    },
+    moonriver: {
+      url: process.env.MOONRIVER_NODE || 'http://127.0.0.1:8545',
+      chainId: 1285,
+      gasPrice: 1_000_000_000,
+      blockGasLimit: 15_000_000,
+      accounts: [...maybeAccount(process.env.MOONRIVER_DEPLOYER)],
+    },
+    moonbaseAlpha: {
+      url: process.env.MOONBASE_ALPHA_NODE || 'http://127.0.0.1:8545',
+      chainId: 1287,
+      gasPrice: 1_000_000_000,
+      blockGasLimit: 15_000_000,
+      accounts: [...maybeAccount(process.env.MOONBASE_ALPHA_DEPLOYER)],
     },
   },
   namedAccounts: {

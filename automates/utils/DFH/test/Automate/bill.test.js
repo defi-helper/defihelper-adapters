@@ -52,7 +52,7 @@ describe('Automate.bill', function () {
     const proxyTx = await (
       await proxyFactory.create(
         prototype.address,
-        new ethers.utils.Interface(AutomateABI).encodeFunctionData('init', [stakingAddress])
+        new ethers.utils.Interface(AutomateABI).encodeFunctionData('init', [stakingAddress, '1'])
       )
     ).wait();
     const proxyCreatedEvent = proxyTx.events.find(({ event }) => event === 'ProxyCreated');

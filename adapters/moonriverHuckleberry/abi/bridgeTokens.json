@@ -1,0 +1,46 @@
+{
+  "0x576fde3f61b7c97e381c94e7a03dbc2e08af1111": {
+    "platform": "ethereum",
+    "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+  },
+  "0x78f811a431d248c1edcf6d95ec8551879b2897c3": {
+    "platform": "ethereum",
+    "address": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599"
+  },
+  "0x748134b5f553f2bcbd78c6826de99a70274bdeb3": {
+    "platform": "ethereum",
+    "address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+  },
+  "0xe936caa7f6d9f5c9e907111fcaf7c351c184cda7": {
+    "platform": "ethereum",
+    "address": "0xdac17f958d2ee523a2206206994597c13d831ec7"
+  },
+  "0x15b9ca9659f5dff2b7d35a98dd0790a3cbb3d445": {
+    "platform": "binance-smart-chain",
+    "address": "0x7083609fce4d1d8dc0c979aab8c869ea2c873402"
+  },
+  "0x9d5bc9b873aed984e2b6a64d4792249d68bba2fe": {
+    "platform": "binance-smart-chain",
+    "address": "0x1d2f0da169ceb9fc7b3144628db156f3f6c60dbe"
+  },
+  "0xc005a7a1502c9de16ccdaba7cda0cee4ac304993": {
+    "platform": "avalanche",
+    "address": "0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7"
+  },
+  "0xb668cd490a4421f993f93be2819a922dbbb32804": {
+    "platform": "ethereum",
+    "address": "0x35a532d376ffd9a705d0bb319532837337a398e7"
+  },
+  "0xd924f195c6012c301f42290cf0fde385a66039de": {
+    "platform": "ethereum",
+    "address": "0x4e15361fd6b4bb609fa63c81a2be19d873717870"
+  },
+  "0xf47002e6151e06554b8f16e9cc704edd3fc078b8": {
+    "platform": "binance-smart-chain",
+    "address": "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c"
+  },
+  "0xdd7f2bc5f0ef210ca183349ae90785fdfb374ae7": {
+    "platform": "binance-smart-chain",
+    "address": "0x4338665cbb7b2485a8855a139b75d5e34ab0db94"
+  }
+}

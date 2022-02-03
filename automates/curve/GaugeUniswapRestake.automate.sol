@@ -17,6 +17,8 @@ contract GaugeUniswapRestake is Automate {
 
   IGauge public staking;
 
+  address public liquidityRouter;
+
   address public swapToken;
 
   uint16 public slippage;
@@ -34,23 +36,36 @@ contract GaugeUniswapRestake is Automate {
 
   function init(
     address _staking,
+    address _liquidityRouter,
     address _swapToken,
     uint16 _slippage,
     uint16 _deadline
   ) external initializer {
-    IRegistry registry = IRegistry(_registry());
-
+    require(
+      !_initialized || address(staking) == _staking,
+      "GaugeUniswapRestake::init: reinitialize staking address forbidden"
+    );
     staking = IGauge(_staking);
+    require(
+      !_initialized || liquidityRouter == _liquidityRouter,
+      "GaugeUniswapRestake::init: reinitialize liquidity router address forbidden"
+    );
+    liquidityRouter = _liquidityRouter;
     swapToken = _swapToken;
     slippage = _slippage;
     deadline = _deadline;
-    _lpToken = IERC20(staking.lp_token());
-    _pool = registry.get_pool_from_lp_token(address(_lpToken));
-    address[8] memory coins = registry.get_coins(_pool);
 
-    for (; _swapTokenN < 9; _swapTokenN++) {
-      require(_swapTokenN < 8, "GaugeUniswapRestake::init: invalid swap token address");
-      if (coins[_swapTokenN] == _swapToken) break;
+    if (!_initialized) {
+      IRegistry registry = IRegistry(_registry());
+      _lpToken = IERC20(staking.lp_token());
+      _pool = registry.get_pool_from_lp_token(address(_lpToken));
+      address[8] memory coins = registry.get_coins(_pool);
+      uint256 nCoinsPool = registry.get_n_coins(_pool);
+
+      for (; _swapTokenN <= nCoinsPool; _swapTokenN++) {
+        require(_swapTokenN < nCoinsPool, "GaugeUniswapRestake::init: invalid swap token address");
+        if (coins[_swapTokenN] == _swapToken) break;
+      }
     }
   }
 
@@ -59,8 +74,10 @@ contract GaugeUniswapRestake is Automate {
   }
 
   function deposit() external onlyOwner {
-    _lpToken.safeApproveAll(address(staking));
-    staking.deposit(_lpToken.balanceOf(address(this)));
+    IERC20 lpToken = _lpToken; // gas optimisation
+    uint256 balance = lpToken.balanceOf(address(this));
+    lpToken.safeApprove(address(staking), balance);
+    staking.deposit(balance);
   }
 
   function refund() external onlyOwner {
@@ -87,7 +104,6 @@ contract GaugeUniswapRestake is Automate {
   }
 
   function _swap(
-    address router,
     address[2] memory path,
     uint256 amount,
     uint256 minOut,
@@ -97,7 +113,8 @@ contract GaugeUniswapRestake is Automate {
     _path[0] = path[0];
     _path[1] = path[1];
 
-    return IUniswapV2Router02(router).swapExactTokensForTokens(amount, minOut, _path, address(this), _deadline)[1];
+    return
+      IUniswapV2Router02(liquidityRouter).swapExactTokensForTokens(amount, minOut, _path, address(this), _deadline)[1];
   }
 
   function calcTokenAmount(uint256 amount) external view returns (uint256) {
@@ -140,20 +157,19 @@ contract GaugeUniswapRestake is Automate {
     uint256 lpOutMin
   ) external bill(gasFee, "CurveGaugeUniswapRestake") {
     IGauge _staking = staking; // gas optimization
-    address router = IStorage(info()).getAddress(keccak256("UniswapV2:Contract:Router2"));
-    require(router != address(0), "GaugeUniswapRestake::run: uniswap router contract not found");
 
-    IMinter _minter = IMinter(staking.minter());
-    _minter.mint(address(staking));
+    IMinter _minter = IMinter(_staking.minter());
+    _minter.mint(address(_staking));
     address rewardToken = _staking.crv_token();
     uint256 rewardAmount = IERC20(rewardToken).balanceOf(address(this));
 
-    IERC20(rewardToken).safeApproveAll(router);
-    uint256 amount = _swap(router, [rewardToken, swapToken], rewardAmount, swapOutMin, _deadline);
-    IERC20(swapToken).safeApproveAll(_pool);
+    IERC20(rewardToken).safeApprove(liquidityRouter, rewardAmount);
+    uint256 amount = _swap([rewardToken, swapToken], rewardAmount, swapOutMin, _deadline);
+    IERC20(swapToken).safeApprove(_pool, amount);
     _addLiquidity(_pool, amount, lpOutMin);
 
-    _lpToken.safeApproveAll(address(_staking));
-    _staking.deposit(_lpToken.balanceOf(address(this)));
+    uint256 lpAmount = _lpToken.balanceOf(address(this));
+    _lpToken.safeApprove(address(_staking), lpAmount);
+    _staking.deposit(lpAmount);
   }
 }

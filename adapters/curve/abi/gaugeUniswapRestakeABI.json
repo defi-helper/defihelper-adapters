@@ -116,6 +116,11 @@
       },
       {
         "internalType": "address",
+        "name": "_liquidityRouter",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
         "name": "_swapToken",
         "type": "address"
       },
@@ -133,6 +138,19 @@
     "name": "init",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "liquidityRouter",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {

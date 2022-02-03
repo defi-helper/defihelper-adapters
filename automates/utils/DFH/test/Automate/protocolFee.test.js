@@ -52,7 +52,10 @@ describe('Automate.protocolFee', function () {
     const proxyTx = await (
       await proxyFactory
         .connect(proxyOwner)
-        .create(prototype.address, new ethers.utils.Interface(AutomateABI).encodeFunctionData('init', [stakingAddress]))
+        .create(
+          prototype.address,
+          new ethers.utils.Interface(AutomateABI).encodeFunctionData('init', [stakingAddress, '1'])
+        )
     ).wait();
     const proxyCreatedEvent = proxyTx.events.find(({ event }) => event === 'ProxyCreated');
     const proxy = new ethers.Contract(proxyCreatedEvent.args.proxy, AutomateABI, prototypeOwner);
@@ -81,7 +84,10 @@ describe('Automate.protocolFee', function () {
     const proxyTx = await (
       await proxyFactory
         .connect(proxyOwner)
-        .create(prototype.address, new ethers.utils.Interface(AutomateABI).encodeFunctionData('init', [stakingAddress]))
+        .create(
+          prototype.address,
+          new ethers.utils.Interface(AutomateABI).encodeFunctionData('init', [stakingAddress, '1'])
+        )
     ).wait();
     const proxyCreatedEvent = proxyTx.events.find(({ event }) => event === 'ProxyCreated');
     const proxy = new ethers.Contract(proxyCreatedEvent.args.proxy, AutomateABI, prototypeOwner);
@@ -110,7 +116,10 @@ describe('Automate.protocolFee', function () {
     const proxyTx = await (
       await proxyFactory
         .connect(proxyOwner)
-        .create(prototype.address, new ethers.utils.Interface(AutomateABI).encodeFunctionData('init', [stakingAddress]))
+        .create(
+          prototype.address,
+          new ethers.utils.Interface(AutomateABI).encodeFunctionData('init', [stakingAddress, '1'])
+        )
     ).wait();
     const proxyCreatedEvent = proxyTx.events.find(({ event }) => event === 'ProxyCreated');
     const proxy = new ethers.Contract(proxyCreatedEvent.args.proxy, AutomateABI, prototypeOwner);
@@ -135,7 +144,10 @@ describe('Automate.protocolFee', function () {
     const proxyTx = await (
       await proxyFactory
         .connect(proxyOwner)
-        .create(prototype.address, new ethers.utils.Interface(AutomateABI).encodeFunctionData('init', [stakingAddress]))
+        .create(
+          prototype.address,
+          new ethers.utils.Interface(AutomateABI).encodeFunctionData('init', [stakingAddress, '1'])
+        )
     ).wait();
     const proxyCreatedEvent = proxyTx.events.find(({ event }) => event === 'ProxyCreated');
     const proxy = new ethers.Contract(proxyCreatedEvent.args.proxy, AutomateABI, prototypeOwner);

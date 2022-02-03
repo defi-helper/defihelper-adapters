@@ -8,10 +8,14 @@ import "../Automate.sol";
 contract AutomateMock is Automate {
   address public staking;
 
+  uint256 public pool;
+
   constructor(address _info) Automate(_info) {}
 
-  function init(address _staking) external initializer {
+  function init(address _staking, uint256 _pool) external initializer {
+    require(!_initialized || staking == _staking, "AutomateMock::init: reinitialize staking address forbidden");
     staking = _staking;
+    pool = _pool;
   }
 
   function run(

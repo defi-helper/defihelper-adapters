@@ -1,5 +1,8 @@
 const { ethers, axios, bn, ethersMulticall, dayjs } = require('../lib');
-const { ethereum, waves, toFloat, staking } = require('../utils');
+const { ethereum } = require('../utils/ethereum');
+const { waves } = require('../utils/waves');
+const { toFloat } = require('../utils/toFloat');
+const { synthetixStaking } = require('../utils/staking');
 const StakingABI = require('./abi/Staking.json');
 const SynthetixUniswapLpRestakeABI = require('./abi/SynthetixUniswapLpRestake.json');
 const AutomateActions = require('../utils/automate/actions');
@@ -9,7 +12,7 @@ const swopTokenId = 'Ehie5xYpeN8op1Cctc6aGUrqx8jq3jtf1DSjXDbfm7aT';
 
 module.exports = {
   // For instance: 0x969c70f75aecb0decbde0554fb570276c9a85751
-  staking: staking.synthetixStaking(),
+  staking: synthetixStaking(),
   swopfiStaking: async (provider, contractAddress, initOptions = waves.defaultOptions()) => {
     const options = {
       ...waves.defaultOptions(),
@@ -81,11 +84,15 @@ module.exports = {
             AutomateActions.tab(
               'Deploy',
               async () => ({
-                description: 'Deploy your automate contract',
+                description: 'Deploy your own contract',
                 inputs: [
                   AutomateActions.input({
                     placeholder: 'Staking contract',
                     value: stakingContract,
+                  }),
+                  AutomateActions.input({
+                    placeholder: 'Liquidity pool router address',
+                    value: '0x7a250d5630b4cf539739df2c5dacb4c659f2488d',
                   }),
                   AutomateActions.input({
                     placeholder: 'Slippage percent',
@@ -97,7 +104,7 @@ module.exports = {
                   }),
                 ],
               }),
-              async (staking, slippage, deadline) => {
+              async (staking, router, slippage, deadline) => {
                 if (
                   stakingContracts.find(
                     ({ stakingContract }) => staking.toLowerCase() === stakingContract.toLowerCase()
@@ -109,14 +116,15 @@ module.exports = {
 
                 return true;
               },
-              async (staking, slippage, deadline) =>
+              async (staking, router, slippage, deadline) =>
                 AutomateActions.ethereum.proxyDeploy(
                   signer,
                   factoryAddress,
                   prototypeAddress,
                   new ethers.utils.Interface(SynthetixUniswapLpRestakeABI).encodeFunctionData('init', [
                     staking,
-                    Math.floor(slippage * 10),
+                    router,
+                    Math.floor(slippage * 100),
                     deadline,
                   ])
                 )
@@ -138,7 +146,7 @@ module.exports = {
         AutomateActions.tab(
           'Transfer',
           async () => ({
-            description: 'Transfer your tokens to automate',
+            description: 'Transfer your tokens to your contract',
             inputs: [
               AutomateActions.input({
                 placeholder: 'amount',
@@ -166,7 +174,7 @@ module.exports = {
         AutomateActions.tab(
           'Deposit',
           async () => ({
-            description: 'Deposit tokens to staking',
+            description: 'Stake your tokens to the contract',
           }),
           async () => {
             const automateBalance = new bn(await stakingToken.balanceOf(automate.address).then((v) => v.toString()));
@@ -226,7 +234,7 @@ module.exports = {
         const stakingMulticall = new ethersMulticall.Contract(stakingAddress, StakingABI);
         const stakingTokenMulticall = new ethersMulticall.Contract(stakingTokenAddress, ethereum.uniswap.pairABI);
         const [
-          infoAddress,
+          routerAddress,
           slippagePercent,
           deadlineSeconds,
           token0Address,
@@ -234,7 +242,7 @@ module.exports = {
           rewardTokenAddress,
           earned,
         ] = await multicall.all([
-          automateMulticall.info(),
+          automateMulticall.liquidityRouter(),
           automateMulticall.slippage(),
           automateMulticall.deadline(),
           stakingTokenMulticall.token0(),
@@ -243,9 +251,6 @@ module.exports = {
           stakingMulticall.earned(contractAddress),
         ]);
         if (earned.toString() === '0') return new Error('No earned');
-        const routerAddress = await ethereum.dfh
-          .storage(signer, infoAddress)
-          .getAddress(ethereum.dfh.storageKey('UniswapV2:Contract:Router2'));
         const router = ethereum.uniswap.router(signer, routerAddress);
 
         const slippage = 1 - slippagePercent / 10000;

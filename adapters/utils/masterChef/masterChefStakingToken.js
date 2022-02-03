@@ -1,6 +1,6 @@
 const { bn } = require('../../lib');
 const { ethereum } = require('../ethereum');
-const { coingecko } = require('../coingecko');
+const { CoingeckoProvider } = require('../coingecko');
 
 class StakingToken {
   /**
@@ -50,18 +50,9 @@ class PairStakingToken extends StakingToken {
       this.provider,
       this.token
     );
-    const token0Usd = await coingecko.getPriceUSDByContract(
-      coingecko.platformByEthereumNetwork(this.network),
-      this.blockTag === 'latest',
-      this.block,
-      token0
-    );
-    const token1Usd = await coingecko.getPriceUSDByContract(
-      coingecko.platformByEthereumNetwork(this.network),
-      this.blockTag === 'latest',
-      this.block,
-      token1
-    );
+    const priceFeed = new CoingeckoProvider({ block: this.block, blockTag: this.blockTag }).initPlatform(this.network);
+    const token0Usd = await priceFeed.contractPrice(token0);
+    const token1Usd = await priceFeed.contractPrice(token1);
 
     let stakingTokenUSD = new bn(reserve0)
       .multipliedBy(token0Usd)
@@ -123,14 +114,8 @@ class ErcStakingToken extends StakingToken {
   }
 
   async init() {
-    let tokenUSD = new bn(
-      await coingecko.getPriceUSDByContract(
-        coingecko.platformByEthereumNetwork(this.network),
-        this.blockTag === 'latest',
-        this.block,
-        this.token
-      )
-    );
+    const priceFeed = new CoingeckoProvider({ block: this.block, blockTag: this.blockTag }).initPlatform(this.network);
+    let tokenUSD = new bn(await priceFeed.contractPrice(this.token));
 
     if (!tokenUSD.isFinite()) tokenUSD = new bn(0);
 
@@ -151,6 +136,28 @@ class ErcStakingToken extends StakingToken {
 }
 
 module.exports = {
+  /**
+   *
+   * @param {!*} provider
+   * @param {string} token
+   * @param {number} network
+   * @param {string} blockTag
+   * @param {string} block
+   * @returns {Promise<PairStakingToken>}
+   */
+  getUniPairToken: (provider, token, network, blockTag, block) =>
+    PairStakingToken.create(provider, token, network, blockTag, block),
+  /**
+   *
+   * @param {!*} provider
+   * @param {string} token
+   * @param {number} network
+   * @param {string} blockTag
+   * @param {string} block
+   * @returns {Promise<ErcStakingToken>}
+   */
+  getPlainToken: (provider, token, network, blockTag, block) =>
+    ErcStakingToken.create(provider, token, network, blockTag, block),
   /**
    *
    * @param {!*} provider

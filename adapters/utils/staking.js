@@ -1,8 +1,9 @@
 const { ethers, bn, ethersMulticall } = require('../lib');
 const { ethereum } = require('./ethereum');
-const { coingecko } = require('./coingecko');
+const { CoingeckoProvider } = require('./coingecko');
 const { toFloat } = require('./toFloat');
 const { tokens } = require('./tokens');
+const AutomateActions = require('./automate/actions');
 
 const stakingABI = require('./abi/stakingAbi.json');
 
@@ -33,6 +34,7 @@ module.exports = {
       const network = (await provider.detectNetwork()).chainId;
       const block = await provider.getBlock(blockTag);
       const blockNumber = block.number;
+      const priceFeed = new CoingeckoProvider({ block, blockTag }).initPlatform(network);
       const avgBlockTime = await ethereum.getAvgBlockTime(provider, blockNumber);
       const blocksPerDay = new bn((1000 * 60 * 60 * 24) / avgBlockTime);
 
@@ -61,12 +63,7 @@ module.exports = {
       totalSupply = toFloat(totalSupply, ethereum.uniswap.pairDecimals);
       stakingToken = stakingToken.toLowerCase();
       rewardsToken = rewardsToken.toLowerCase();
-      const rewardTokenUSD = await coingecko.getPriceUSDByContract(
-        coingecko.platformByEthereumNetwork(network),
-        blockTag === 'latest',
-        block,
-        rewardsToken
-      );
+      const rewardTokenUSD = await priceFeed.contractPrice(rewardsToken);
       const {
         token0,
         reserve0,
@@ -74,18 +71,8 @@ module.exports = {
         reserve1,
         totalSupply: lpTotalSupply,
       } = await ethereum.uniswap.pairInfo(provider, stakingToken);
-      const token0Usd = await coingecko.getPriceUSDByContract(
-        coingecko.platformByEthereumNetwork(network),
-        blockTag === 'latest',
-        block,
-        token0
-      );
-      const token1Usd = await coingecko.getPriceUSDByContract(
-        coingecko.platformByEthereumNetwork(network),
-        blockTag === 'latest',
-        block,
-        token1
-      );
+      const token0Usd = await priceFeed.contractPrice(token0);
+      const token1Usd = await priceFeed.contractPrice(token1);
       let stakingTokenUSD = new bn(reserve0)
         .multipliedBy(token0Usd)
         .plus(new bn(reserve1).multipliedBy(token1Usd))
@@ -186,63 +173,122 @@ module.exports = {
             ),
           };
         },
-
         actions: async (walletAddress) => {
           if (options.signer === null) {
             throw new Error('Signer not found, use options.signer for use actions');
           }
           const { signer } = options;
+          const rewardTokenContract = ethereum.erc20(provider, rewardsToken).connect(signer);
+          const rewardTokenSymbol = await rewardTokenContract.symbol();
           const stakingTokenContract = ethereum.erc20(provider, stakingToken).connect(signer);
+          const stakingTokenSymbol = await stakingTokenContract.symbol();
+          const stakingTokenDecimals = await stakingTokenContract.decimals().then((v) => v.toString());
           const stakingContract = contract.connect(signer);
 
           return {
-            stake: {
-              can: async (amount) => {
-                const balance = await stakingTokenContract.balanceOf(walletAddress);
-                if (bn(amount).isGreaterThan(balance.toString())) {
-                  return Error('Amount exceeds balance');
-                }
+            stake: [
+              AutomateActions.tab(
+                'Stake',
+                async () => ({
+                  description: `Stake your [${stakingTokenSymbol}](https://etherscan.io/address/${stakingToken}) tokens to contract`,
+                  inputs: [
+                    AutomateActions.input({
+                      placeholder: 'amount',
+                      value: new bn(await stakingTokenContract.balanceOf(walletAddress).then((v) => v.toString()))
+                        .div(`1e${stakingTokenDecimals}`)
+                        .toString(10),
+                    }),
+                  ],
+                }),
+                async (amount) => {
+                  const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
+                  if (amountInt.lte(0)) return Error('Invalid amount');
 
-                return true;
-              },
-              send: async (amount) => {
-                await stakingTokenContract.approve(contractAddress, amount);
-                await stakingContract.stake(amount);
-              },
-            },
-            unstake: {
-              can: async (amount) => {
-                const balance = await contract.balanceOf(walletAddress);
-                if (bn(amount).isGreaterThan(balance.toString())) {
-                  return Error('Amount exceeds balance');
-                }
+                  const balance = await stakingTokenContract.balanceOf(walletAddress).then((v) => v.toString());
+                  if (amountInt.gt(balance)) return Error('Insufficient funds on the balance');
 
-                return true;
-              },
-              send: async (amount) => {
-                await stakingContract.withdraw(amount);
-              },
-            },
-            claim: {
-              can: async () => {
-                const earned = await contract.earned(walletAddress);
-                if (bn(earned).isLessThanOrEqualTo(0)) {
-                  return Error('No earnings');
+                  return true;
+                },
+                async (amount) => {
+                  const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
+                  await ethereum.erc20ApproveAll(
+                    stakingTokenContract,
+                    walletAddress,
+                    masterChefAddress,
+                    amountInt.toFixed(0)
+                  );
+
+                  return {
+                    tx: await stakingContract.stake(amountInt.toFixed(0)),
+                  };
                 }
-                return true;
-              },
-              send: async () => {
-                await stakingContract.getReward();
-              },
-            },
-            exit: {
-              can: async () => {
-                return true;
-              },
-              send: async () => {
-                await stakingContract.exit();
-              },
-            },
+              ),
+            ],
+            unstake: [
+              AutomateActions.tab(
+                'Unstake',
+                async () => ({
+                  description: `Unstake your [${stakingTokenSymbol}](https://etherscan.io/address/${stakingToken}) tokens from contract`,
+                  inputs: [
+                    AutomateActions.input({
+                      placeholder: 'amount',
+                      value: new bn(await stakingContract.balanceOf(walletAddress).then((v) => v.toString()))
+                        .div(`1e${stakingTokenDecimals}`)
+                        .toString(10),
+                    }),
+                  ],
+                }),
+                async (amount) => {
+                  const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
+                  if (amountInt.lte(0)) return Error('Invalid amount');
+
+                  const balance = await stakingContract.balanceOf(walletAddress).then((v) => v.toString());
+                  if (amountInt.isGreaterThan(balance)) {
+                    return Error('Amount exceeds balance');
+                  }
+
+                  return true;
+                },
+                async (amount) => {
+                  const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
+
+                  return {
+                    tx: await stakingContract.withdraw(amountInt.toFixed(0)),
+                  };
+                }
+              ),
+            ],
+            claim: [
+              AutomateActions.tab(
+                'Claim',
+                async () => ({
+                  description: `Claim your [${rewardTokenSymbol}](https://etherscan.io/address/${rewardsToken}) reward from contract`,
+                }),
+                async () => {
+                  const earned = await stakingContract.earned(walletAddress).then((v) => v.toString());
+                  if (new bn(earned).isLessThanOrEqualTo(0)) {
+                    return Error('No earnings');
+                  }
+
+                  return true;
+                },
+                async () => ({
+                  tx: await stakingContract.getReward(),
+                })
+              ),
+            ],
+            exit: [
+              AutomateActions.tab(
+                'Exit',
+                async () => ({
+                  description: 'Get all tokens from contract',
+                }),
+                () => true,
+                async () => ({
+                  tx: await stakingContract.exit(),
+                })
+              ),
+            ],
           };
         },
       };

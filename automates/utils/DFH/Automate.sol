@@ -23,6 +23,9 @@ abstract contract Automate {
   /// @notice Protocol fee in USD (-1 if value in global storage).
   int256 internal _protocolFee;
 
+  /// @notice Is contract already initialized.
+  bool internal _initialized;
+
   event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
   event ProtocolFeeChanged(int256 protocolFee);
@@ -52,6 +55,7 @@ abstract contract Automate {
       require(_owner == msg.sender, "Automate: caller is not the owner");
     }
     _;
+    _initialized = true;
   }
 
   /**
@@ -105,7 +109,7 @@ abstract contract Automate {
   }
 
   /**
-   * @dev Throws if contract paused.
+   * @dev Throws if contract unpaused.
    */
   modifier whenPaused() {
     require(paused(), "Automate: not paused");
@@ -113,7 +117,7 @@ abstract contract Automate {
   }
 
   /**
-   * @dev Throws if contract unpaused.
+   * @dev Throws if contract paused.
    */
   modifier whenNotPaused() {
     require(!paused(), "Automate: paused");
