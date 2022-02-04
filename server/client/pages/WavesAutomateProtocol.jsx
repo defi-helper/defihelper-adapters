@@ -180,7 +180,10 @@ export function WavesAutomateProtocol(props) {
             />
           </div>
           {!deploySteps.length || (
-            <AutomateSteps steps={deploySteps} onAction={onAutomateDeploy} />
+            <AdapterModalSteps
+              steps={deploySteps}
+              onAction={onAutomateDeploy}
+            />
           )}
           {!deployResult || <div>{JSON.stringify(deployResult)}</div>}
         </div>
@@ -226,7 +229,6 @@ export function WavesAutomateProtocol(props) {
       {!actionSteps.length || (
         <div>
           <h3>Action steps</h3>
-          <AutomateSteps steps={actionSteps} onAction={setActionResult} />
           <AdapterModalSteps steps={actionSteps} onAction={setActionResult} />
         </div>
       )}
