@@ -1,1 +1,101 @@
-{}
+{
+  "0xad6caeb32cd2c308980a548bd0bc5aa4306c6c18": {
+    "platform": "ethereum",
+    "address": "0xba11d00c5f74255f56a5e366f4f77f5a186d7f55"
+  },
+
+  "0x5a16e8ce8ca316407c6e6307095dc9540a8d62b3": {
+    "platform": "ethereum",
+    "address": "0xd433138d12beb9929ff6fd583dc83663eea6aaa5"
+  },
+
+  "0x8595f9da7b868b1822194faed312235e43007b49": {
+    "platform": "tron",
+    "address": "tafjulxivgt4qwk6uzwjqwzxtsagaqnvp4"
+  },
+
+  "0xf07a32eb035b786898c00bb1c64d8c6f8e7a46d5": {
+    "platform": "ethereum",
+    "address": "0x1b06b43f3b0bbad73784d858c782e029f3f5af14"
+  },
+
+  "0x5c8c8d560048f34e5f7f8ad71f2f81a89dbd273e": {
+    "platform": "ethereum",
+    "address": "0x5c8c8d560048f34e5f7f8ad71f2f81a89dbd273e"
+  },
+
+  "0x758fb037a375f17c7e195cc634d77da4f554255b": {
+    "platform": "ethereum",
+    "address": "0x10633216e7e8281e33c86f02bf8e565a635d9770"
+  },
+
+  "0x84e9a6f9d240fdd33801f7135908bfa16866939a": {
+    "platform": "ethereum",
+    "address": "0xd9016a907dc0ecfa3ca425ab20b6b785b42f2373"
+  },
+
+  "0x4e840aadd28da189b9906674b4afcb77c128d9ea": {
+    "platform": "ethereum",
+    "address": "0x6be61833fc4381990e82d7d4a9f4c9b3f67ea941"
+  },
+
+  "0xb59490ab09a0f526cc7305822ac65f2ab12f9723": {
+    "platform": "ethereum",
+    "address": "0xb59490ab09a0f526cc7305822ac65f2ab12f9723"
+  },
+
+  "0x5fe80d2cd054645b9419657d3d10d26391780a7b": {
+    "platform": "ethereum",
+    "address": "0x4e352cf164e64adcbad318c3a1e222e9eba4ce42"
+  },
+
+  "0x9f882567a62a5560d147d64871776eea72df41d3": {
+    "platform": "ethereum",
+    "address": "0x11eef04c884e24d9b7b4760e7476d06ddf797f36"
+  },
+
+  "0xcaa662ad41a662b81be2aea5d59ec0697628665f": {
+    "platform": "ethereum",
+    "address": "0x4a615bb7166210cce20e6642a6f8fb5d4d044496"
+  },
+
+  "0x5857c96dae9cf8511b08cb07f85753c472d36ea3": {
+    "platform": "ethereum",
+    "address": "0x970b9bb2c0444f5e81e9d0efb84c8ccdcdcaf84d"
+  },
+
+  "0x3192ccddf1cdce4ff055ebc80f3f0231b86a7e30": {
+    "platform": "ethereum",
+    "address": "0x544c42fbb96b39b21df61cf322b5edc285ee7429"
+  },
+
+  "0x90ed8f1dc86388f14b64ba8fb4bbd23099f18240": {
+    "platform": "ethereum",
+    "address": "0x993864e43caa7f7f12953ad6feb1d1ca635b875f"
+  },
+
+  "0x1c640a98a0c62120b0ad23c15fff8dc1a2fb9c4d": {
+    "platform": "ethereum",
+    "address": "0xbc7250c8c3eca1dfc1728620af835fca489bfdf3"
+  },
+
+  "0x0112e557d400474717056c4e6d40edd846f38351": {
+    "platform": "ethereum",
+    "address": "0x6c5ba91642f10282b576d91922ae6448c9d52f4e"
+  },
+
+  "0x8729438eb15e2c8b576fcc6aecda6a148776c0f5": {
+    "platform": "avalanche",
+    "address": "0x8729438eb15e2c8b576fcc6aecda6a148776c0f5"
+  },
+
+  "0xa1434f1fc3f437fa33f7a781e041961c0205b5da": {
+    "platform": "ethereum",
+    "address": "0xea26c4ac16d4a5a106820bc8aee85fd0b7b2b664"
+  },
+
+  "0xe898edc43920f357a93083f1d4460437de6daec2": {
+    "platform": "ethereum",
+    "address": "0x3a8cccb969a61532d1e6005e2ce12c200caece87"
+  }
+}
