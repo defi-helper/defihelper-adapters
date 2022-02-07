@@ -1,11 +1,13 @@
 const { bn, ethers, ethersMulticall } = require('../lib');
 const { ethereum } = require('../utils/ethereum');
-const { coingecko, bridgeWrapperBuild } = require('../utils/coingecko');
+const { bridgeWrapperBuild } = require('../utils/coingecko');
 const registryABI = require('./abi/registryABI.json');
 const gaugeABI = require('./abi/gaugeABI.json');
 const poolABI = require('./abi/poolABI.json');
 const landingPoolABI = require('./abi/landingPoolABI.json');
 const minterABI = require('./abi/minterABI.json');
+const veCRVABI = require('./abi/veCRVABI.json');
+const feeDistributorABI = require('./abi/feeDistributorABI.json');
 const gaugeControllerABI = require('./abi/gaugeControllerABI.json');
 const gaugeUniswapRestakeABI = require('./abi/gaugeUniswapRestakeABI.json');
 const { tokens } = require('../utils');
@@ -364,6 +366,96 @@ function stakingAdapterFactory(poolABI) {
 module.exports = {
   staking: stakingAdapterFactory(poolABI),
   stakingLanding: stakingAdapterFactory(landingPoolABI),
+  veCRV: async (provider, contractAddress, initOptions = ethereum.defaultOptions()) => {
+    const options = {
+      ...ethereum.defaultOptions(),
+      ...initOptions,
+    };
+
+    const blockTag = options.blockNumber === 'latest' ? 'latest' : parseInt(options.blockNumber, 10);
+    const network = (await provider.detectNetwork()).chainId;
+    const block = await provider.getBlock(blockTag);
+    const multicall = new ethersMulticall.Provider(provider, network);
+    const priceFeed = bridgeWrapperBuild(bridgeTokens, blockTag, block, network);
+
+    return {
+      metrics: {
+        tvl: '0',
+        aprDay: '0',
+        aprWeek: '0',
+        aprMonth: '0',
+        aprYear: '0',
+      },
+      wallet: async (walletAddress) => {
+        const veCRVAddress = '0x5f3b5DfEb7B28CDbD7FAba78963EE202a494e2A2';
+        const feeDistributorAddress = '0xA464e6DCda8AC41e03616F95f4BC98a13b8922Dc';
+        const veCRVContract = new ethers.Contract(veCRVAddress, veCRVABI, provider);
+        const feeDistributorContract = new ethers.Contract(feeDistributorAddress, feeDistributorABI, provider);
+        const staked = await veCRVContract.callStatic['locked(address)'](walletAddress).then(({ amount }) =>
+          new bn(amount.toString()).div('1e18')
+        );
+        const stakedUSD = staked.multipliedBy(await priceFeed(veCRVAddress));
+        const rewardTokenAddress = await feeDistributorContract.token();
+        const pools = new PoolRegistry({ multicall, blockTag });
+        const poolInfo = await pools.findByLp(rewardTokenAddress);
+        const pool = new Pool({ multicall, blockTag }, { ...poolInfo, abi: poolABI });
+        const earned = await feeDistributorContract.callStatic['claim(address)'](walletAddress).then(
+          (v) => new bn(v.toString())
+        );
+        const rewardTokens = (await getUnderlyingBalance(pools, priceFeed, pool, earned.toString(10))).flat(Infinity);
+
+        return {
+          staked: {
+            [veCRVAddress]: {
+              balance: staked.toString(10),
+              usd: stakedUSD.toString(10),
+            },
+          },
+          earned: rewardTokens.reduce(
+            (result, { address, balance, balanceUSD }) => ({
+              ...result,
+              [address]: {
+                balance,
+                usd: balanceUSD,
+              },
+            }),
+            {}
+          ),
+          metrics: {
+            staking: staked.toString(10),
+            stakingUSD: stakedUSD.toString(10),
+            earned: earned.div('1e18').toString(10),
+            earnedUSD: rewardTokens.reduce((sum, { balanceUSD }) => sum.plus(balanceUSD), new bn(0)).toString(10),
+          },
+          tokens: tokens(
+            ...rewardTokens
+              .concat([{ address: veCRVAddress, balance: staked.toString(10), balanceUSD: stakedUSD.toString(10) }])
+              .reduce(
+                (result, { address, balance, balanceUSD }) => [
+                  ...result,
+                  {
+                    token: address,
+                    data: {
+                      balance,
+                      usd: balanceUSD,
+                    },
+                  },
+                ],
+                []
+              )
+          ),
+        };
+      },
+      actions: async (walletAddress) => {
+        return {
+          stake: [],
+          unstake: [],
+          claim: [],
+          exit: [],
+        };
+      },
+    };
+  },
   automates: {
     deploy: {
       GaugeUniswapRestake: async (signer, factoryAddress, prototypeAddress, contractAddress = undefined) => {

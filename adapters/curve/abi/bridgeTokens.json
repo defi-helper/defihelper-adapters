@@ -14,5 +14,9 @@
   "0x04bc0ab673d88ae9dbc9da2380cb6b79c4bca9ae": {
     "platform": "ethereum",
     "address": "0x4fabb145d64652a948d72533023f6e7a623c7c53"
+  },
+  "0x5f3b5dfeb7b28cdbd7faba78963ee202a494e2a2": {
+    "platform": "ethereum",
+    "address": "0xd533a949740bb3306d119cc777fa900ba034cd52"
   }
 }
