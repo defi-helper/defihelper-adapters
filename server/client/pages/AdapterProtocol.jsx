@@ -1,7 +1,7 @@
 import React from "react";
 import * as adaptersGateway from "../common/adapter";
 import { useProvider as useEthProvider } from "../common/ether";
-import { useProvider as useWavesProvider } from "../common/waves";
+//import { useProvider as useWavesProvider } from "../common/waves";
 import { AdapterModalSteps } from "../components";
 import ReactJson from "react-json-view";
 
@@ -9,7 +9,7 @@ const searchParams = new URLSearchParams(new URL(window.location).searchParams);
 
 export function AdapterProtocol(props) {
   const [ethProvider, ethSigner] = useEthProvider();
-  const [wavesProvider, wavesSigner] = useWavesProvider();
+  //const [wavesProvider, wavesSigner] = useWavesProvider();
   const [blockchain, setBlockchain] = React.useState(
     searchParams.get("blockchain") ?? "ethereum"
   );
@@ -53,6 +53,7 @@ export function AdapterProtocol(props) {
             signer: ethSigner,
           });
           break;
+          /*
         case "waves":
           metrics = await protocol[currentAdapter](wavesProvider, contract, {
             node: await wavesProvider
@@ -61,6 +62,7 @@ export function AdapterProtocol(props) {
             signer: wavesSigner,
           });
           break;
+          */
         default:
           throw new Error(`Undefined blockchain "${blockchain}"`);
       }
