@@ -443,17 +443,21 @@ module.exports = {
         .then((v) => Number(v.toString())),
     ]);
     const stakedTokenPriceUSD = await priceFeed(stakedTokenAddress);
+    const rewardTokenPriceUSD = await priceFeed(rewardTokenAddress);
     const totalLocked = await ethereum
       .erc20(provider, stakedTokenAddress)
       .balanceOf(contractAddress, { blockTag })
       .then((v) => new bn(v.toString()).div(`1e${stakedTokenDecimals}`));
     const tvl = new bn(totalLocked).multipliedBy(stakedTokenPriceUSD);
 
+    const bonusEndBlock = await contract.bonusEndBlock({ blockTag }).then((v) => new bn(v.toString()));
     const rewardPerBlock = await contract
       .rewardPerBlock({ blockTag })
-      .then((v) => new bn(v.toString()).div(`1e${rewardTokenDecimals}`));
+      .then((v) =>
+        new bn(v.toString()).div(`1e${rewardTokenDecimals}`).multipliedBy(bonusEndBlock.lte(blockNumber) ? 0 : 1)
+      );
 
-    let aprBlock = rewardPerBlock.multipliedBy(stakedTokenPriceUSD).div(tvl);
+    let aprBlock = rewardPerBlock.multipliedBy(rewardTokenPriceUSD).div(tvl);
     if (!aprBlock.isFinite()) aprBlock = new bn(0);
 
     const blocksPerDay = new bn((1000 * 60 * 60 * 24) / avgBlockTime);
