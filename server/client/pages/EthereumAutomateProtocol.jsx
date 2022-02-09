@@ -1,11 +1,14 @@
 import React from "react";
-import * as automatesGateway from "../common/automate";
-import * as adaptersGateway from "../common/adapter";
 import ReactJson from "react-json-view";
-import { useProvider } from "../common/ether";
-import { AdapterModalSteps } from "../components";
 import networks from "@defihelper/networks/contracts.json";
 import { ethers } from "ethers";
+
+import * as automatesGateway from "../common/automate";
+import * as adaptersGateway from "../common/adapter";
+import { useProvider } from "../common/ether";
+import { AdapterModalSteps } from "../components";
+import { ReactJsonWrap } from "../components/ReactJsonWrap";
+import { Button } from "../components/Button";
 
 function txMinimal({ hash, type, from, data, r, s, v }) {
   return {
@@ -44,7 +47,7 @@ function receiptMinimal({
 }
 
 function AutomateArtifactSelector({ chainId, automates, onReload }) {
-  const [current, setCurrent] = React.useState(automates[0]);
+  const [current = null, setCurrent] = React.useState(automates[0]);
   const [reload, setReload] = React.useState(false);
 
   const onReloadHandler = async () => {
@@ -80,20 +83,36 @@ function AutomateArtifactSelector({ chainId, automates, onReload }) {
           </select>
         </div>
         <div className="column column-10">
-          <button
-            className="button"
-            onClick={onReloadHandler}
-            disabled={reload}
-          >
-            {reload ? "Loading" : "Reload"}
-          </button>
+          <Button onClick={onReloadHandler} loading={reload}>
+            Reload
+          </Button>
         </div>
       </div>
     </div>
   );
 }
 
-const automateAdapterActions = ["migrate", "deposit", "refund", "run"];
+const adapterActions = {
+  migrate: "migrate",
+  deposit: "deposit",
+  refund: "refund",
+  run: "run",
+};
+
+const automateAdapterActions = Object.values(adapterActions);
+
+function getNetwork(chainId) {
+  const networksId = Object.keys(networks);
+  if (!networksId.includes(chainId.toString())) {
+    throw new Error(
+      `Protocol contracts not found in @defihelper/network package for "${chainId}" chain. Only (${networksId.join(
+        ", "
+      )}) chains supported`
+    );
+  }
+
+  return networks[chainId.toString()];
+}
 
 export function EthereumAutomateProtocol(props) {
   const [automates, setAutomates] = React.useState(null);
@@ -110,23 +129,10 @@ export function EthereumAutomateProtocol(props) {
   const [deploySteps, setDeploySteps] = React.useState([]);
   const [deployProxyResult, setDeployProxyResult] = React.useState(null);
   const [instance, setInstance] = React.useState("");
-  const [currentAction, setCurrentAction] = React.useState("run");
+  const [currentAction, setCurrentAction] = React.useState(adapterActions.run);
   const [actionReload, setActionReload] = React.useState(false);
   const [actionResult, setActionResult] = React.useState(null);
   const [actionSteps, setActionSteps] = React.useState([]);
-
-  function getNetwork(chainId) {
-    const networksId = Object.keys(networks);
-    if (!networksId.includes(chainId.toString())) {
-      throw new Error(
-        `Protocol contracts not found in @defihelper/network package for "${chainId}" chain. Only (${networksId.join(
-          ", "
-        )}) chains supported`
-      );
-    }
-
-    return networks[chainId.toString()];
-  }
 
   React.useEffect(() => {
     automatesGateway
@@ -137,15 +143,19 @@ export function EthereumAutomateProtocol(props) {
       .then(setAutomates);
   }, []);
 
-  React.useEffect(async () => {
-    if (!provider) return;
+  React.useEffect(() => {
+    const handler = async () => {
+      if (!provider) return;
 
-    const { chainId } = await provider.getNetwork();
-    setChainId(chainId);
+      const { chainId } = await provider.getNetwork();
+      setChainId(chainId);
 
-    const network = getNetwork(chainId);
-    setStorage(network ? network.Storage.address : "");
-    setErc1167(network ? network.ERC1167.address : "");
+      const network = getNetwork(chainId);
+      setStorage(network ? network.Storage.address : "");
+      setErc1167(network ? network.ERC1167.address : "");
+    };
+
+    handler().catch(console.error);
   }, [provider]);
 
   React.useEffect(() => {
@@ -154,14 +164,18 @@ export function EthereumAutomateProtocol(props) {
     setPrototype(automateArtifact.address);
   }, [automateArtifact]);
 
-  React.useEffect(async () => {
-    if (instance !== "") return;
+  React.useEffect(() => {
+    const handler = async () => {
+      if (instance !== "") return;
 
-    if (deploy.receipt !== null) {
-      setInstance(deploy.receipt.contractAddress);
-    } else if (automateArtifact && automateArtifact.address) {
-      setInstance(automateArtifact.address);
-    }
+      if (deploy.receipt !== null) {
+        setInstance(deploy.receipt.contractAddress);
+      } else if (automateArtifact && automateArtifact.address) {
+        setInstance(automateArtifact.address);
+      }
+    };
+
+    handler().catch(console.error);
   }, [automateArtifact, deploy]);
 
   const onAutomateReload = async ({ protocol }, artifact) => {
@@ -204,11 +218,13 @@ export function EthereumAutomateProtocol(props) {
         signer
       );
       const automateDeploy = await factory.deploy(storage);
+
       const { deployTransaction } = automateDeploy;
       setDeploy({
         tx: txMinimal(deployTransaction),
         receipt: null,
       });
+
       const receipt = await deployTransaction.wait();
       setDeploy({
         tx: txMinimal(deployTransaction),
@@ -217,6 +233,7 @@ export function EthereumAutomateProtocol(props) {
     } catch (e) {
       console.error(e);
     }
+
     setAutomateDeployLoading(false);
   };
 
@@ -236,12 +253,14 @@ export function EthereumAutomateProtocol(props) {
 
     setActionReload(true);
     setActionSteps([]);
+
     try {
       const actions = await adapters[automateArtifact.contractName](
         signer,
         instance
       );
-      if (currentAction === "run") {
+
+      if (currentAction === adapterActions.run) {
         const actionResult = await actions.run();
         setActionResult(
           actionResult instanceof Error ? actionResult.toString() : actionResult
@@ -253,6 +272,7 @@ export function EthereumAutomateProtocol(props) {
     } catch (e) {
       console.error(e);
     }
+
     setActionReload(false);
   };
 
@@ -272,12 +292,12 @@ export function EthereumAutomateProtocol(props) {
         <div>
           <div>
             <h3>Automate</h3>
-            <div>
+            <ReactJsonWrap>
               <ReactJson
                 src={JSON.parse(JSON.stringify(automateArtifact))}
                 collapsed={1}
               />
-            </div>
+            </ReactJsonWrap>
             <div>
               <div>
                 <div className="row">
@@ -301,36 +321,35 @@ export function EthereumAutomateProtocol(props) {
                   </div>
                 </div>
                 <div>
-                  <button
-                    className="button"
+                  <Button
                     onClick={onAutomateDeploy}
-                    disabled={automateDeployLoading}
+                    loading={automateDeployLoading}
                   >
-                    {!automateDeployLoading ? "Deploy" : "Loading"}
-                  </button>
+                    Deploy
+                  </Button>
                 </div>
               </div>
             </div>
             {!deploy.tx || (
               <div>
                 <div>Deploy transaction:</div>
-                <div>
+                <ReactJsonWrap>
                   <ReactJson
                     src={JSON.parse(JSON.stringify(deploy.tx))}
                     collapsed={1}
                   />
-                </div>
+                </ReactJsonWrap>
                 {deploy.receipt === null ? (
                   <div>Transaction waiting...</div>
                 ) : (
                   <>
                     <div>Deploy receipt:</div>
-                    <div>
+                    <ReactJsonWrap>
                       <ReactJson
                         src={JSON.parse(JSON.stringify(deploy.receipt))}
                         collapsed={1}
                       />
-                    </div>
+                    </ReactJsonWrap>
                   </>
                 )}
               </div>
@@ -349,7 +368,7 @@ export function EthereumAutomateProtocol(props) {
                 />
               </div>
               <div className="column">
-                <button onClick={onDeployStepsCall}>Call</button>
+                <Button onClick={onDeployStepsCall}>Call</Button>
               </div>
             </div>
             {!deploySteps.length || (
@@ -359,7 +378,7 @@ export function EthereumAutomateProtocol(props) {
               />
             )}
             {deployProxyResult !== null && (
-              <div>
+              <ReactJsonWrap>
                 {deployProxyResult.tx ? (
                   <ReactJson
                     src={JSON.parse(
@@ -368,9 +387,11 @@ export function EthereumAutomateProtocol(props) {
                     collapsed={1}
                   />
                 ) : (
-                  JSON.stringify(deployProxyResult)
+                  <pre>
+                    <code>{JSON.stringify(deployProxyResult, null, 2)}</code>
+                  </pre>
                 )}
-              </div>
+              </ReactJsonWrap>
             )}
           </div>
         </div>
@@ -402,13 +423,9 @@ export function EthereumAutomateProtocol(props) {
               </select>
             </div>
             <div className="column column-10">
-              <button
-                className="button"
-                onClick={onAction}
-                disabled={actionReload}
-              >
+              <Button onClick={onAction} loading={actionReload}>
                 Call
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -419,7 +436,11 @@ export function EthereumAutomateProtocol(props) {
           <AdapterModalSteps steps={actionSteps} onAction={setActionResult} />
         </div>
       )}
-      {actionResult !== null && <div>{JSON.stringify(actionResult)}</div>}
+      {actionResult !== null && (
+        <pre>
+          <code>{JSON.stringify(actionResult, null, 2)}</code>
+        </pre>
+      )}
     </div>
   );
 }

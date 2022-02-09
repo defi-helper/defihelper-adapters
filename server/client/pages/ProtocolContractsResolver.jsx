@@ -1,12 +1,15 @@
 import React from "react";
+import ReactJson from "react-json-view";
+
 import * as adaptersGateway from "../common/adapter";
 import { useProvider } from "../common/ether";
 import { createWavesProvider } from "../common/waves";
-import ReactJson from "react-json-view";
+import { blockchainEnum } from "../common/constants";
+import { Button } from "../components/Button";
 
 export function ProtocolContractsResolver(props) {
   const [ethProvider, ethSigner] = useProvider();
-  const [blockchain, setBlockchain] = React.useState("ethereum");
+  const [blockchain, setBlockchain] = React.useState(blockchainEnum.ethereum);
   const [protocol, setProtocol] = React.useState(null);
   const [contractReload, setContractReload] = React.useState(false);
   const [currentOutput, setCurrentOutput] = React.useState("[null]");
@@ -15,10 +18,14 @@ export function ProtocolContractsResolver(props) {
   );
   const [currentResolver, setCurrentResolver] = React.useState("default");
 
-  React.useEffect(async () => {
-    const protocol = await adaptersGateway.load(props.protocol);
-    setProtocol(protocol);
-    setContractsResolversList(protocol.automates.contractsResolver || []);
+  React.useEffect(() => {
+    const handler = async () => {
+      const protocol = await adaptersGateway.load(props.protocol);
+      setProtocol(protocol);
+      setContractsResolversList(protocol.automates.contractsResolver || []);
+    };
+
+    handler().catch(console.error);
   }, []);
 
   const onContractReload = async () => {
@@ -27,9 +34,11 @@ export function ProtocolContractsResolver(props) {
     setContractReload(true);
     try {
       const bc =
-        blockchain === "ethereum" ? ethProvider : await createWavesProvider();
+        blockchain === blockchainEnum.ethereum
+          ? ethProvider
+          : await createWavesProvider();
       const params =
-        blockchain === "ethereum"
+        blockchain === blockchainEnum.ethereum
           ? {
               blockNumber: "latest",
               signer: ethSigner,
@@ -60,7 +69,7 @@ export function ProtocolContractsResolver(props) {
             value={blockchain}
             onChange={(e) => setBlockchain(e.target.value)}
           >
-            {["ethereum", "waves"].map((bc) => (
+            {Object.values(blockchainEnum).map((bc) => (
               <option key={bc} value={bc}>
                 {bc}
               </option>
@@ -81,18 +90,14 @@ export function ProtocolContractsResolver(props) {
           </select>
         </div>
         <div className="column">
-          <button
-            className="button"
-            onClick={onContractReload}
-            disabled={contractReload}
-          >
-            {contractReload ? "Loading" : "Reload"}
-          </button>
+          <Button onClick={onContractReload} loading={contractReload}>
+            Reload
+          </Button>
         </div>
       </div>
 
       <div>
-        <div>
+        <div style={{ overflowX: "auto", maxWidth: "100%" }}>
           <ReactJson src={JSON.parse(currentOutput)} collapsed={1} />
         </div>
       </div>

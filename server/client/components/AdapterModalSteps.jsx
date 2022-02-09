@@ -2,6 +2,9 @@ import React from "react";
 import { Remarkable } from "remarkable";
 import RemarkableReactRenderer from "remarkable-react";
 
+const md = new Remarkable();
+md.renderer = new RemarkableReactRenderer();
+
 /**
  * @param {{
  * 	steps: Array<{
@@ -20,8 +23,6 @@ export function AdapterModalSteps({ steps, onAction }) {
   const [currentIndex, setCurrentIndex] = React.useState(0);
   const [info, setInfo] = React.useState(null);
   const [inputs, setInputs] = React.useState([]);
-  const md = new Remarkable();
-  md.renderer = new RemarkableReactRenderer();
 
   const onInputChange = (inputIndex, newValue) => {
     setInputs(
@@ -48,17 +49,21 @@ export function AdapterModalSteps({ steps, onAction }) {
     onAction(send);
   };
 
-  React.useEffect(async () => {
-    const step = steps[currentIndex];
-    if (!step) return;
+  React.useEffect(() => {
+    const handler = async () => {
+      const step = steps[currentIndex];
+      if (!step) return;
 
-    const stepInfo = await step.info();
-    setInputs(
-      Array.from(new Array((stepInfo.inputs ?? []).length).values()).map(
-        (_, i) => stepInfo.inputs[i].value ?? ""
-      )
-    );
-    setInfo(stepInfo);
+      const stepInfo = await step.info();
+      setInputs(
+        Array.from(new Array((stepInfo.inputs ?? []).length).values()).map(
+          (_, i) => stepInfo.inputs[i].value ?? ""
+        )
+      );
+      setInfo(stepInfo);
+    };
+
+    handler().catch(console.error);
   }, [currentIndex]);
 
   return (

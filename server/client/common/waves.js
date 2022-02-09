@@ -23,17 +23,28 @@ export function useProvider() {
 
   const onReloadProvider = () => window.WavesKeeper.initialPromise.then(setProvider);
 
-  const onReloadSigner = () => {
-    provider.publicState().then(async ({ network: { server } }) => {
-      const signer = new Signer({ NODE_URL: server });
-      signer.setProvider(new ProviderKeeper());
-      signer.on('login', () => setSigner(signer));
-    });
+  const onReloadSigner = async () => {
+    const {
+      network: { server },
+    } = await provider.publicState();
+
+    const signer = new Signer({ NODE_URL: server });
+    signer.setProvider(new ProviderKeeper());
+    const handleSetSigner = () => setSigner(signer);
+    signer.on('login', handleSetSigner);
+
+    return () => {
+      signer.off('login', handleSetSigner);
+    };
   };
 
   useEffect(() => {
     if (!provider) return;
-    onReloadSigner();
+    const unsub = onReloadSigner();
+
+    return () => {
+      unsub();
+    };
   }, [provider]);
 
   useEffect(() => {
