@@ -1,12 +1,14 @@
 import React from "react";
+import ReactJson from "react-json-view";
+
 import * as automatesGateway from "../common/automate";
 import * as adaptersGateway from "../common/adapter";
-import ReactJson from "react-json-view";
 import { useProvider } from "../common/waves";
 import { AdapterModalSteps } from "../components";
+import { Button } from "../components/Button";
 
 function AutomateArtifactSelector({ automates, onReload }) {
-  const [current, setCurrent] = React.useState(automates[0]);
+  const [current = null, setCurrent] = React.useState(automates[0]);
   const [reload, setReload] = React.useState(false);
 
   const onReloadHandler = async () => {
@@ -42,13 +44,9 @@ function AutomateArtifactSelector({ automates, onReload }) {
           </select>
         </div>
         <div className="column column-10">
-          <button
-            className="button"
-            onClick={onReloadHandler}
-            disabled={reload}
-          >
-            {reload ? "Loading" : "Reload"}
-          </button>
+          <Button onClick={onReloadHandler} loading={reload}>
+            Reload
+          </Button>
         </div>
       </div>
     </div>
@@ -173,7 +171,7 @@ export function WavesAutomateProtocol(props) {
       {automate.artifact === null || (
         <div>
           <h3>Automate</h3>
-          <div>
+          <div style={{ overflowX: "auto", maxWidth: "100%" }}>
             <ReactJson
               src={JSON.parse(JSON.stringify(automate.artifact))}
               collapsed={1}
@@ -182,7 +180,11 @@ export function WavesAutomateProtocol(props) {
           {!deploySteps.length || (
             <AutomateSteps steps={deploySteps} onAction={onAutomateDeploy} />
           )}
-          {!deployResult || <div>{JSON.stringify(deployResult)}</div>}
+          {!deployResult || (
+            <pre>
+              <code>{JSON.stringify(deployResult, null, 2)}</code>
+            </pre>
+          )}
         </div>
       )}
       {!adapters || (
@@ -212,13 +214,9 @@ export function WavesAutomateProtocol(props) {
               </select>
             </div>
             <div className="column column-10">
-              <button
-                className="button"
-                onClick={onAction}
-                disabled={actionReload}
-              >
+              <Button onClick={onAction} loading={actionReload}>
                 Call
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -230,7 +228,11 @@ export function WavesAutomateProtocol(props) {
           <AdapterModalSteps steps={actionSteps} onAction={setActionResult} />
         </div>
       )}
-      {actionResult !== null && <div>{JSON.stringify(actionResult)}</div>}
+      {actionResult !== null && (
+        <pre>
+          <code>{JSON.stringify(actionResult, null, 2)}</code>
+        </pre>
+      )}
     </div>
   );
 }

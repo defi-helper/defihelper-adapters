@@ -17,7 +17,8 @@
     "server": "node ./server/index.js",
     "client:build": "parcel build ./server/client/index.js -d public/dist --no-cache",
     "client:watch": "parcel watch ./server/client/index.js -d public/dist",
-    "dev": "npm-run-all --parallel adapters:watch client:watch server"
+    "dev": "npm-run-all --parallel adapters:watch client:watch server",
+    "serve": "parcel watch ./server/client/index.js -d public/dist"
   },
   "author": "DeFi Helper",
   "license": "",
@@ -32,7 +33,7 @@
     "@rollup/plugin-node-resolve": "^13.0.4",
     "@rollup/plugin-replace": "^3.0.1",
     "@waves.exchange/provider-web": "^1.1.1",
-    "@waves/signer": "^1.0.3",
+    "@waves/signer": "^1.0.7",
     "dotenv": "^8.6.0",
     "express": "^4.17.1",
     "hardhat": "^2.5.0",
@@ -51,13 +52,12 @@
   },
   "dependencies": {
     "@chainlink/contracts": "^0.2.2",
-    "@defihelper/provider-keeper": "0.0.3",
     "@defihelper/ethers-multicall": "^0.3.2",
     "@defihelper/networks": "^1.0.1",
+    "@defihelper/provider-keeper": "^0.0.3",
     "@openzeppelin/contracts": "^4.2.0",
     "@waves/provider-seed": "^0.2.0",
     "@waves/ride-js": "^2.1.4",
-    "@waves/signer": "^1.0.7",
     "@waves/ts-lib-crypto": "^1.4.3",
     "@waves/waves-transactions": "^4.2.5-beta.1",
     "axios": "^0.21.1",
@@ -71,6 +71,7 @@
     "react-dom": "^17.0.2",
     "react-json-view": "^1.21.3",
     "react-router-dom": "^5.2.0",
+    "react-use": "^17.3.2",
     "rollup": "^2.55.1",
     "tiny-glob": "^0.2.9"
   },

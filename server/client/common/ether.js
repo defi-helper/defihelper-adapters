@@ -5,6 +5,10 @@ if (window.ethereum === undefined) {
   throw new Error('MetaMask not found');
 }
 
+/**
+ *
+ * @returns {[ethers.providers.Web3Provider, ethers.providers.JsonRpcSigner]}
+ */
 export function useProvider() {
   ethereum.request({ method: 'eth_requestAccounts' });
 

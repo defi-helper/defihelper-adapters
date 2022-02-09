@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
+
 import * as adaptersGateway from "../common/adapter";
 import * as automatesGateway from "../common/automate";
 
@@ -47,10 +48,14 @@ export function Main() {
   const [ethereumAutomates, setEthereumAutomates] = React.useState(null);
   const [wavesAutomates, setWavesAutomates] = React.useState(null);
 
-  React.useEffect(async () => {
-    adaptersGateway.list().then(setAdapters);
-    automatesGateway.ethereumList().then(setEthereumAutomates);
-    automatesGateway.wavesList().then(setWavesAutomates);
+  React.useEffect(() => {
+    const handler = async () => {
+      adaptersGateway.list().then(setAdapters);
+      automatesGateway.ethereumList().then(setEthereumAutomates);
+      automatesGateway.wavesList().then(setWavesAutomates);
+    };
+
+    handler().catch(console.error);
   }, []);
 
   return (

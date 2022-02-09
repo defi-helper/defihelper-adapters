@@ -1,17 +1,22 @@
 import React from "react";
+import ReactJson from "react-json-view";
+
+import { ReactJsonWrap } from "../components/ReactJsonWrap";
 import * as adaptersGateway from "../common/adapter";
 import { useProvider as useEthProvider } from "../common/ether";
 import { useProvider as useWavesProvider } from "../common/waves";
 import { AdapterModalSteps } from "../components";
-import ReactJson from "react-json-view";
-
-const searchParams = new URLSearchParams(new URL(window.location).searchParams);
+import { useQueryParams } from "../common/useQueryParams";
+import { blockchainEnum } from "../common/constants";
+import { Button } from "../components/Button";
 
 export function AdapterProtocol(props) {
+  const searchParams = useQueryParams();
+
   const [ethProvider, ethSigner] = useEthProvider();
   const [wavesProvider, wavesSigner] = useWavesProvider();
   const [blockchain, setBlockchain] = React.useState(
-    searchParams.get("blockchain") ?? "ethereum"
+    searchParams.get("blockchain") ?? blockchainEnum.ethereum
   );
   const [protocol, setProtocol] = React.useState(null);
   const [currentAdapter, setCurrentAdapter] = React.useState(
@@ -31,12 +36,16 @@ export function AdapterProtocol(props) {
   const [actionResult, setActionResult] = React.useState(null);
   const [actionSteps, setActionSteps] = React.useState([]);
 
-  React.useEffect(async () => {
-    const protocol = await adaptersGateway.load(props.protocol);
-    if (currentAdapter === "") {
-      setCurrentAdapter(Object.keys(protocol)[0]);
-    }
-    setProtocol(protocol);
+  React.useEffect(() => {
+    const handler = async () => {
+      const protocol = await adaptersGateway.load(props.protocol);
+      if (currentAdapter === "") {
+        setCurrentAdapter(Object.keys(protocol)[0]);
+      }
+      setProtocol(protocol);
+    };
+
+    handler().catch(console.error);
   }, []);
 
   const onContractReload = async () => {
@@ -47,13 +56,13 @@ export function AdapterProtocol(props) {
     try {
       let metrics = {};
       switch (blockchain) {
-        case "ethereum":
+        case blockchainEnum.ethereum:
           metrics = await protocol[currentAdapter](ethProvider, contract, {
             blockNumber: "latest",
             signer: ethSigner,
           });
           break;
-        case "waves":
+        case blockchainEnum.waves:
           metrics = await protocol[currentAdapter](wavesProvider, contract, {
             node: await wavesProvider
               .publicState()
@@ -119,7 +128,7 @@ export function AdapterProtocol(props) {
             value={blockchain}
             onChange={(e) => setBlockchain(e.target.value)}
           >
-            {["ethereum", "waves"].map((bc) => (
+            {Object.values(blockchainEnum).map((bc) => (
               <option key={bc} value={bc}>
                 {bc}
               </option>
@@ -149,23 +158,19 @@ export function AdapterProtocol(props) {
           />
         </div>
         <div className="column">
-          <button
-            className="button"
-            onClick={onContractReload}
-            disabled={contractReload}
-          >
-            {contractReload ? "Loading" : "Reload"}
-          </button>
+          <Button onClick={onContractReload} loading={contractReload}>
+            Reload
+          </Button>
         </div>
       </div>
       {!contractMetrics || (
         <div>
-          <div>
+          <ReactJsonWrap>
             <ReactJson
               src={JSON.parse(JSON.stringify(contractMetrics))}
               collapsed={1}
             />
-          </div>
+          </ReactJsonWrap>
           <div className="row">
             <div className="column">
               <label>Wallet:</label>
@@ -177,23 +182,19 @@ export function AdapterProtocol(props) {
               />
             </div>
             <div className="column">
-              <button
-                className="button"
-                onClick={onWalletReload}
-                disabled={walletReload}
-              >
-                {walletReload ? "Loading" : "Reload"}
-              </button>
+              <Button onClick={onWalletReload} loading={walletReload}>
+                Reload
+              </Button>
             </div>
           </div>
           {!walletMetrics || (
             <div>
-              <div>
+              <ReactJsonWrap>
                 <ReactJson
                   src={JSON.parse(JSON.stringify(walletMetrics))}
                   collapsed={1}
                 />
-              </div>
+              </ReactJsonWrap>
             </div>
           )}
           {!actions || (
@@ -214,13 +215,9 @@ export function AdapterProtocol(props) {
                   </select>
                 </div>
                 <div className="column column-10">
-                  <button
-                    className="button"
-                    onClick={onAction}
-                    disabled={actionReload}
-                  >
+                  <Button onClick={onAction} loading={actionReload}>
                     Call
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -234,7 +231,11 @@ export function AdapterProtocol(props) {
               />
             </div>
           )}
-          {actionResult !== null && <div>{JSON.stringify(actionResult)}</div>}
+          {actionResult !== null && (
+            <pre>
+              <code>{JSON.stringify(actionResult, null, 2)}</code>
+            </pre>
+          )}
         </div>
       )}
     </div>
