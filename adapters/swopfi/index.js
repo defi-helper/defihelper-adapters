@@ -1,4 +1,4 @@
-const { axios, bn, wavesTransaction } = require('../lib');
+const { axios, bn, wavesSigner, wavesSeedProvider, wavesTransaction } = require('../lib');
 const { waves } = require('../utils/waves');
 const { toFloat } = require('../utils/toFloat');
 const { tokens } = require('../utils/tokens');
@@ -60,6 +60,10 @@ const getGovStaked = (walletAddress) => {
   return axios
     .get(`https://backend.swop.fi/governance/${walletAddress}`)
     .then(({ data: { data } }) => new bn(data.find(({ key }) => key === `${walletAddress}_SWOP_amount`)?.value || 0));
+};
+
+const getWavesBalance = (node, walletAddress) => {
+  return axios.get(`${node}/addresses/balance/${walletAddress}`).then(({ data: { balance } }) => new bn(balance));
 };
 
 /*
@@ -187,7 +191,7 @@ module.exports = {
                 const tx = await signer
                   .invoke({
                     dApp: stakingContract,
-                    fee: 5000000,
+                    fee: 5e6,
                     payment: [
                       {
                         assetId: stakingToken.id,
@@ -240,7 +244,7 @@ module.exports = {
                 const tx = await signer
                   .invoke({
                     dApp: stakingContract,
-                    fee: 5000000,
+                    fee: 5e6,
                     payment: [],
                     call: {
                       function: 'withdrawSWOP',
@@ -267,7 +271,7 @@ module.exports = {
                 const tx = await signer
                   .invoke({
                     dApp: stakingContract,
-                    fee: 5000000,
+                    fee: 5e6,
                     payment: [],
                     call: {
                       function: 'claimAndStakeSWOP',
@@ -302,7 +306,7 @@ module.exports = {
                 const tx = await signer
                   .invoke({
                     dApp: stakingContract,
-                    fee: 5000000,
+                    fee: 5e6,
                     payment: [],
                     call: {
                       function: 'withdrawSWOP',
@@ -529,7 +533,7 @@ module.exports = {
                 const tx = await signer
                   .invoke({
                     dApp: farmingContract,
-                    fee: 5000000,
+                    fee: 5e6,
                     payment: [
                       {
                         assetId: stakingToken.id,
@@ -582,7 +586,7 @@ module.exports = {
                 const tx = await signer
                   .invoke({
                     dApp: farmingContract,
-                    fee: 5000000,
+                    fee: 5e6,
                     payment: [],
                     call: {
                       function: 'withdrawShareTokens',
@@ -612,7 +616,7 @@ module.exports = {
                 const tx = await signer
                   .invoke({
                     dApp: farmingContract,
-                    fee: 5000000,
+                    fee: 5e6,
                     payment: [],
                     call: {
                       function: 'claim',
@@ -647,7 +651,7 @@ module.exports = {
                 const tx = await signer
                   .invoke({
                     dApp: farmingContract,
-                    fee: 5000000,
+                    fee: 5e6,
                     payment: [],
                     call: {
                       function: 'withdrawShareTokens',
@@ -686,6 +690,11 @@ module.exports = {
                 description: `Transfer 0.04 Waves tokens to contract wallet ${deployAddress}`,
               }),
               async () => {
+                const wavesBalance = await getWavesBalance(node, signer.currentProvider.user.address);
+                if (wavesBalance.lt(4e6)) {
+                  return Error('Exceeds balance');
+                }
+
                 return true;
               },
               async () => {

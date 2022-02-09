@@ -288,55 +288,40 @@ module.exports = {
   automates: {
     contractsResolver: {
       default: async (provider, options = {}) => {
-        const blockTag = 'latest';
         const network = (await provider.detectNetwork()).chainId;
-        const block = await provider.getBlock(blockTag);
-        const priceFeed = bridgeWrapperBuild(bridgeTokens, blockTag, block, network);
 
         const masterChiefContract = new ethers.Contract(masterChefAddress, masterChefABI, provider);
 
         const totalPools = await masterChiefContract.poolLength();
-        const pools = (
-          await Promise.all(
-            (
-              await Promise.all(new Array(totalPools.toNumber()).fill(1).map((_, i) => masterChiefContract.poolInfo(i)))
-            ).map(async (p, i) => {
-              let stakingTokenPair;
-              try {
-                stakingTokenPair = await ethereum.uniswap.pairInfo(provider, p.lpToken);
+        const pools = await Promise.all(
+          (
+            await Promise.all(new Array(totalPools.toNumber()).fill(1).map((_, i) => masterChiefContract.poolInfo(i)))
+          ).map(async (p, i) => {
+            const stakingTokenPair = await ethereum.uniswap.pairInfo(provider, p.lpToken);
 
-                await Promise.all([
-                  priceFeed(stakingTokenPair.token0),
-                  priceFeed(stakingTokenPair.token1),
-                ]);
-              } catch {
-                return null;
-              }
+            const [token0, token1] = await Promise.all([
+              ethereum.erc20Info(provider, stakingTokenPair.token0),
+              ethereum.erc20Info(provider, stakingTokenPair.token1),
+            ]);
 
-              const [token0, token1] = await Promise.all([
-                ethereum.erc20Info(provider, stakingTokenPair.token0),
-                ethereum.erc20Info(provider, stakingTokenPair.token1),
-              ]);
-
-              return {
-                poolIndex: i,
-                stakingToken: p.lpToken,
-                name: `${token0.symbol}-${token1.symbol}`,
-                address: p.lpToken,
-                blockchain: 'ethereum',
-                network: network.toString(),
-                layout: 'staking',
-                adapter: 'masterChef',
-                description: '',
-                automate: {
-                  autorestakeAdapter: 'MasterChefFinnLpRestake',
-                  adapters: ['masterChef'],
-                },
-                link: '',
-              };
-            })
-          )
-        ).filter((v) => v);
+            return {
+              poolIndex: i,
+              stakingToken: p.lpToken,
+              name: `${token0.symbol}-${token1.symbol}`,
+              address: p.lpToken,
+              blockchain: 'ethereum',
+              network: network.toString(),
+              layout: 'staking',
+              adapter: 'masterChef',
+              description: '',
+              automate: {
+                autorestakeAdapter: 'MasterChefFinnLpRestake',
+                adapters: ['masterChef'],
+              },
+              link: '',
+            };
+          })
+        );
         if (options.cacheAuth) {
           cache.write(
             options.cacheAuth,

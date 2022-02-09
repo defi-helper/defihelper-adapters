@@ -52,9 +52,9 @@
   },
   "dependencies": {
     "@chainlink/contracts": "^0.2.2",
+    "@defihelper/provider-keeper": "0.1.4-dfh",
     "@defihelper/ethers-multicall": "^0.3.2",
     "@defihelper/networks": "^1.0.1",
-    "@defihelper/provider-keeper": "^0.0.3",
     "@openzeppelin/contracts": "^4.2.0",
     "@waves/provider-seed": "^0.2.0",
     "@waves/ride-js": "^2.1.4",
