@@ -2,14 +2,22 @@ const { ethers } = require('../../../lib');
 const ProxyFactoryABI = require('../../abi/dfh/proxyFactory.json');
 
 /**
- * @typedef {{}} Input
- */
-/**
  * @typedef {{
  *  type: 'text';
  * 	placeholder: string;
  * 	value: string;
- * } & Input} TextInput
+ * }} TextInput
+ */
+/**
+ * @typedef {{
+ *  type: 'radio';
+ * 	placeholder?: string;
+ *  value: string;
+ * 	options: Array<{
+ *    value: string;
+ *    label: string;
+ *  }>;
+ * }} RadioInput
  */
 /**
  * @typedef {{
@@ -20,7 +28,10 @@ const ProxyFactoryABI = require('../../abi/dfh/proxyFactory.json');
  *    value: string;
  *    label: string;
  *  }>;
- * } & Input} SelectInput
+ * }} SelectInput
+ */
+/**
+ * @typedef {TextInput | RadioInput | SelectInput} Input
  */
 
 /**
@@ -31,6 +42,19 @@ const ProxyFactoryABI = require('../../abi/dfh/proxyFactory.json');
  * @returns {TextInput}
  */
 const input = ({ placeholder = '', value = '' }) => ({ type: 'text', placeholder, value });
+
+/**
+ * @param {{
+ * 	placeholder?: string;
+ * 	value?: string;
+ *  options?: Array<{
+ *    value: string;
+ *    label: string;
+ *  }>;
+ * }} args
+ * @returns {RadioInput}
+ */
+const radio = ({ placeholder = '', value = '', options = [] }) => ({ type: 'radio', placeholder, value, options });
 
 /**
  * @param {{
@@ -91,5 +115,6 @@ module.exports = {
   ethereum,
   input,
   select,
+  radio,
   tab,
 };

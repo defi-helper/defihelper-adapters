@@ -19,6 +19,28 @@ function TextInput({ input: { placeholder }, value, onChange }) {
   );
 }
 
+function RadioInput({ input: { placeholder, options }, value, onChange }) {
+  return (
+    <div>
+      {placeholder !== "" && <label>{placeholder}:</label>}
+      <div style={{ display: "flex" }}>
+        {options.map((option) => (
+          <div key={option.label} style={{ padding: "0 10px" }}>
+            <input
+              name="modal-radio"
+              type="radio"
+              value={option.value}
+              onChange={(e) => onChange(e.target.value)}
+              checked={value === option.value}
+            />
+            <label>{option.label}</label>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function SelectInput({ input: { placeholder, options }, value, onChange }) {
   return (
     <div>
@@ -47,6 +69,7 @@ function SelectInput({ input: { placeholder, options }, value, onChange }) {
  * 			inputs: Array<
  *        {type: 'text', placeholder: string, value: string}
  *        | {type: 'select', placeholder: string, value: string, options: Array<{value: string, label: string}>}
+ *        | {type: 'radio', placeholder: string, value: string, options: Array<{value: string, label: string}>}
  *      >;
  * 		}>;
  * 		can: (...args: any[]) => Promise<boolean | Error>;
@@ -126,6 +149,7 @@ export function AdapterModalSteps({ steps, onAction }) {
             {(info.inputs ?? []).map((input, i) => {
               const Component = {
                 text: TextInput,
+                radio: RadioInput,
                 select: SelectInput,
               }[input.type];
 
