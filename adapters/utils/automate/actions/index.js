@@ -2,19 +2,48 @@ const { ethers } = require('../../../lib');
 const ProxyFactoryABI = require('../../abi/dfh/proxyFactory.json');
 
 /**
+ * @typedef {{}} Input
+ */
+/**
  * @typedef {{
+ *  type: 'text';
  * 	placeholder: string;
  * 	value: string;
- * }} Input
+ * } & Input} TextInput
  */
+/**
+ * @typedef {{
+ *  type: 'select';
+ * 	placeholder?: string;
+ *  value: string;
+ * 	options: Array<{
+ *    value: string;
+ *    label: string;
+ *  }>;
+ * } & Input} SelectInput
+ */
+
 /**
  * @param {{
  * 	placeholder?: string;
  * 	value?: string;
  * }} args
- * @returns {Input}
+ * @returns {TextInput}
  */
-const input = ({ placeholder = '', value = '' }) => ({ placeholder, value });
+const input = ({ placeholder = '', value = '' }) => ({ type: 'text', placeholder, value });
+
+/**
+ * @param {{
+ * 	placeholder?: string;
+ * 	value?: string;
+ *  options?: Array<{
+ *    value: string;
+ *    label: string;
+ *  }>;
+ * }} args
+ * @returns {SelectInput}
+ */
+const select = ({ placeholder = '', value = '', options = [] }) => ({ type: 'select', placeholder, value, options });
 
 /**
  * @typedef {{
@@ -61,5 +90,6 @@ const ethereum = {
 module.exports = {
   ethereum,
   input,
+  select,
   tab,
 };

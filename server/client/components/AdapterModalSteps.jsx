@@ -5,13 +5,49 @@ import RemarkableReactRenderer from "remarkable-react";
 const md = new Remarkable();
 md.renderer = new RemarkableReactRenderer();
 
+function TextInput({ input: { placeholder }, value, onChange }) {
+  return (
+    <div>
+      {placeholder !== "" && <label>{placeholder}:</label>}
+      <input
+        type="text"
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
+  );
+}
+
+function SelectInput({ input: { placeholder, options }, value, onChange }) {
+  return (
+    <div>
+      {placeholder !== "" && <label>{placeholder}:</label>}
+      <select
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        {options.map(({ value, label }) => (
+          <option key={label} value={value}>
+            {label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 /**
  * @param {{
  * 	steps: Array<{
  * 		name: string;
  * 		info: () => Promise<{
  * 			description: string;
- * 			inputs: Array<{placeholder: string, value: string}>;
+ * 			inputs: Array<
+ *        {type: 'text', placeholder: string, value: string}
+ *        | {type: 'select', placeholder: string, value: string, options: Array<{value: string, label: string}>}
+ *      >;
  * 		}>;
  * 		can: (...args: any[]) => Promise<boolean | Error>;
  * 		send: (...args: any[]) => Promise<{tx: any, ...args: any[]}>;
@@ -87,17 +123,21 @@ export function AdapterModalSteps({ steps, onAction }) {
         <div>
           {md.render(info.description)}
           <div>
-            {(info.inputs ?? []).map(({ placeholder }, i) => (
-              <div key={i}>
-                {placeholder !== "" && <label>{placeholder}:</label>}
-                <input
-                  type="text"
-                  placeholder={placeholder}
-                  value={inputs[i] ?? ""}
-                  onChange={(e) => onInputChange(i, e.target.value)}
+            {(info.inputs ?? []).map((input, i) => {
+              const Component = {
+                text: TextInput,
+                select: SelectInput,
+              }[input.type];
+
+              return (
+                <Component
+                  key={i}
+                  input={input}
+                  value={inputs[i]}
+                  onChange={onInputChange.bind(null, i)}
                 />
-              </div>
-            ))}
+              );
+            })}
           </div>
           <div>
             <button onClick={onCanClick}>Can</button>
