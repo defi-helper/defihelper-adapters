@@ -701,6 +701,16 @@ module.exports = {
               token0Symbol = pairSymbols[0];
               token1Symbol = pairSymbols[1];
             }
+            const automate = {
+                autorestakeAdapter: isPair ? 'MasterChefLpRestake' : 'MasterChefSingleRestake',
+                adapters: isPair ? ['masterChefPair'] : ['masterChefSingle'],
+            };
+            if (isPair) {
+              automate.buyLiquidity = {
+                router: '0x10ED43C718714eb63d5aA57B78B54704E256024E',
+                pair: info.lpToken,
+              };
+            }
 
             return {
               poolIndex: index,
@@ -712,10 +722,7 @@ module.exports = {
               layout: 'staking',
               adapter: isPair ? 'masterChefPair' : 'masterChefSingle',
               description: '',
-              automate: {
-                autorestakeAdapter: isPair ? 'MasterChefLpRestake' : 'MasterChefSingleRestake',
-                adapters: isPair ? ['masterChefPair'] : ['masterChefSingle'],
-              },
+              automate,
               link: 'https://pancakeswap.finance/farms',
             };
           })

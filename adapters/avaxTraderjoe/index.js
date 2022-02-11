@@ -571,6 +571,16 @@ module.exports = {
             else if (info.lpToken.toLowerCase() !== '0x57319d41f71e81f3c65f2a47ca4e001ebafd4f33') {
               autorestakeAdapter = 'MasterChefV2SingleRestake';
             }
+            const automate = {
+              autorestakeAdapter,
+              adapters: isPair ? ['masterChefV2Pair'] : ['masterChefV2Single'],
+            };
+            if (isPair) {
+              automate.buyLiquidity = {
+                router: '0x60aE616a2155Ee3d9A68541Ba4544862310933d4',
+                pair: info.lpToken,
+              };
+            }
 
             return {
               poolIndex: index,
@@ -582,10 +592,7 @@ module.exports = {
               layout: 'staking',
               adapter: isPair ? 'masterChefV2Pair' : 'masterChefV2Single',
               description: '',
-              automate: {
-                autorestakeAdapter,
-                adapters: isPair ? ['masterChefV2Pair'] : ['masterChefV2Single'],
-              },
+              automate,
               link: `https://traderjoexyz.com/farm/${info.lpToken}-${masterChefV2Address}`,
             };
           })
@@ -609,6 +616,16 @@ module.exports = {
               token0Symbol = pairSymbols[0];
               token1Symbol = pairSymbols[1];
             }
+            const automate = {
+              autorestakeAdapter: isPair ? 'MasterChefV3LpRestake' : 'MasterChefV3SingleRestake',
+              adapters: isPair ? ['masterChefV3Pair'] : ['masterChefV3Single'],
+            };
+            if (isPair) {
+              automate.buyLiquidity = {
+                router: '0x60aE616a2155Ee3d9A68541Ba4544862310933d4',
+                pair: info.lpToken,
+              };
+            }
 
             return {
               poolIndex: index,
@@ -620,10 +637,7 @@ module.exports = {
               layout: 'staking',
               adapter: isPair ? 'masterChefV3Pair' : 'masterChefV3Single',
               description: '',
-              automate: {
-                autorestakeAdapter: isPair ? 'MasterChefV3LpRestake' : 'MasterChefV3SingleRestake',
-                adapters: isPair ? ['masterChefV3Pair'] : ['masterChefV3Single'],
-              },
+              automate,
               link: `https://traderjoexyz.com/farm/${info.lpToken}-${masterChefV3Address}`,
             };
           })

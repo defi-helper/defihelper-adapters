@@ -712,6 +712,16 @@ module.exports = {
               token0Symbol = pairSymbols[0];
               token1Symbol = pairSymbols[1];
             }
+            const automate = {
+              autorestakeAdapter: isPair ? 'MasterChefLpRestake' : 'MasterChefSingleRestake',
+              adapters: isPair ? ['masterChefPair'] : ['masterChefSingle'],
+            };
+            if (isPair) {
+              automate.buyLiquidity = {
+                router: '0xcF0feBd3f17CEf5b47b0cD257aCf6025c5BFf3b7',
+                pair: info.lpToken,
+              };
+            }
 
             return {
               poolIndex: index,
@@ -723,10 +733,7 @@ module.exports = {
               layout: 'staking',
               adapter: isPair ? 'masterChefPair' : 'masterChefSingle',
               description: '',
-              automate: {
-                autorestakeAdapter: isPair ? 'MasterChefLpRestake' : 'MasterChefSingleRestake',
-                adapters: isPair ? ['masterChefPair'] : ['masterChefSingle'],
-              },
+              automate,
               link: 'https://apeswap.finance/farms',
             };
           })
