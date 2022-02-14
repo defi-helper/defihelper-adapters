@@ -12,8 +12,126 @@ const bridgeTokens = require('./abi/bridgeTokens.json');
 const masterChefAddress = '0x1f4b7660b6AdC3943b5038e3426B33c1c0e343E6';
 const routeTokens = ['0x98878B06940aE243284CA214f92Bb71a2b032B8A'];
 
+async function masterChefActionsFactory(rewardTokenContract, stakingTokenContract, stakingContract, pool) {
+  const rewardTokenSymbol = await rewardTokenContract.symbol();
+  const stakingTokenSymbol = await stakingTokenContract.symbol();
+  const stakingTokenDecimals = await stakingTokenContract.decimals().then((v) => v.toString());
+
+  return async (walletAddress) => ({
+    stake: [
+      AutomateActions.tab(
+        'Stake',
+        async () => ({
+          description: `Stake your [${stakingTokenSymbol}](https://moonriver.moonscan.io/address/${stakingTokenContract.address}) tokens to contract`,
+          inputs: [
+            AutomateActions.input({
+              placeholder: 'amount',
+              value: new bn(await stakingTokenContract.balanceOf(walletAddress).then((v) => v.toString()))
+                .div(`1e${stakingTokenDecimals}`)
+                .toString(10),
+            }),
+          ],
+        }),
+        async (amount) => {
+          const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
+          if (amountInt.lte(0)) return Error('Invalid amount');
+
+          const balance = await stakingTokenContract.balanceOf(walletAddress).then((v) => v.toString());
+          if (amountInt.gt(balance)) return Error('Insufficient funds on the balance');
+
+          return true;
+        },
+        async (amount) => {
+          const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
+          await ethereum.erc20ApproveAll(stakingTokenContract, walletAddress, masterChefAddress, amountInt.toFixed(0));
+
+          return { tx: await stakingContract.deposit(pool.index, amountInt.toFixed(0)) };
+        }
+      ),
+    ],
+    unstake: [
+      AutomateActions.tab(
+        'Unstake',
+        async () => {
+          const userInfo = await stakingContract.userInfo(pool.index, walletAddress);
+
+          return {
+            description: `Unstake your [${stakingTokenSymbol}](https://moonriver.moonscan.io/address/${stakingTokenContract.address}) tokens from contract`,
+            inputs: [
+              AutomateActions.input({
+                placeholder: 'amount',
+                value: new bn(userInfo.amount.toString()).div(`1e${stakingTokenDecimals}`).toString(10),
+              }),
+            ],
+          };
+        },
+        async (amount) => {
+          const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
+          if (amountInt.lte(0)) return Error('Invalid amount');
+
+          const userInfo = await stakingContract.userInfo(pool.index, walletAddress);
+          if (amountInt.isGreaterThan(userInfo.amount.toString())) {
+            return Error('Amount exceeds balance');
+          }
+
+          return true;
+        },
+        async (amount) => {
+          const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
+
+          return { tx: await stakingContract.withdraw(pool.index, amountInt.toFixed(0)) };
+        }
+      ),
+    ],
+    claim: [
+      AutomateActions.tab(
+        'Claim',
+        async () => ({
+          description: `Claim your [${rewardTokenSymbol}](https://moonriver.moonscan.io/address/${rewardTokenContract.address}) reward from contract`,
+        }),
+        async () => {
+          const earned = await stakingContract.pendingCake(pool.index, walletAddress).then((v) => v.toString());
+          if (new bn(earned).isLessThanOrEqualTo(0)) {
+            return Error('No earnings');
+          }
+
+          return true;
+        },
+        async () => {
+          return { tx: await stakingContract.deposit(pool.index, 0) };
+        }
+      ),
+    ],
+    exit: [
+      AutomateActions.tab(
+        'Exit',
+        async () => ({
+          description: 'Get all tokens from contract',
+        }),
+        async () => {
+          const earned = await stakingContract.pendingCake(pool.index, walletAddress).then((v) => v.toString());
+          const userInfo = await stakingContract.userInfo(pool.index, walletAddress);
+          if (new bn(earned).isLessThanOrEqualTo(0) && new bn(userInfo.amount.toString()).isLessThanOrEqualTo(0)) {
+            return Error('No staked');
+          }
+
+          return true;
+        },
+        async () => {
+          const userInfo = await stakingContract.userInfo(pool.index, walletAddress);
+          if (new bn(userInfo.amount.toString()).isGreaterThan(0)) {
+            await stakingContract.withdraw(pool.index, userInfo.amount.toString());
+          }
+
+          return { tx: await stakingContract.deposit(pool.index, 0) };
+        }
+      ),
+    ],
+  });
+}
+
 module.exports = {
-  masterChef: async (provider, contractAddress, initOptions = ethereum.defaultOptions()) => {
+  masterChefPair: async (provider, contractAddress, initOptions = ethereum.defaultOptions()) => {
     const options = {
       ...ethereum.defaultOptions(),
       ...initOptions,
@@ -23,7 +141,6 @@ module.exports = {
     const network = (await provider.detectNetwork()).chainId;
     const block = await provider.getBlock(blockTag);
     const priceFeed = bridgeWrapperBuild(bridgeTokens, blockTag, block, network);
-    const rewardTokenFunctionName = 'finn';
 
     const pool = masterChefSavedPools.find((p) => p.stakingToken.toLowerCase() === contractAddress.toLowerCase());
     if (!pool) {
@@ -31,14 +148,14 @@ module.exports = {
     }
 
     const masterChiefContract = new ethers.Contract(masterChefAddress, masterChefABI, provider);
-    const poolInfo = await masterChiefContract.poolInfo(pool.index);
+    const poolInfo = await masterChiefContract.poolInfo(pool.index, { blockTag });
 
-    const rewardToken = (await masterChiefContract[rewardTokenFunctionName]()).toLowerCase();
+    const rewardToken = '0x9a92b5ebf1f6f6f7d93696fcd44e5cf75035a756';
     const rewardsTokenDecimals = 18;
     const rewardTokenPriceUSD = await priceFeed(rewardToken);
     const [rewardTokenPerSec, totalAllocPoint] = await Promise.all([
-      masterChiefContract[`${rewardTokenFunctionName}PerSecond`](),
-      masterChiefContract.totalAllocPoint(),
+      masterChiefContract.finnPerSecond({ blockTag }),
+      masterChiefContract.totalAllocPoint({ blockTag }),
     ]);
     const rewardPerSec = toFloat(
       new bn(poolInfo.allocPoint.toString())
@@ -49,13 +166,13 @@ module.exports = {
 
     const stakingToken = contractAddress.toLowerCase();
     const stakingTokenDecimals = 18;
-    const stakingTokenPair = await ethereum.uniswap.pairInfo(provider, stakingToken);
+    const stakingTokenPair = await ethereum.uniswap.pairInfo(provider, stakingToken, options);
     const token0PriceUSD = await priceFeed(stakingTokenPair.token0);
     const token1PriceUSD = await priceFeed(stakingTokenPair.token1);
     const stakingTokenPriceUSD = stakingTokenPair.calcPrice(token0PriceUSD, token1PriceUSD);
 
     const totalLocked = toFloat(
-      await ethereum.erc20(provider, contractAddress).balanceOf(masterChefAddress),
+      await ethereum.erc20(provider, contractAddress).balanceOf(masterChefAddress, { blockTag }),
       stakingTokenDecimals
     );
     const tvl = new bn(totalLocked).multipliedBy(stakingTokenPriceUSD);
@@ -85,10 +202,10 @@ module.exports = {
         aprYear: aprYear.toString(10),
       },
       wallet: async (walletAddress) => {
-        const { amount } = await masterChiefContract.userInfo(pool.index, walletAddress);
+        const { amount } = await masterChiefContract.userInfo(pool.index, walletAddress, { blockTag });
         const balance = toFloat(amount, ethereum.uniswap.pairDecimals);
         const earned = toFloat(
-          await masterChiefContract.pendingReward(pool.index, walletAddress).then((v) => v.toString()),
+          await masterChiefContract.pendingReward(pool.index, walletAddress, { blockTag }).then((v) => v.toString()),
           rewardsTokenDecimals
         );
         const expandedBalance = stakingTokenPair.expandBalance(balance);
@@ -149,179 +266,222 @@ module.exports = {
           throw new Error('Signer not found, use options.signer for use actions');
         }
         const { signer } = options;
-        const rewardTokenContract = ethereum.erc20(provider, rewardToken).connect(signer);
-        const rewardTokenSymbol = await rewardTokenContract.symbol();
-        const stakingTokenContract = ethereum.erc20(provider, stakingToken).connect(signer);
-        const stakingTokenSymbol = await stakingTokenContract.symbol();
-        const stakingContract = masterChiefContract.connect(signer);
+
+        return (
+          await masterChefActionsFactory(
+            ethereum.erc20(provider, rewardToken).connect(signer),
+            ethereum.erc20(provider, stakingToken).connect(signer),
+            masterChiefContract.connect(signer),
+            pool
+          )
+        )(walletAddress);
+      },
+    };
+  },
+  masterChefSingle: async (provider, contractAddress, initOptions = ethereum.defaultOptions()) => {
+    const options = {
+      ...ethereum.defaultOptions(),
+      ...initOptions,
+    };
+    const masterChefSavedPools = await cache.read('moonriverHuckleberry', 'masterChefPools');
+    const blockTag = options.blockNumber === 'latest' ? 'latest' : parseInt(options.blockNumber, 10);
+    const network = (await provider.detectNetwork()).chainId;
+    const block = await provider.getBlock(blockTag);
+    const blockNumber = block.number;
+    const priceFeed = bridgeWrapperBuild(bridgeTokens, blockTag, block, network);
+
+    const pool = masterChefSavedPools.find((p) => p.stakingToken.toLowerCase() === contractAddress.toLowerCase());
+    if (!pool) {
+      throw new Error('Pool is not found');
+    }
+
+    const masterChiefContract = new ethers.Contract(masterChefAddress, masterChefABI, provider);
+    const poolInfo = await masterChiefContract.poolInfo(pool.index, { blockTag });
+
+    const rewardToken = '0x9a92b5ebf1f6f6f7d93696fcd44e5cf75035a756';
+    const rewardsTokenDecimals = 18;
+    const rewardTokenPriceUSD = await priceFeed(rewardToken);
+    const [rewardTokenPerSec, totalAllocPoint] = await Promise.all([
+      masterChiefContract.finnPerSecond().then((v) => new bn(v.toString())),
+      masterChiefContract.totalAllocPoint().then((v) => new bn(v.toString())),
+    ]);
+    const rewardPerSec = new bn(poolInfo.allocPoint.toString())
+      .multipliedBy(rewardTokenPerSec)
+      .div(totalAllocPoint)
+      .div(`1e${rewardsTokenDecimals}`);
+
+    const stakingToken = contractAddress.toLowerCase();
+    const stakingTokenDecimals = await ethereum
+      .erc20(provider, stakingToken)
+      .decimals()
+      .then((v) => Number(v.toString()));
+    let stakingTokenPriceUSD = '0';
+    // Tom token price feed
+    if (stakingToken.toLowerCase() === '0x37619cc85325afea778830e184cb60a3abc9210b') {
+      const [tomTotalSupply, finnBalance, finnPriceUSD] = await Promise.all([
+        ethereum
+          .erc20(provider, stakingToken)
+          .totalSupply({ blockTag })
+          .then((v) => new bn(v.toString())),
+        ethereum
+          .erc20(provider, rewardToken)
+          .balanceOf(stakingToken, { blockTag })
+          .then((v) => new bn(v.toString())),
+        priceFeed(rewardToken),
+      ]);
+      stakingTokenPriceUSD = finnBalance.div(tomTotalSupply).multipliedBy(finnPriceUSD).toString(10);
+    } else {
+      stakingTokenPriceUSD = await priceFeed(stakingToken);
+    }
+
+    const totalLocked = await ethereum
+      .erc20(provider, contractAddress)
+      .balanceOf(masterChefAddress)
+      .then((v) => new bn(v.toString()).div(`1e${stakingTokenDecimals}`));
+    const tvl = new bn(totalLocked).multipliedBy(stakingTokenPriceUSD);
+
+    let aprSec = rewardPerSec.multipliedBy(rewardTokenPriceUSD).div(tvl);
+    if (!aprSec.isFinite()) aprSec = new bn(0);
+
+    const aprDay = aprSec.multipliedBy(60 * 60 * 24);
+    const aprWeek = aprDay.multipliedBy(7);
+    const aprMonth = aprDay.multipliedBy(30);
+    const aprYear = aprDay.multipliedBy(365);
+
+    return {
+      staking: {
+        token: stakingToken,
+        decimals: stakingTokenDecimals,
+      },
+      reward: {
+        token: rewardToken,
+        decimals: rewardsTokenDecimals,
+      },
+      metrics: {
+        tvl: tvl.toString(10),
+        aprDay: aprDay.toString(10),
+        aprWeek: aprWeek.toString(10),
+        aprMonth: aprMonth.toString(10),
+        aprYear: aprYear.toString(10),
+      },
+      wallet: async (walletAddress) => {
+        const { amount } = await masterChiefContract.userInfo(pool.index, walletAddress, { blockTag });
+        const balance = new bn(amount.toString()).div(`1e${stakingTokenDecimals}`);
+        const earned = await masterChiefContract
+          .pendingReward(pool.index, walletAddress, { blockTag })
+          .then((v) => new bn(v.toString()).div(`1e${rewardsTokenDecimals}`));
+        const balanceUSD = balance.multipliedBy(stakingTokenPriceUSD);
+        const earnedUSD = earned.multipliedBy(rewardTokenPriceUSD);
 
         return {
-          stake: [
-            AutomateActions.tab(
-              'Stake',
-              async () => ({
-                description: `Stake your [${stakingTokenSymbol}](https://moonriver.moonscan.io/address/${stakingToken}) tokens to contract`,
-                inputs: [
-                  AutomateActions.input({
-                    placeholder: 'amount',
-                    value: new bn(await stakingTokenContract.balanceOf(walletAddress).then((v) => v.toString()))
-                      .div(`1e${stakingTokenDecimals}`)
-                      .toString(10),
-                  }),
-                ],
-              }),
-              async (amount) => {
-                const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
-                if (amountInt.lte(0)) return Error('Invalid amount');
-
-                const balance = await stakingTokenContract.balanceOf(walletAddress).then((v) => v.toString());
-                if (amountInt.gt(balance)) return Error('Insufficient funds on the balance');
-
-                return true;
+          staked: {
+            [stakingToken]: {
+              balance: balance.toString(10),
+              usd: balanceUSD.toString(10),
+            },
+          },
+          earned: {
+            [rewardToken]: {
+              balance: earned.toString(10),
+              usd: earnedUSD.toString(10),
+            },
+          },
+          metrics: {
+            staking: balance.toString(10),
+            stakingUSD: balanceUSD.toString(10),
+            earned: earned.toString(10),
+            earnedUSD: earnedUSD.toString(10),
+          },
+          tokens: tokens(
+            {
+              token: stakingToken,
+              data: {
+                balance: balance.toString(10),
+                usd: balanceUSD.toString(10),
               },
-              async (amount) => {
-                const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
-                await ethereum.erc20ApproveAll(
-                  stakingTokenContract,
-                  walletAddress,
-                  masterChefAddress,
-                  amountInt.toFixed(0)
-                );
-
-                return {
-                  tx: await stakingContract.deposit(pool.index, amountInt.toFixed(0)),
-                };
-              }
-            ),
-          ],
-          unstake: [
-            AutomateActions.tab(
-              'Unstake',
-              async () => {
-                const userInfo = await stakingContract.userInfo(pool.index, walletAddress);
-
-                return {
-                  description: `Unstake your [${stakingTokenSymbol}](https://moonriver.moonscan.io/address/${stakingToken}) tokens from contract`,
-                  inputs: [
-                    AutomateActions.input({
-                      placeholder: 'amount',
-                      value: new bn(userInfo.amount.toString()).div(`1e${stakingTokenDecimals}`).toString(10),
-                    }),
-                  ],
-                };
+            },
+            {
+              token: rewardToken,
+              data: {
+                balance: earned.toString(10),
+                usd: earnedUSD.toString(10),
               },
-              async (amount) => {
-                const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
-                if (amountInt.lte(0)) return Error('Invalid amount');
-
-                const userInfo = await stakingContract.userInfo(pool.index, walletAddress);
-                if (amountInt.isGreaterThan(userInfo.amount.toString())) {
-                  return Error('Amount exceeds balance');
-                }
-
-                return true;
-              },
-              async (amount) => {
-                const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
-
-                return {
-                  tx: await stakingContract.withdraw(pool.index, amountInt.toFixed(0)),
-                };
-              }
-            ),
-          ],
-          claim: [
-            AutomateActions.tab(
-              'Claim',
-              async () => ({
-                description: `Claim your [${rewardTokenSymbol}](https://moonriver.moonscan.io/address/${rewardToken}) reward from contract`,
-              }),
-              async () => {
-                const earned = await stakingContract.pendingReward(pool.index, walletAddress).then((v) => v.toString());
-                if (new bn(earned).isLessThanOrEqualTo(0)) {
-                  return Error('No earnings');
-                }
-
-                return true;
-              },
-              async () => ({
-                tx: await stakingContract.deposit(pool.index, 0),
-              })
-            ),
-          ],
-          exit: [
-            AutomateActions.tab(
-              'Exit',
-              async () => ({
-                description: 'Get all tokens from contract',
-              }),
-              async () => {
-                const earned = await masterChiefContract
-                  .pendingReward(pool.index, walletAddress)
-                  .then((v) => v.toString());
-                const userInfo = await stakingContract.userInfo(pool.index, walletAddress);
-                if (
-                  new bn(earned).isLessThanOrEqualTo(0) &&
-                  new bn(userInfo.amount.toString()).isLessThanOrEqualTo(0)
-                ) {
-                  return Error('No staked');
-                }
-
-                return true;
-              },
-              async () => {
-                const userInfo = await stakingContract.userInfo(pool.index, walletAddress);
-                if (new bn(userInfo.amount.toString()).isGreaterThan(0)) {
-                  await stakingContract.withdraw(pool.index, userInfo.amount.toString()).then((tx) => tx.wait());
-                }
-
-                return {
-                  tx: await stakingContract.deposit(pool.index, 0),
-                };
-              }
-            ),
-          ],
+            }
+          ),
         };
+      },
+      actions: async (walletAddress) => {
+        if (options.signer === null) {
+          throw new Error('Signer not found, use options.signer for use actions');
+        }
+        const { signer } = options;
+
+        return (
+          await masterChefActionsFactory(
+            ethereum.erc20(provider, rewardToken).connect(signer),
+            ethereum.erc20(provider, stakingToken).connect(signer),
+            masterChiefContract.connect(signer),
+            pool
+          )
+        )(walletAddress);
       },
     };
   },
   automates: {
     contractsResolver: {
       default: async (provider, options = {}) => {
-        const network = (await provider.detectNetwork()).chainId;
+        const multicall = new ethersMulticall.Provider(provider);
+        await multicall.init();
 
-        const masterChiefContract = new ethers.Contract(masterChefAddress, masterChefABI, provider);
+        const masterChiefContract = new ethersMulticall.Contract(masterChefAddress, masterChefABI);
 
-        const totalPools = await masterChiefContract.poolLength();
+        const [totalPools] = await multicall.all([masterChiefContract.poolLength()]);
+        const poolsIndex = Array.from(new Array(totalPools.toNumber()).keys());
+        const poolsInfo = await multicall.all(poolsIndex.map((poolIndex) => masterChiefContract.poolInfo(poolIndex)));
+        const poolsStakingTokensSymbol = await multicall.all(
+          poolsInfo.map(({ lpToken }) => new ethersMulticall.Contract(lpToken, ethereum.abi.ERC20ABI).symbol())
+        );
+
         const pools = await Promise.all(
-          (
-            await Promise.all(new Array(totalPools.toNumber()).fill(1).map((_, i) => masterChiefContract.poolInfo(i)))
-          ).map(async (p, i) => {
-            const stakingTokenPair = await ethereum.uniswap.pairInfo(provider, p.lpToken);
+          poolsInfo.map(async (info, index) => {
+            const stakingTokenSymbol = poolsStakingTokensSymbol[index];
+            const isPair = stakingTokenSymbol === 'HBLP';
 
-            const [token0, token1] = await Promise.all([
-              ethereum.erc20Info(provider, stakingTokenPair.token0),
-              ethereum.erc20Info(provider, stakingTokenPair.token1),
-            ]);
+            let token0Symbol, token1Symbol;
+            if (isPair) {
+              const [token0, token1] = await multicall.all([
+                new ethersMulticall.Contract(info.lpToken, ethereum.uniswap.pairABI).token0(),
+                new ethersMulticall.Contract(info.lpToken, ethereum.uniswap.pairABI).token1(),
+              ]);
+              const pairSymbols = await multicall.all([
+                new ethersMulticall.Contract(token0, ethereum.abi.ERC20ABI).symbol(),
+                new ethersMulticall.Contract(token1, ethereum.abi.ERC20ABI).symbol(),
+              ]);
+              token0Symbol = pairSymbols[0];
+              token1Symbol = pairSymbols[1];
+            }
+            const automate = {
+              adapters: isPair ? ['masterChefPair'] : ['masterChefSingle'],
+            };
+            if (isPair) {
+              automate.autorestakeAdapter = 'MasterChefFinnLpRestake';
+              automate.buyLiquidity = {
+                router: '0x2d4e873f9Ab279da9f1bb2c532d4F06f67755b77',
+                pair: info.lpToken,
+              };
+            }
 
             return {
-              poolIndex: i,
-              stakingToken: p.lpToken,
-              name: `${token0.symbol}-${token1.symbol}`,
-              address: p.lpToken,
+              poolIndex: index,
+              stakingToken: info.lpToken,
+              name: isPair ? `${token0Symbol}-${token1Symbol}` : stakingTokenSymbol,
+              address: info.lpToken,
               blockchain: 'ethereum',
-              network: network.toString(),
+              network: '1285',
               layout: 'staking',
-              adapter: 'masterChef',
+              adapter: isPair ? 'masterChefPair' : 'masterChefSingle',
               description: '',
-              automate: {
-                autorestakeAdapter: 'MasterChefFinnLpRestake',
-                adapters: ['masterChef'],
-                buyLiquidity: {
-                  router: '0x2d4e873f9Ab279da9f1bb2c532d4F06f67755b77',
-                  pair: p.lpToken,
-                },
-              },
+              automate,
               link: '',
             };
           })
@@ -331,9 +491,10 @@ module.exports = {
             options.cacheAuth,
             'moonriverHuckleberry',
             'masterChefPools',
-            pools.map(({ poolIndex, stakingToken }) => ({
+            pools.map(({ poolIndex, stakingToken, adapter }) => ({
               index: poolIndex,
               stakingToken,
+              type: adapter === 'masterChefPair' ? 'lp' : 'single',
             }))
           );
         }
@@ -344,7 +505,8 @@ module.exports = {
     deploy: {
       MasterChefFinnLpRestake: async (signer, factoryAddress, prototypeAddress, contractAddress = undefined) => {
         const masterChefSavedPools = await cache.read('moonriverHuckleberry', 'masterChefPools');
-        let poolIndex = masterChefSavedPools[0].index.toString();
+        const firstPoolCandidate = masterChefSavedPools.find(({ type }) => type === 'lp');
+        let poolIndex = firstPoolCandidate ? firstPoolCandidate.index.toString() : '';
         if (contractAddress) {
           poolIndex =
             masterChefSavedPools.find(
