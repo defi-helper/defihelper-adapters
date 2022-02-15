@@ -33,20 +33,12 @@ export function DFHAutomate() {
       .buyLiquidity(signer, buyLiquidityAddress, {
         tokens: [
           {
-            address: "0x0a180a76e4466bf68a7f86fb029bed3cccfaaac5",
-            symbol: "WETH",
-          },
-          {
-            address: "0x7b319ecb25518b8236bd43ee810c43460e631f72",
-            symbol: "DFH",
-          },
-          {
-            address: "0x509d5d259d2481bde18bbbf297bcdec8895a0292",
-            symbol: "BAG",
+            address: "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7",
+            symbol: "WAVAX",
           },
         ],
-        router: "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
-        pair: "0xffdeca9081a5627a95249a19bd5ff5eba94228cf",
+        router: "0x60aE616a2155Ee3d9A68541Ba4544862310933d4",
+        pair: "0x41f3092d6dd8db25ec0f7395f56cac107ecb7a12",
       })
       .then(({ buy }) => setModalSteps(buy));
 
