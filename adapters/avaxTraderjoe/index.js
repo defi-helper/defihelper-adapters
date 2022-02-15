@@ -7,6 +7,7 @@ const cache = require('../utils/cache');
 const AutomateActions = require('../utils/automate/actions');
 const masterChefV2ABI = require('./abi/masterChefV2ABI.json');
 const masterChefV3ABI = require('./abi/masterChefV3ABI.json');
+const xJoeTokenABI = require('./abi/XJoeTokenABI.json');
 const bridgeTokens = require('./abi/bridgeTokens.json');
 const MasterChefV2LpRestakeABI = require('./abi/MasterChefV2LpRestakeABI.json');
 const MasterChefV2SingleRestakeABI = require('./abi/MasterChefV2SingleRestakeABI.json');
@@ -514,6 +515,175 @@ module.exports = {
           signer,
           etherscanAddressURL: 'https://snowtrace.io/address',
         }).then((actions) => actions(walletAddress));
+      },
+    };
+  },
+  xJoe: async (provider, xJoeAddress, initOptions = ethereum.defaultOptions()) => {
+    const options = {
+      ...ethereum.defaultOptions(),
+      ...initOptions,
+    };
+    const blockTag = options.blockNumber === 'latest' ? 'latest' : parseInt(options.blockNumber, 10);
+    const network = (await provider.detectNetwork()).chainId;
+    const block = await provider.getBlock(blockTag);
+    const priceFeed = bridgeWrapperBuild(bridgeTokens, blockTag, block, network);
+
+    const joeAddress = '0x6e84a6216ea6dacc71ee8e6b0a5b7322eebc0fdd';
+    const joeContract = ethereum.erc20(provider, joeAddress);
+    const joeDecimals = 18;
+    const xJoeContract = new ethers.Contract(xJoeAddress, tomTokenABI, provider);
+    const xJoeDecimals = 18;
+
+    const [joeBalance, joePriceUSD] = await Promise.all([
+      joeContract.balanceOf(xJoeAddress, { blockTag }).then((v) => new bn(v.toString()).div(`1e${joeDecimals}`)),
+      priceFeed(joeAddress),
+    ]);
+    const tvl = joeBalance.multipliedBy(joePriceUSD);
+
+    return {
+      staking: {
+        token: joeAddress,
+        decimals: joeDecimals,
+      },
+      metrics: {
+        tvl: tvl.toString(10),
+        aprDay: '0',
+        aprWeek: '0',
+        aprMonth: '0',
+        aprYear: '0',
+      },
+      wallet: async (walletAddress) => {
+        const [xJoeBalance, joeBalance, xJoeTotalSupply, joePriceUSD] = await Promise.all([
+          xJoeContract.balanceOf(walletAddress, { blockTag }).then((v) => new bn(v.toString()).div(`1e${xJoeDecimals}`)),
+          joeContract.balanceOf(xJoeAddress, { blockTag }).then((v) => new bn(v.toString()).div(`1e${joeDecimals}`)),
+          xJoeContract.totalSupply({ blockTag }).then((v) => new bn(v.toString()).div(`1e${xJoeDecimals}`)),
+          priceFeed(joeAddress),
+        ]);
+        const k = joeBalance.div(xJoeTotalSupply);
+        const balance = xJoeBalance.multipliedBy(k);
+        const balanceUSD = balance.multipliedBy(joePriceUSD);
+        const earned = xJoeBalance;
+        const earnedUSD = balanceUSD;
+
+        return {
+          staked: {
+            [joeAddress]: {
+              balance: balance.toString(10),
+              usd: balanceUSD.toString(10),
+            },
+          },
+          earned: {
+            [xJoeAddress]: {
+              balance: earned.toString(10),
+              usd: earnedUSD.toString(10),
+            },
+          },
+          metrics: {
+            staking: balance.toString(10),
+            stakingUSD: balanceUSD.toString(10),
+            earned: earned.toString(10),
+            earnedUSD: earnedUSD.toString(10),
+          },
+          tokens: tokens(
+            {
+              token: joeAddress,
+              data: {
+                balance: balance.toString(10),
+                usd: balanceUSD.toString(10),
+              },
+            },
+            {
+              token: xJoeAddress,
+              data: {
+                balance: earned.toString(10),
+                usd: earnedUSD.toString(10),
+              },
+            }
+          ),
+        };
+      },
+      actions: async (walletAddress) => {
+        if (options.signer === null) {
+          throw new Error('Signer not found, use options.signer for use actions');
+        }
+        const { signer } = options;
+
+        return {
+          stake: [
+            AutomateActions.tab(
+              'Stake',
+              async () => ({
+                description: `Swap your [JOE](https://snowtrace.io/address/${joeAddress}) tokens to [xJoe](https://snowtrace.io/address/${xJoeAddress}) tokens`,
+                inputs: [
+                  AutomateActions.input({
+                    placeholder: 'amount',
+                    value: new bn(await joeContract.balanceOf(walletAddress).then((v) => v.toString()))
+                      .div(`1e${joeDecimals}`)
+                      .toString(10),
+                  }),
+                ],
+              }),
+              async (amount) => {
+                const amountInt = new bn(amount).multipliedBy(`1e${joeDecimals}`);
+                if (amountInt.lte(0)) return Error('Invalid amount');
+
+                const balance = await joeContract.balanceOf(walletAddress).then((v) => v.toString());
+                if (amountInt.gt(balance)) return Error('Insufficient funds on the balance');
+
+                return true;
+              },
+              async (amount) => {
+                const amountInt = new bn(amount).multipliedBy(`1e${joeDecimals}`);
+                await ethereum.erc20ApproveAll(
+                  joeContract.connect(signer),
+                  walletAddress,
+                  xJoeAddress,
+                  amountInt.toFixed(0)
+                );
+
+                return { tx: await xJoeContract.connect(signer).deposit(amountInt.toFixed(0)) };
+              }
+            ),
+          ],
+          unstake: [
+            AutomateActions.tab(
+              'Unstake',
+              async () => ({
+                description: `Swap your [xJoe](https://snowtrace.io/address/${xJoeAddress}) tokens to [JOE](https://snowtrace.io/address/${joeAddress}) tokens`,
+                inputs: [
+                  AutomateActions.input({
+                    placeholder: 'amount',
+                    value: new bn(await xJoeContract.balanceOf(walletAddress).then((v) => v.toString()))
+                      .div(`1e${xJoeDecimals}`)
+                      .toString(10),
+                  }),
+                ],
+              }),
+              async (amount) => {
+                const amountInt = new bn(amount).multipliedBy(`1e${xJoeDecimals}`);
+                if (amountInt.lte(0)) return Error('Invalid amount');
+
+                const balance = await xJoeContract.balanceOf(walletAddress).then((v) => v.toString());
+                if (amountInt.isGreaterThan(balance)) {
+                  return Error('Amount exceeds balance');
+                }
+
+                return true;
+              },
+              async (amount) => {
+                const amountInt = new bn(amount).multipliedBy(`1e${xJoeDecimals}`);
+                await ethereum.erc20ApproveAll(
+                  xJoeContract.connect(signer),
+                  walletAddress,
+                  xJoeAddress,
+                  amountInt.toFixed(0)
+                );
+
+                return { tx: await xJoeContract.connect(signer).withdraw(amountInt.toFixed(0)) };
+              }
+            ),
+          ],
+        };
       },
     };
   },

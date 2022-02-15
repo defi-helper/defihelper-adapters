@@ -6,6 +6,7 @@ const { bridgeWrapperBuild } = require('../utils/coingecko');
 const cache = require('../utils/cache');
 const AutomateActions = require('../utils/automate/actions');
 const masterChefABI = require('./abi/masterChefABI.json');
+const tomTokenABI = require('./abi/TomTokenABI.json');
 const MasterChefFinnLpRestakeABI = require('./abi/MasterChefFinnLpRestakeABI.json');
 const bridgeTokens = require('./abi/bridgeTokens.json');
 
@@ -424,6 +425,175 @@ module.exports = {
             pool
           )
         )(walletAddress);
+      },
+    };
+  },
+  tom: async (provider, tomAddress, initOptions = ethereum.defaultOptions()) => {
+    const options = {
+      ...ethereum.defaultOptions(),
+      ...initOptions,
+    };
+    const blockTag = options.blockNumber === 'latest' ? 'latest' : parseInt(options.blockNumber, 10);
+    const network = (await provider.detectNetwork()).chainId;
+    const block = await provider.getBlock(blockTag);
+    const priceFeed = bridgeWrapperBuild(bridgeTokens, blockTag, block, network);
+
+    const finnAddress = '0x9a92b5ebf1f6f6f7d93696fcd44e5cf75035a756';
+    const finnContract = ethereum.erc20(provider, finnAddress);
+    const finnDecimals = 18;
+    const tomContract = new ethers.Contract(tomAddress, tomTokenABI, provider);
+    const tomDecimals = 18;
+
+    const [finnBalance, finnPriceUSD] = await Promise.all([
+      finnContract.balanceOf(tomAddress, { blockTag }).then((v) => new bn(v.toString()).div(`1e${finnDecimals}`)),
+      priceFeed(finnAddress),
+    ]);
+    const tvl = finnBalance.multipliedBy(finnPriceUSD);
+
+    return {
+      staking: {
+        token: finnAddress,
+        decimals: finnDecimals,
+      },
+      metrics: {
+        tvl: tvl.toString(10),
+        aprDay: '0',
+        aprWeek: '0',
+        aprMonth: '0',
+        aprYear: '0',
+      },
+      wallet: async (walletAddress) => {
+        const [tomBalance, finnBalance, tomTotalSupply, finnPriceUSD] = await Promise.all([
+          tomContract.balanceOf(walletAddress, { blockTag }).then((v) => new bn(v.toString()).div(`1e${tomDecimals}`)),
+          finnContract.balanceOf(tomAddress, { blockTag }).then((v) => new bn(v.toString()).div(`1e${finnDecimals}`)),
+          tomContract.totalSupply({ blockTag }).then((v) => new bn(v.toString()).div(`1e${tomDecimals}`)),
+          priceFeed(finnAddress),
+        ]);
+        const k = finnBalance.div(tomTotalSupply);
+        const balance = tomBalance.multipliedBy(k);
+        const balanceUSD = balance.multipliedBy(finnPriceUSD);
+        const earned = tomBalance;
+        const earnedUSD = balanceUSD;
+
+        return {
+          staked: {
+            [finnAddress]: {
+              balance: balance.toString(10),
+              usd: balanceUSD.toString(10),
+            },
+          },
+          earned: {
+            [tomAddress]: {
+              balance: earned.toString(10),
+              usd: earnedUSD.toString(10),
+            },
+          },
+          metrics: {
+            staking: balance.toString(10),
+            stakingUSD: balanceUSD.toString(10),
+            earned: earned.toString(10),
+            earnedUSD: earnedUSD.toString(10),
+          },
+          tokens: tokens(
+            {
+              token: finnAddress,
+              data: {
+                balance: balance.toString(10),
+                usd: balanceUSD.toString(10),
+              },
+            },
+            {
+              token: tomAddress,
+              data: {
+                balance: earned.toString(10),
+                usd: earnedUSD.toString(10),
+              },
+            }
+          ),
+        };
+      },
+      actions: async (walletAddress) => {
+        if (options.signer === null) {
+          throw new Error('Signer not found, use options.signer for use actions');
+        }
+        const { signer } = options;
+
+        return {
+          stake: [
+            AutomateActions.tab(
+              'Stake',
+              async () => ({
+                description: `Swap your [FINN](https://moonriver.moonscan.io/address/${finnAddress}) tokens to [TOM](https://moonriver.moonscan.io/address/${tomAddress}) tokens`,
+                inputs: [
+                  AutomateActions.input({
+                    placeholder: 'amount',
+                    value: new bn(await finnContract.balanceOf(walletAddress).then((v) => v.toString()))
+                      .div(`1e${finnDecimals}`)
+                      .toString(10),
+                  }),
+                ],
+              }),
+              async (amount) => {
+                const amountInt = new bn(amount).multipliedBy(`1e${finnDecimals}`);
+                if (amountInt.lte(0)) return Error('Invalid amount');
+
+                const balance = await finnContract.balanceOf(walletAddress).then((v) => v.toString());
+                if (amountInt.gt(balance)) return Error('Insufficient funds on the balance');
+
+                return true;
+              },
+              async (amount) => {
+                const amountInt = new bn(amount).multipliedBy(`1e${finnDecimals}`);
+                await ethereum.erc20ApproveAll(
+                  finnContract.connect(signer),
+                  walletAddress,
+                  tomAddress,
+                  amountInt.toFixed(0)
+                );
+
+                return { tx: await tomContract.connect(signer).deposit(amountInt.toFixed(0)) };
+              }
+            ),
+          ],
+          unstake: [
+            AutomateActions.tab(
+              'Unstake',
+              async () => ({
+                description: `Swap your [TOM](https://moonriver.moonscan.io/address/${tomAddress}) tokens to [FINN](https://moonriver.moonscan.io/address/${finnAddress}) tokens`,
+                inputs: [
+                  AutomateActions.input({
+                    placeholder: 'amount',
+                    value: new bn(await tomContract.balanceOf(walletAddress).then((v) => v.toString()))
+                      .div(`1e${tomDecimals}`)
+                      .toString(10),
+                  }),
+                ],
+              }),
+              async (amount) => {
+                const amountInt = new bn(amount).multipliedBy(`1e${tomDecimals}`);
+                if (amountInt.lte(0)) return Error('Invalid amount');
+
+                const balance = await tomContract.balanceOf(walletAddress).then((v) => v.toString());
+                if (amountInt.isGreaterThan(balance)) {
+                  return Error('Amount exceeds balance');
+                }
+
+                return true;
+              },
+              async (amount) => {
+                const amountInt = new bn(amount).multipliedBy(`1e${tomDecimals}`);
+                await ethereum.erc20ApproveAll(
+                  tomContract.connect(signer),
+                  walletAddress,
+                  tomAddress,
+                  amountInt.toFixed(0)
+                );
+
+                return { tx: await tomContract.connect(signer).withdraw(amountInt.toFixed(0)) };
+              }
+            ),
+          ],
+        };
       },
     };
   },
