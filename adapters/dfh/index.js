@@ -19,6 +19,15 @@ module.exports = {
       const automate = new ethers.Contract(contractAddress, BuyLiquidityABI).connect(signer);
 
       return AutomateActions.component('DHFBuyLiquidity', {
+        balanceOf: async (tokenAddress) => {
+          const token = ethereum.erc20(signer, tokenAddress);
+          const [balance, tokenDecimals] = await Promise.all([
+            token.balanceOf(signerAddress).then((v) => new bn(v.toString())),
+            token.decimals().then((v) => v.toString()),
+          ]);
+
+          return balance.div(`1e${tokenDecimals}`).toString(10);
+        },
         isApproved: async (tokenAddress, amount) => {
           if (new bn(amount).lte(0)) return new Error('Invalid amount');
 
