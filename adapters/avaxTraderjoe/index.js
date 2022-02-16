@@ -531,7 +531,7 @@ module.exports = {
     const joeAddress = '0x6e84a6216ea6dacc71ee8e6b0a5b7322eebc0fdd';
     const joeContract = ethereum.erc20(provider, joeAddress);
     const joeDecimals = 18;
-    const xJoeContract = new ethers.Contract(xJoeAddress, tomTokenABI, provider);
+    const xJoeContract = new ethers.Contract(xJoeAddress, xJoeTokenABI, provider);
     const xJoeDecimals = 18;
 
     const [joeBalance, joePriceUSD] = await Promise.all([

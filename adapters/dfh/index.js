@@ -3,10 +3,19 @@ const { ethereum } = require('../utils/ethereum');
 const AutomateActions = require('../utils/automate/actions');
 const BuyLiquidityABI = require('./abi/BuyLiquidityABI.json');
 
+const routeTokens = {
+  1: ['0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2'],
+  56: ['0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c'],
+  137: ['0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270'],
+  1285: ['0x98878b06940ae243284ca214f92bb71a2b032b8a'],
+  43114: ['0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7'],
+};
+
 module.exports = {
   automates: {
     buyLiquidity: async (signer, contractAddress, { tokens, router, pair }) => {
       const signerAddress = await signer.getAddress();
+      const network = await signer.getChainId().then((v) => v.toString());
       const automate = new ethers.Contract(contractAddress, BuyLiquidityABI).connect(signer);
 
       const buyStep1 = { inToken: null, amount: null, slippage: null };
@@ -130,7 +139,7 @@ module.exports = {
                   amountInt.div(2).toFixed(0),
                   inToken,
                   token0,
-                  []
+                  routeTokens[network] ?? []
                 );
                 swap0.path = path;
                 swap0.outMin = new bn(amountOut.toString()).multipliedBy(1 - slippage / 100).toFixed(0);
@@ -143,7 +152,7 @@ module.exports = {
                   amountInt.minus(amountInt.div(2).toFixed(0)).toFixed(0),
                   inToken,
                   token1,
-                  []
+                  routeTokens[network] ?? []
                 );
                 swap1.path = path;
                 swap1.outMin = new bn(amountOut.toString()).multipliedBy(1 - slippage / 100).toFixed(0);
