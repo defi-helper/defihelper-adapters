@@ -34,7 +34,7 @@ module.exports = {
           const [allowance, tokenDecimals] = await Promise.all([
             ethereum
               .erc20(signer, tokenAddress)
-              .allowance(signerAddress)
+              .allowance(signerAddress, contractAddress)
               .then((v) => v.toString()),
             ethereum
               .erc20(signer, tokenAddress)
