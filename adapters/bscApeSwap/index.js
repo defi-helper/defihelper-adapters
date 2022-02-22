@@ -11,147 +11,10 @@ const MasterChefSingleRestakeABI = require('./abi/MasterChefSingleRestakeABI.jso
 const MasterChefLpRestakeABI = require('./abi/MasterChefLpRestakeABI.json');
 const ApeRewardV4RestakeABI = require('./abi/ApeRewardV4RestakeABI.json');
 const bridgeTokens = require('./abi/bridgeTokens.json');
+const { buildMasterChefProvider, toBN, buildMasterChefActions } = require('../utils/masterChef/provider');
 
 const masterChefAddress = '0x5c8D727b265DBAfaba67E050f2f739cAeEB4A6F9';
 const routeTokens = ['0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c'];
-
-async function masterChefActionsFactory(rewardTokenContract, stakingTokenContract, stakingContract, pool) {
-  const rewardTokenSymbol = await rewardTokenContract.symbol();
-  const stakingTokenSymbol = await stakingTokenContract.symbol();
-  const stakingTokenDecimals = await stakingTokenContract.decimals().then((v) => v.toString());
-
-  return async (walletAddress) => ({
-    stake: [
-      AutomateActions.tab(
-        'Stake',
-        async () => ({
-          description: `Stake your [${stakingTokenSymbol}](https://bscscan.com/address/${stakingTokenContract.address}) tokens to contract`,
-          inputs: [
-            AutomateActions.input({
-              placeholder: 'amount',
-              value: new bn(await stakingTokenContract.balanceOf(walletAddress).then((v) => v.toString()))
-                .div(`1e${stakingTokenDecimals}`)
-                .toString(10),
-            }),
-          ],
-        }),
-        async (amount) => {
-          const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
-          if (amountInt.lte(0)) return Error('Invalid amount');
-
-          const balance = await stakingTokenContract.balanceOf(walletAddress).then((v) => v.toString());
-          if (amountInt.gt(balance)) return Error('Insufficient funds on the balance');
-
-          return true;
-        },
-        async (amount) => {
-          const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
-          await ethereum.erc20ApproveAll(stakingTokenContract, walletAddress, masterChefAddress, amountInt.toFixed(0));
-
-          if (pool.index === 0) {
-            return { tx: await stakingContract.enterStaking(amountInt.toFixed(0)) };
-          } else {
-            return { tx: await stakingContract.deposit(pool.index, amountInt.toFixed(0)) };
-          }
-        }
-      ),
-    ],
-    unstake: [
-      AutomateActions.tab(
-        'Unstake',
-        async () => {
-          const userInfo = await stakingContract.userInfo(pool.index, walletAddress);
-
-          return {
-            description: `Unstake your [${stakingTokenSymbol}](https://bscscan.com/address/${stakingTokenContract.address}) tokens from contract`,
-            inputs: [
-              AutomateActions.input({
-                placeholder: 'amount',
-                value: new bn(userInfo.amount.toString()).div(`1e${stakingTokenDecimals}`).toString(10),
-              }),
-            ],
-          };
-        },
-        async (amount) => {
-          const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
-          if (amountInt.lte(0)) return Error('Invalid amount');
-
-          const userInfo = await stakingContract.userInfo(pool.index, walletAddress);
-          if (amountInt.isGreaterThan(userInfo.amount.toString())) {
-            return Error('Amount exceeds balance');
-          }
-
-          return true;
-        },
-        async (amount) => {
-          const amountInt = new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`);
-
-          if (pool.index === 0) {
-            return { tx: await stakingContract.leaveStaking(pool.index, amountInt.toFixed(0)) };
-          } else {
-            return { tx: await stakingContract.withdraw(pool.index, amountInt.toFixed(0)) };
-          }
-        }
-      ),
-    ],
-    claim: [
-      AutomateActions.tab(
-        'Claim',
-        async () => ({
-          description: `Claim your [${rewardTokenSymbol}](https://bscscan.com/address/${rewardTokenContract.address}) reward from contract`,
-        }),
-        async () => {
-          const earned = await stakingContract.pendingCake(pool.index, walletAddress).then((v) => v.toString());
-          if (new bn(earned).isLessThanOrEqualTo(0)) {
-            return Error('No earnings');
-          }
-
-          return true;
-        },
-        async () => {
-          if (pool.index === 0) {
-            return { tx: await stakingContract.enterStaking(0) };
-          } else {
-            return { tx: await stakingContract.deposit(pool.index, 0) };
-          }
-        }
-      ),
-    ],
-    exit: [
-      AutomateActions.tab(
-        'Exit',
-        async () => ({
-          description: 'Get all tokens from contract',
-        }),
-        async () => {
-          const earned = await stakingContract.pendingCake(pool.index, walletAddress).then((v) => v.toString());
-          const userInfo = await stakingContract.userInfo(pool.index, walletAddress);
-          if (new bn(earned).isLessThanOrEqualTo(0) && new bn(userInfo.amount.toString()).isLessThanOrEqualTo(0)) {
-            return Error('No staked');
-          }
-
-          return true;
-        },
-        async () => {
-          const userInfo = await stakingContract.userInfo(pool.index, walletAddress);
-          if (new bn(userInfo.amount.toString()).isGreaterThan(0)) {
-            if (pool.index === 0) {
-              await stakingContract.leaveStaking(userInfo.amount.toString());
-            } else {
-              await stakingContract.withdraw(pool.index, userInfo.amount.toString());
-            }
-          }
-
-          if (pool.index === 0) {
-            return { tx: await stakingContract.enterStaking(0) };
-          } else {
-            return { tx: await stakingContract.deposit(pool.index, 0) };
-          }
-        }
-      ),
-    ],
-  });
-}
 
 module.exports = {
   masterChefPair: async (provider, contractAddress, initOptions = ethereum.defaultOptions()) => {
@@ -166,48 +29,64 @@ module.exports = {
     const blockNumber = block.number;
     const priceFeed = bridgeWrapperBuild(bridgeTokens, blockTag, block, network);
     const avgBlockTime = await ethereum.getAvgBlockTime(provider, blockNumber);
-    const rewardTokenFunctionName = 'cake';
 
     const pool = masterChefSavedPools.find((p) => p.stakingToken.toLowerCase() === contractAddress.toLowerCase());
     if (!pool) {
       throw new Error('Pool is not found');
     }
 
-    const masterChiefContract = new ethers.Contract(masterChefAddress, masterChefABI, provider);
-    const poolInfo = await masterChiefContract.poolInfo(pool.index, { blockTag });
-
-    const rewardToken = (await masterChiefContract[rewardTokenFunctionName]()).toLowerCase();
-    const rewardsTokenDecimals = 18;
-    const rewardTokenPriceUSD = await priceFeed(rewardToken);
-    const [rewardTokenPerBlock, totalAllocPoint] = await Promise.all([
-      masterChiefContract[`${rewardTokenFunctionName}PerBlock`]({ blockTag }),
-      masterChiefContract.totalAllocPoint({ blockTag }),
-    ]);
-    const rewardPerBlock = toFloat(
-      new bn(poolInfo.allocPoint.toString())
-        .multipliedBy(rewardTokenPerBlock.toString())
-        .dividedBy(totalAllocPoint.toString()),
-      rewardsTokenDecimals
+    const masterChefProvider = buildMasterChefProvider(
+      new ethers.Contract(masterChefAddress, masterChefABI, provider),
+      { blockTag },
+      {
+        rewardToken() {
+          return '0x603c7f932ED1fc6575303D8Fb018fDCBb0f39a95';
+        },
+        poolInfo(poolIndex) {
+          return this.contract
+            .poolInfo(poolIndex, { blockTag: this.options.blockTag })
+            .then(({ lpToken, allocPoint, accCakePerShare }) => ({
+              lpToken,
+              allocPoint: toBN(allocPoint),
+              accRewardPerShare: toBN(accCakePerShare),
+            }));
+        },
+        rewardPerSecond() {
+          return this.contract
+            .cakePerBlock({ blockTag: this.options.blockTag })
+            .then((v) => toBN(v).multipliedBy(1000).div(avgBlockTime));
+        },
+        pendingReward(poolIndex, wallet) {
+          return this.contract.pendingCake(poolIndex, wallet).then(toBN);
+        },
+      }
     );
+    const poolInfo = await masterChefProvider.poolInfo(pool.index);
 
-    const stakingToken = contractAddress.toLowerCase();
+    const rewardToken = await masterChefProvider.rewardToken();
+    const rewardTokenDecimals = 18;
+    const rewardTokenPriceUSD = await priceFeed(rewardToken);
+
+    const stakingToken = await masterChefProvider.stakingToken(poolInfo);
     const stakingTokenDecimals = 18;
     const stakingTokenPair = await ethereum.uniswap.pairInfo(provider, stakingToken, options);
     const token0PriceUSD = await priceFeed(stakingTokenPair.token0);
     const token1PriceUSD = await priceFeed(stakingTokenPair.token1);
     const stakingTokenPriceUSD = stakingTokenPair.calcPrice(token0PriceUSD, token1PriceUSD);
 
-    const totalLocked = toFloat(
-      await ethereum.erc20(provider, contractAddress).balanceOf(masterChefAddress, { blockTag }),
-      stakingTokenDecimals
-    );
+    const totalLocked = await masterChefProvider.totalLocked(poolInfo).then((v) => v.div(`1e${stakingTokenDecimals}`));
     const tvl = new bn(totalLocked).multipliedBy(stakingTokenPriceUSD);
 
-    let aprBlock = rewardPerBlock.multipliedBy(rewardTokenPriceUSD).div(tvl);
-    if (!aprBlock.isFinite()) aprBlock = new bn(0);
-
-    const blocksPerDay = new bn((1000 * 60 * 60 * 24) / avgBlockTime);
-    const aprDay = aprBlock.multipliedBy(blocksPerDay);
+    const [rewardPerSecond, totalAllocPoint] = await Promise.all([
+      masterChefProvider.rewardPerSecond({ blockTag }),
+      masterChefProvider.totalAllocPoint({ blockTag }),
+    ]);
+    const rewardPerSec = poolInfo.allocPoint
+      .multipliedBy(rewardPerSecond)
+      .div(totalAllocPoint)
+      .div(`1e${rewardTokenDecimals}`);
+    const aprSecond = rewardPerSec.multipliedBy(rewardTokenPriceUSD).div(tvl);
+    const aprDay = aprSecond.multipliedBy(86400);
     const aprWeek = aprDay.multipliedBy(7);
     const aprMonth = aprDay.multipliedBy(30);
     const aprYear = aprDay.multipliedBy(365);
@@ -219,7 +98,29 @@ module.exports = {
       },
       reward: {
         token: rewardToken,
-        decimals: rewardsTokenDecimals,
+        decimals: rewardTokenDecimals,
+      },
+      stakeToken: {
+        address: stakingToken,
+        decimals: stakingTokenDecimals,
+        priceUSD: stakingTokenPriceUSD.toString(10),
+        parts: [
+          {
+            address: stakingTokenPair.token0,
+            decimals: stakingTokenPair.token0Decimals,
+            priceUSD: token0PriceUSD.toString(10),
+          },
+          {
+            address: stakingTokenPair.token1,
+            decimals: stakingTokenPair.token1Decimals,
+            priceUSD: token1PriceUSD.toString(10),
+          },
+        ],
+      },
+      rewardToken: {
+        address: rewardToken,
+        decimals: rewardTokenDecimals,
+        priceUSD: rewardTokenPriceUSD.toString(10),
       },
       metrics: {
         tvl: tvl.toString(10),
@@ -229,11 +130,12 @@ module.exports = {
         aprYear: aprYear.toString(10),
       },
       wallet: async (walletAddress) => {
-        const { amount } = await masterChiefContract.userInfo(pool.index, walletAddress, { blockTag });
-        const balance = toFloat(amount, stakingTokenDecimals);
-        const earned = new bn(
-          await masterChiefContract.pendingCake(pool.index, walletAddress, { blockTag }).then((v) => v.toString())
-        ).div(`1e${rewardsTokenDecimals}`);
+        const balance = await masterChefProvider
+          .userInfo(pool.index, walletAddress)
+          .then(({ amount }) => amount.div(`1e${stakingTokenDecimals}`));
+        const earned = await masterChefProvider
+          .pendingReward(pool.index, walletAddress)
+          .then((v) => v.div(`1e${rewardTokenDecimals}`));
         const expandedBalance = stakingTokenPair.expandBalance(balance);
         const reviewedBalance = [
           {
@@ -293,14 +195,12 @@ module.exports = {
         }
         const { signer } = options;
 
-        return (
-          await masterChefActionsFactory(
-            ethereum.erc20(provider, rewardToken).connect(signer),
-            ethereum.erc20(provider, stakingToken).connect(signer),
-            masterChiefContract.connect(signer),
-            pool
-          )
-        )(walletAddress);
+        return buildMasterChefActions(masterChefProvider, {
+          poolIndex: pool.index,
+          poolInfo,
+          signer,
+          etherscanAddressURL: 'https://bscscan.com/address',
+        }).then((actions) => actions(walletAddress));
       },
     };
   },
@@ -316,29 +216,43 @@ module.exports = {
     const blockNumber = block.number;
     const priceFeed = bridgeWrapperBuild(bridgeTokens, blockTag, block, network);
     const avgBlockTime = await ethereum.getAvgBlockTime(provider, blockNumber);
-    const rewardTokenFunctionName = 'cake';
 
     const pool = masterChefSavedPools.find((p) => p.stakingToken.toLowerCase() === contractAddress.toLowerCase());
     if (!pool) {
       throw new Error('Pool is not found');
     }
 
-    const masterChiefContract = new ethers.Contract(masterChefAddress, masterChefABI, provider);
-    const poolInfo = await masterChiefContract.poolInfo(pool.index, { blockTag });
-
-    const rewardToken = (await masterChiefContract[rewardTokenFunctionName]()).toLowerCase();
-    const rewardsTokenDecimals = 18;
-    const rewardTokenPriceUSD = await priceFeed(rewardToken);
-    const [rewardTokenPerBlock, totalAllocPoint] = await Promise.all([
-      masterChiefContract[`${rewardTokenFunctionName}PerBlock`]({ blockTag }),
-      masterChiefContract.totalAllocPoint({ blockTag }),
-    ]);
-    const rewardPerBlock = toFloat(
-      new bn(poolInfo.allocPoint.toString())
-        .multipliedBy(rewardTokenPerBlock.toString())
-        .dividedBy(totalAllocPoint.toString()),
-      rewardsTokenDecimals
+    const masterChefProvider = buildMasterChefProvider(
+      new ethers.Contract(masterChefAddress, masterChefABI, provider),
+      { blockTag },
+      {
+        rewardToken() {
+          return '0x603c7f932ED1fc6575303D8Fb018fDCBb0f39a95';
+        },
+        poolInfo(poolIndex) {
+          return this.contract
+            .poolInfo(poolIndex, { blockTag: this.options.blockTag })
+            .then(({ lpToken, allocPoint, accCakePerShare }) => ({
+              lpToken,
+              allocPoint: toBN(allocPoint),
+              accRewardPerShare: toBN(accCakePerShare),
+            }));
+        },
+        rewardPerSecond() {
+          return this.contract
+            .cakePerBlock({ blockTag: this.options.blockTag })
+            .then((v) => toBN(v).multipliedBy(1000).div(avgBlockTime));
+        },
+        pendingReward(poolIndex, wallet) {
+          return this.contract.pendingCake(poolIndex, wallet).then(toBN);
+        },
+      }
     );
+    const poolInfo = await masterChefProvider.poolInfo(pool.index);
+
+    const rewardToken = await masterChefProvider.rewardToken();
+    const rewardTokenDecimals = 18;
+    const rewardTokenPriceUSD = await priceFeed(rewardToken);
 
     const stakingToken = contractAddress.toLowerCase();
     const stakingTokenDecimals = await ethereum
@@ -347,17 +261,19 @@ module.exports = {
       .then((v) => Number(v.toString()));
     const stakingTokenPriceUSD = await priceFeed(stakingToken);
 
-    const totalLocked = toFloat(
-      await ethereum.erc20(provider, contractAddress).balanceOf(masterChefAddress, { blockTag }),
-      stakingTokenDecimals
-    );
+    const totalLocked = await masterChefProvider.totalLocked(poolInfo).then((v) => v.div(`1e${stakingTokenDecimals}`));
     const tvl = new bn(totalLocked).multipliedBy(stakingTokenPriceUSD);
 
-    let aprBlock = rewardPerBlock.multipliedBy(rewardTokenPriceUSD).div(tvl);
-    if (!aprBlock.isFinite()) aprBlock = new bn(0);
-
-    const blocksPerDay = new bn((1000 * 60 * 60 * 24) / avgBlockTime);
-    const aprDay = aprBlock.multipliedBy(blocksPerDay);
+    const [rewardPerSecond, totalAllocPoint] = await Promise.all([
+      masterChefProvider.rewardPerSecond({ blockTag }),
+      masterChefProvider.totalAllocPoint({ blockTag }),
+    ]);
+    const rewardPerSec = poolInfo.allocPoint
+      .multipliedBy(rewardPerSecond)
+      .div(totalAllocPoint)
+      .div(`1e${rewardTokenDecimals}`);
+    const aprSecond = rewardPerSec.multipliedBy(rewardTokenPriceUSD).div(tvl);
+    const aprDay = aprSecond.multipliedBy(86400);
     const aprWeek = aprDay.multipliedBy(7);
     const aprMonth = aprDay.multipliedBy(30);
     const aprYear = aprDay.multipliedBy(365);
@@ -369,7 +285,17 @@ module.exports = {
       },
       reward: {
         token: rewardToken,
-        decimals: rewardsTokenDecimals,
+        decimals: rewardTokenDecimals,
+      },
+      stakeToken: {
+        address: stakingToken,
+        decimals: stakingTokenDecimals,
+        priceUSD: stakingTokenPriceUSD.toString(10),
+      },
+      rewardToken: {
+        address: rewardToken,
+        decimals: rewardTokenDecimals,
+        priceUSD: rewardTokenPriceUSD.toString(10),
       },
       metrics: {
         tvl: tvl.toString(10),
@@ -379,18 +305,20 @@ module.exports = {
         aprYear: aprYear.toString(10),
       },
       wallet: async (walletAddress) => {
-        const { amount } = await masterChiefContract.userInfo(pool.index, walletAddress, { blockTag });
-        const balance = toFloat(amount, stakingTokenDecimals);
-        const earned = new bn(
-          await masterChiefContract.pendingCake(pool.index, walletAddress, { blockTag }).then((v) => v.toString())
-        ).div(`1e${rewardsTokenDecimals}`);
+        const balance = await masterChefProvider
+          .userInfo(pool.index, walletAddress)
+          .then(({ amount }) => amount.div(`1e${stakingTokenDecimals}`));
+        const earned = await masterChefProvider
+          .pendingReward(pool.index, walletAddress)
+          .then((v) => v.div(`1e${rewardTokenDecimals}`));
+        const balanceUSD = balance.multipliedBy(stakingTokenPriceUSD);
         const earnedUSD = earned.multipliedBy(rewardTokenPriceUSD);
 
         return {
           staked: {
             [stakingToken]: {
               balance: balance.toString(10),
-              usd: balance.multipliedBy(stakingTokenPriceUSD).toString(10),
+              usd: balanceUSD.toString(10),
             },
           },
           earned: {
@@ -401,7 +329,7 @@ module.exports = {
           },
           metrics: {
             staking: balance.toString(10),
-            stakingUSD: balance.multipliedBy(stakingTokenPriceUSD).toString(10),
+            stakingUSD: balanceUSD.toString(10),
             earned: earned.toString(10),
             earnedUSD: earnedUSD.toString(10),
           },
@@ -410,7 +338,7 @@ module.exports = {
               token: stakingToken,
               data: {
                 balance: balance.toString(10),
-                usd: balance.multipliedBy(stakingTokenPriceUSD).toString(10),
+                usd: balanceUSD.toString(10),
               },
             },
             {
@@ -429,14 +357,12 @@ module.exports = {
         }
         const { signer } = options;
 
-        return (
-          await masterChefActionsFactory(
-            ethereum.erc20(provider, rewardToken).connect(signer),
-            ethereum.erc20(provider, stakingToken).connect(signer),
-            masterChiefContract.connect(signer),
-            pool
-          )
-        )(walletAddress);
+        return buildMasterChefActions(masterChefProvider, {
+          poolIndex: pool.index,
+          poolInfo,
+          signer,
+          etherscanAddressURL: 'https://bscscan.com/address',
+        }).then((actions) => actions(walletAddress));
       },
     };
   },
@@ -454,14 +380,14 @@ module.exports = {
 
     const apeRewardContract = new ethers.Contract(contractAddress, apeRewardV4ABI, provider);
     const rewardToken = await apeRewardContract.REWARD_TOKEN().then((v) => v.toLowerCase());
-    const rewardsTokenDecimals = await ethereum
+    const rewardTokenDecimals = await ethereum
       .erc20(provider, rewardToken)
       .decimals()
       .then((v) => Number(v.toString()));
     const rewardTokenPriceUSD = await priceFeed(rewardToken);
     const rewardTokenPerBlock = await apeRewardContract
       .rewardPerBlock({ blockTag })
-      .then((v) => toFloat(new bn(v.toString()), rewardsTokenDecimals));
+      .then((v) => toFloat(new bn(v.toString()), rewardTokenDecimals));
 
     const stakingToken = await apeRewardContract.STAKE_TOKEN().then((v) => v.toLowerCase());
     const stakingTokenDecimals = await ethereum
@@ -492,7 +418,17 @@ module.exports = {
       },
       reward: {
         token: rewardToken,
-        decimals: rewardsTokenDecimals,
+        decimals: rewardTokenDecimals,
+      },
+      stakeToken: {
+        address: stakingToken,
+        decimals: stakingTokenDecimals,
+        priceUSD: stakingTokenPriceUSD.toString(10),
+      },
+      rewardToken: {
+        address: rewardToken,
+        decimals: rewardTokenDecimals,
+        priceUSD: rewardTokenPriceUSD.toString(10),
       },
       metrics: {
         tvl: tvl.toString(10),
@@ -504,10 +440,7 @@ module.exports = {
       wallet: async (walletAddress) => {
         const { amount } = await apeRewardContract.userInfo(walletAddress, { blockTag });
         const balance = toFloat(amount, stakingTokenDecimals);
-        const earned = toFloat(
-          await apeRewardContract.pendingReward(walletAddress, { blockTag }),
-          rewardsTokenDecimals
-        );
+        const earned = toFloat(await apeRewardContract.pendingReward(walletAddress, { blockTag }), rewardTokenDecimals);
         const earnedUSD = earned.multipliedBy(rewardTokenPriceUSD);
 
         return {

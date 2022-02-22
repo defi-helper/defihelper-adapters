@@ -64,20 +64,11 @@ module.exports = {
       stakingToken = stakingToken.toLowerCase();
       rewardsToken = rewardsToken.toLowerCase();
       const rewardTokenUSD = await priceFeed.contractPrice(rewardsToken);
-      const {
-        token0,
-        reserve0,
-        token1,
-        reserve1,
-        totalSupply: lpTotalSupply,
-      } = await ethereum.uniswap.pairInfo(provider, stakingToken);
-      const token0Usd = await priceFeed.contractPrice(token0);
-      const token1Usd = await priceFeed.contractPrice(token1);
-      let stakingTokenUSD = new bn(reserve0)
-        .multipliedBy(token0Usd)
-        .plus(new bn(reserve1).multipliedBy(token1Usd))
-        .div(lpTotalSupply);
-      if (!stakingTokenUSD.isFinite()) stakingTokenUSD = new bn(0);
+
+      const stakingTokenPair = await ethereum.uniswap.pairInfo(provider, stakingToken, options);
+      const token0PriceUSD = await priceFeed.contractPrice(stakingTokenPair.token0);
+      const token1PriceUSD = await priceFeed.contractPrice(stakingTokenPair.token1);
+      const stakingTokenUSD = stakingTokenPair.calcPrice(token0PriceUSD, token1PriceUSD);
 
       const tvl = totalSupply.multipliedBy(stakingTokenUSD);
 
@@ -102,6 +93,28 @@ module.exports = {
         reward: {
           token: rewardsToken,
           decimals: rewardsTokenDecimals,
+        },
+        stakeToken: {
+          address: stakingToken,
+          decimals: stakingTokenDecimals,
+          priceUSD: stakingTokenUSD.toString(10),
+          parts: [
+            {
+              address: stakingTokenPair.token0,
+              decimals: stakingTokenPair.token0Decimals,
+              priceUSD: token0PriceUSD.toString(10),
+            },
+            {
+              address: stakingTokenPair.token1,
+              decimals: stakingTokenPair.token1Decimals,
+              priceUSD: token1PriceUSD.toString(10),
+            },
+          ],
+        },
+        rewardToken: {
+          address: rewardsToken,
+          decimals: rewardsTokenDecimals,
+          priceUSD: rewardTokenUSD.toString(10),
         },
         metrics: {
           tvl: tvl.toString(10),

@@ -82,13 +82,12 @@ module.exports = {
       masterChefProvider.contract.investorPercent({ blockTag }).then(toBN),
     ]);
     const lpPercent = new bn(1000).minus(devPercent).minus(treasuryPercent).minus(investorPercent).div(1000);
-    const aprSecond = poolInfo.allocPoint
+    const rewardPerSec = poolInfo.allocPoint
       .multipliedBy(rewardPerSecond)
       .div(totalAllocPoint)
       .multipliedBy(lpPercent)
-      .div(`1e${rewardTokenDecimals}`)
-      .multipliedBy(rewardTokenPriceUSD)
-      .div(tvl);
+      .div(`1e${rewardTokenDecimals}`);
+    const aprSecond = rewardPerSec.multipliedBy(rewardTokenPriceUSD).div(tvl);
     const aprDay = aprSecond.multipliedBy(86400);
     const aprWeek = aprDay.multipliedBy(7);
     const aprMonth = aprDay.multipliedBy(30);
@@ -102,6 +101,28 @@ module.exports = {
       reward: {
         token: rewardToken,
         decimals: rewardTokenDecimals,
+      },
+      stakeToken: {
+        address: stakingToken,
+        decimals: stakingTokenDecimals,
+        priceUSD: stakingTokenPriceUSD.toString(10),
+        parts: [
+          {
+            address: stakingTokenPair.token0,
+            decimals: stakingTokenPair.token0Decimals,
+            priceUSD: token0PriceUSD.toString(10),
+          },
+          {
+            address: stakingTokenPair.token1,
+            decimals: stakingTokenPair.token1Decimals,
+            priceUSD: token1PriceUSD.toString(10),
+          },
+        ],
+      },
+      rewardToken: {
+        address: rewardToken,
+        decimals: rewardTokenDecimals,
+        priceUSD: rewardTokenPriceUSD.toString(10),
       },
       metrics: {
         tvl: tvl.toString(10),
@@ -266,13 +287,12 @@ module.exports = {
       masterChefProvider.contract.investorPercent({ blockTag }).then(toBN),
     ]);
     const lpPercent = new bn(1000).minus(devPercent).minus(treasuryPercent).minus(investorPercent).div(1000);
-    const aprSecond = poolInfo.allocPoint
+    const rewardPerSec = poolInfo.allocPoint
       .multipliedBy(rewardPerSecond)
       .div(totalAllocPoint)
       .multipliedBy(lpPercent)
-      .div(`1e${rewardTokenDecimals}`)
-      .multipliedBy(rewardTokenPriceUSD)
-      .div(tvl);
+      .div(`1e${rewardTokenDecimals}`);
+    const aprSecond = rewardPerSec.multipliedBy(rewardTokenPriceUSD).div(tvl);
     const aprDay = aprSecond.multipliedBy(86400);
     const aprWeek = aprDay.multipliedBy(7);
     const aprMonth = aprDay.multipliedBy(30);
@@ -286,6 +306,16 @@ module.exports = {
       reward: {
         token: rewardToken,
         decimals: rewardTokenDecimals,
+      },
+      stakeToken: {
+        address: stakingToken,
+        decimals: stakingTokenDecimals,
+        priceUSD: stakingTokenPriceUSD.toString(10),
+      },
+      rewardToken: {
+        address: rewardToken,
+        decimals: rewardTokenDecimals,
+        priceUSD: rewardTokenPriceUSD.toString(10),
       },
       metrics: {
         tvl: tvl.toString(10),
@@ -416,12 +446,11 @@ module.exports = {
       masterChefProvider.rewardPerSecond({ blockTag }),
       masterChefProvider.totalAllocPoint({ blockTag }),
     ]);
-    const aprSecond = poolInfo.allocPoint
+    const rewardPerSec = poolInfo.allocPoint
       .multipliedBy(rewardPerSecond)
       .div(totalAllocPoint)
-      .div(`1e${rewardTokenDecimals}`)
-      .multipliedBy(rewardTokenPriceUSD)
-      .div(tvl);
+      .div(`1e${rewardTokenDecimals}`);
+    const aprSecond = rewardPerSec.multipliedBy(rewardTokenPriceUSD).div(tvl);
     const aprDay = aprSecond.multipliedBy(86400);
     const aprWeek = aprDay.multipliedBy(7);
     const aprMonth = aprDay.multipliedBy(30);
@@ -435,6 +464,28 @@ module.exports = {
       reward: {
         token: rewardToken,
         decimals: rewardTokenDecimals,
+      },
+      stakeToken: {
+        address: stakingToken,
+        decimals: stakingTokenDecimals,
+        priceUSD: stakingTokenPriceUSD.toString(10),
+        parts: [
+          {
+            address: stakingTokenPair.token0,
+            decimals: stakingTokenPair.token0Decimals,
+            priceUSD: token0PriceUSD.toString(10),
+          },
+          {
+            address: stakingTokenPair.token1,
+            decimals: stakingTokenPair.token1Decimals,
+            priceUSD: token1PriceUSD.toString(10),
+          },
+        ],
+      },
+      rewardToken: {
+        address: rewardToken,
+        decimals: rewardTokenDecimals,
+        priceUSD: rewardTokenPriceUSD.toString(10),
       },
       metrics: {
         tvl: tvl.toString(10),
@@ -545,6 +596,16 @@ module.exports = {
         token: joeAddress,
         decimals: joeDecimals,
       },
+      stakeToken: {
+        address: joeAddress,
+        decimals: joeDecimals,
+        priceUSD: joePriceUSD.toString(10),
+      },
+      rewardToken: {
+        address: xJoeAddress,
+        decimals: xJoeDecimals,
+        priceUSD: joePriceUSD.toString(10),
+      },
       metrics: {
         tvl: tvl.toString(10),
         aprDay: '0',
@@ -554,7 +615,9 @@ module.exports = {
       },
       wallet: async (walletAddress) => {
         const [xJoeBalance, joeBalance, xJoeTotalSupply, joePriceUSD] = await Promise.all([
-          xJoeContract.balanceOf(walletAddress, { blockTag }).then((v) => new bn(v.toString()).div(`1e${xJoeDecimals}`)),
+          xJoeContract
+            .balanceOf(walletAddress, { blockTag })
+            .then((v) => new bn(v.toString()).div(`1e${xJoeDecimals}`)),
           joeContract.balanceOf(xJoeAddress, { blockTag }).then((v) => new bn(v.toString()).div(`1e${joeDecimals}`)),
           xJoeContract.totalSupply({ blockTag }).then((v) => new bn(v.toString()).div(`1e${xJoeDecimals}`)),
           priceFeed(joeAddress),
