@@ -123,6 +123,7 @@ async function getUnderlyingBalance(pools, priceFeed, pool, amount) {
       ...result,
       {
         address,
+        decimals,
         balance,
         balanceUSD: new bn(balance).multipliedBy(priceUSD).toString(10),
       },
@@ -167,7 +168,8 @@ function stakingAdapterFactory(poolABI) {
     const stakingTokenDecimals = 18;
 
     const totalSupplyTokens = await getUnderlyingBalance(pools, priceFeed, pool, stakedTotalSupply.toString());
-    const tvl = totalSupplyTokens.flat(Infinity).reduce((sum, { balanceUSD }) => sum.plus(balanceUSD), new bn(0));
+    const stakedTokens = totalSupplyTokens.flat(Infinity);
+    const tvl = stakedTokens.reduce((sum, { balanceUSD }) => sum.plus(balanceUSD), new bn(0));
 
     const aprDay = new bn(e18(inflationRate))
       .multipliedBy(e18(relativeWeight))
@@ -178,6 +180,20 @@ function stakingAdapterFactory(poolABI) {
       .multipliedBy(crvPriceUSD);
 
     return {
+      stakeToken: {
+        address: poolInfo.lpToken,
+        decimals: 18,
+        parts: stakedTokens.map(({ address, decimals, balance, balanceUSD }) => ({
+          address,
+          decimals,
+          priceUSD: new bn(balanceUSD).div(balance).toString(10),
+        })),
+      },
+      rewardToken: {
+        address: crvToken,
+        decimals: 18,
+        priceUSD: crvPriceUSD.toString(10),
+      },
       metrics: {
         tvl: tvl.toString(10),
         aprDay: aprDay.toString(10),
