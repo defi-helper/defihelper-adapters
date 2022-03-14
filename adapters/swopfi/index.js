@@ -264,7 +264,7 @@ module.exports = {
             AutomateActions.tab(
               'Claim',
               async () => ({
-                description: `Claim and restake your [SWOP](https://wavesexplorer.com/assets/Ehie5xYpeN8op1Cctc6aGUrqx8jq3jtf1DSjXDbfm7aT) reward from contract`,
+                description: `Claim and restake your [SWOP](https://wavesexplorer.com/assets/Ehie5xYpeN8op1Cctc6aGUrqx8jq3jtf1DSjXDbfm7aT) reward`,
               }),
               async () => true,
               async () => {
@@ -609,7 +609,7 @@ module.exports = {
             AutomateActions.tab(
               'Claim',
               async () => ({
-                description: `Claim your [SWOP](https://wavesexplorer.com/assets/Ehie5xYpeN8op1Cctc6aGUrqx8jq3jtf1DSjXDbfm7aT) reward from contract`,
+                description: `Claim your [SWOP](https://wavesexplorer.com/assets/Ehie5xYpeN8op1Cctc6aGUrqx8jq3jtf1DSjXDbfm7aT) reward`,
               }),
               async () => true,
               async () => {

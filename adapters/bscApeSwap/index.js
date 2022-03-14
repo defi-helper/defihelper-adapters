@@ -566,7 +566,7 @@ module.exports = {
             AutomateActions.tab(
               'Claim',
               async () => ({
-                description: `Claim your [${rewardTokenSymbol}](https://bscscan.com/address/${rewardTokenContract.address}) reward from contract`,
+                description: `Claim your [${rewardTokenSymbol}](https://bscscan.com/address/${rewardTokenContract.address}) reward`,
               }),
               async () => {
                 const earned = await stakingContract.pendingReward(walletAddress).then((v) => v.toString());
