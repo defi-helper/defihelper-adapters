@@ -627,7 +627,7 @@ module.exports = {
           poolsInfo.map(({ lpToken }) => new ethersMulticall.Contract(lpToken, ethereum.abi.ERC20ABI).symbol())
         );
 
-        const pools = await Promise.all(
+        const uniswapLiquidityPools = await Promise.all(
           poolsInfo.map(async (info, index) => {
             const stakingTokenSymbol = poolsStakingTokensSymbol[index];
             const isPair = stakingTokenSymbol === 'APE-LP';
@@ -676,7 +676,7 @@ module.exports = {
             options.cacheAuth,
             'bscApeSwap',
             'masterChefPools',
-            pools.map(({ poolIndex, stakingToken, adapter }) => ({
+            uniswapLiquidityPools.map(({ poolIndex, stakingToken, adapter }) => ({
               index: poolIndex,
               stakingToken,
               type: adapter === 'masterChefPair' ? 'lp' : 'single',
@@ -684,7 +684,30 @@ module.exports = {
           );
         }
 
-        return pools;
+        const poolsJsonRaw = (await axios.get('http://api.apeswap.finance/stats')).data.incentivizedPools.filter(
+          (v) => {
+            return !uniswapLiquidityPools.some((pool) => v.address === pool.address) && v.active;
+          }
+        );
+
+        const poolsApeReward = poolsJsonRaw.map(({ address, name, rewardTokenSymbol, stakedTokenAddress }) => ({
+          poolIndex: 0,
+          stakingToken: stakedTokenAddress,
+          name: `${name}-${rewardTokenSymbol}`,
+          address,
+          blockchain: 'ethereum',
+          network: '56',
+          layout: 'staking',
+          adapter: 'apeRewardV4',
+          description: '',
+          automate: {
+            autorestakeAdapter: 'ApeRewardV4Restake',
+            adapters: ['apeRewardV4'],
+          },
+          link: 'https://apeswap.finance/pools',
+        }));
+
+        return [...uniswapLiquidityPools, ...poolsApeReward];
       },
     },
     deploy: {
