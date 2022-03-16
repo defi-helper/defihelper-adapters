@@ -2,7 +2,7 @@
 {-# SCRIPT_TYPE ACCOUNT  #-}
 {-# CONTENT_TYPE DAPP    #-}
 
-let oracle = Address(base58'') # Need to filled
+let oracle = Address(base58'3PDedevqMVfpw77FWChNNqYsfhmw63rFfWW')
 
 let balance = oracle.getString("balance_address").valueOrErrorMessage("Empty key balance_address").addressFromStringValue()
 let SWOPgovernanceAdr = oracle.getString("swop_governance").valueOrErrorMessage("Empty key swop_governance").addressFromStringValue()
