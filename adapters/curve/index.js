@@ -336,7 +336,7 @@ function stakingAdapterFactory(poolABI) {
             AutomateActions.tab(
               'Claim',
               async () => ({
-                description: `Claim your [${rewardTokenSymbol}](etherscan.io/address/${rewardToken}) reward from contract`,
+                description: `Claim your [${rewardTokenSymbol}](etherscan.io/address/${rewardToken}) reward`,
               }),
               async () => {
                 const earned = await minterContract.minted(walletAddress, pool.gauge.address).then((v) => v.toString());

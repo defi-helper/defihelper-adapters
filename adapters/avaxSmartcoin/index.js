@@ -252,7 +252,7 @@ module.exports = {
             AutomateActions.tab(
               'Claim',
               async () => ({
-                description: `Claim your [${rewardTokenSymbol}](https://snowtrace.io/address/${rewardsToken}) reward from contract`,
+                description: `Claim your [${rewardTokenSymbol}](https://snowtrace.io/address/${rewardsToken}) reward`,
               }),
               async () => {
                 const earned = await stakingContract.pendingReward(poolIndex, walletAddress).then((v) => v.toString());

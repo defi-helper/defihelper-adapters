@@ -267,7 +267,7 @@ async function buildMasterChefActions(masterChefProvider, { poolIndex, poolInfo,
       AutomateActions.tab(
         'Claim',
         async () => ({
-          description: `Claim your [${rewardTokenSymbol}](${etherscanAddressURL}/${rewardTokenContract.address}) reward from contract`,
+          description: `Claim your [${rewardTokenSymbol}](${etherscanAddressURL}/${rewardTokenContract.address}) reward`,
         }),
         async () => {
           const earned = await masterChefProvider.pendingReward(poolIndex, walletAddress);

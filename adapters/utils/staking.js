@@ -275,7 +275,7 @@ module.exports = {
               AutomateActions.tab(
                 'Claim',
                 async () => ({
-                  description: `Claim your [${rewardTokenSymbol}](https://etherscan.io/address/${rewardsToken}) reward from contract`,
+                  description: `Claim your [${rewardTokenSymbol}](https://etherscan.io/address/${rewardsToken}) reward`,
                 }),
                 async () => {
                   const earned = await stakingContract.earned(walletAddress).then((v) => v.toString());
