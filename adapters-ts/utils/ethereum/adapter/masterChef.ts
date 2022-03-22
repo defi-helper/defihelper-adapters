@@ -429,8 +429,8 @@ export async function buildMasterChefActions(
           new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`)
         );
       },
-      approve: (amount: string) => ({
-        tx: erc20.approveAll(
+      approve: async (amount: string) => ({
+        tx: await erc20.approveAll(
           stakingTokenContract,
           walletAddress,
           masterChefProvider.contract.address,
