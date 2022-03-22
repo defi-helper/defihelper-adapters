@@ -411,7 +411,7 @@ export async function buildMasterChefActions(
   ]);
 
   return async (walletAddress) => ({
-    stake: Action.component("Stake", {
+    stake: Action.component("staking-stake", {
       symbol: () => stakingTokenSymbol,
       link: () => `${etherscanAddressURL}/${stakingTokenContract.address}`,
       balanceOf: () =>
@@ -458,7 +458,7 @@ export async function buildMasterChefActions(
         ),
       }),
     }),
-    unstake: Action.component("Unstake", {
+    unstake: Action.component("staking-unstake", {
       symbol: () => stakingTokenSymbol,
       link: () => `${etherscanAddressURL}/${stakingTokenContract.address}`,
       balanceOf: () =>
@@ -490,7 +490,7 @@ export async function buildMasterChefActions(
         ),
       }),
     }),
-    claim: Action.component("Claim", {
+    claim: Action.component("staking-claim", {
       symbol: () => rewardTokenSymbol,
       link: () => `${etherscanAddressURL}/${rewardTokenContract.address}`,
       balanceOf: () =>
@@ -514,7 +514,7 @@ export async function buildMasterChefActions(
         tx: await masterChefProvider.deposit(poolIndex, 0),
       }),
     }),
-    exit: Action.component("Exit", {
+    exit: Action.component("staking-exit", {
       can: async () => {
         const earned = await masterChefProvider.pendingReward(
           poolIndex,
