@@ -1,4 +1,5 @@
 adapters-public
+adapters-public-ts
 automates-public/ethereum/deployment/local
 public/dist
 .cache
@@ -25,6 +26,7 @@ server/cache/*
 .env.production.local
 
 .idea
+.vscode
 
 npm-debug.log*
 yarn-debug.log*

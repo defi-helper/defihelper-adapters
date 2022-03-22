@@ -14,6 +14,8 @@
     "adapters:build": "rollup -c adapters.rollup.js",
     "adapters:build-dev": "rollup -c adapters.rollup.js",
     "adapters:watch": "rollup -c adapters.rollup.js -w",
+    "adapters-ts:build": "rollup -c ./adapters-ts/rollup.js",
+    "adapters-ts:watch": "rollup -c ./adapters-ts/rollup.js -w",
     "server": "node ./server/index.js",
     "client:build": "parcel build ./server/client/index.js -d public/dist --no-cache",
     "client:watch": "parcel watch ./server/client/index.js -d public/dist",

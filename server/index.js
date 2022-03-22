@@ -8,6 +8,7 @@ const fs = require('fs');
 
 const app = Express();
 app.use(Express.static(path.resolve(__dirname, '../adapters-public')));
+app.use(Express.static(path.resolve(__dirname, '../adapters-public-ts')));
 app.use('/cache', [json()], Express.static(path.resolve(__dirname, './cache')));
 app.post(/^\/cache\/(.+)/i, async (req, res) => {
   const auth = req.header('Auth');
@@ -103,8 +104,14 @@ app.get('/automates/waves', async (req, res) => {
   );
 });
 app.get('/', async (req, res) => {
-  const adapters = await glob(path.resolve(__dirname, '../adapters-public/*.js'));
-  return res.json(adapters.map((adapter) => path.parse(adapter).name));
+  const adapters = await glob(path.resolve(__dirname, '../adapters-public/*.js')).then((adapters) =>
+    adapters.map((adapter) => path.parse(adapter).name)
+  );
+  const adaptersTS = await glob(path.resolve(__dirname, '../adapters-public-ts/*.js')).then((adapters) =>
+    adapters.map((adapter) => path.parse(adapter).name)
+  );
+
+  return res.json([...adapters, ...adaptersTS]);
 });
 app.use(Express.static(path.resolve(__dirname, '../public')));
 app.get(/^\/client/, (req, res) => {

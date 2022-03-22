@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "module": "CommonJS",
+    "strict": true,
+    "outDir": "../adapters-public-ts",
+    "declaration": true,
+    "inlineSourceMap": true,
+    "target": "es2020",
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "allowJs": true
+  }
+}
