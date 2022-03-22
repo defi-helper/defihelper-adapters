@@ -42,13 +42,6 @@ export namespace Action {
   ) => ({ name, info, can, send });
 
   export type Tab = ReturnType<typeof tab>;
-
-  export const component = (
-    name: string,
-    methods: { [method: string]: (...args: any[]) => any }
-  ) => ({ name, methods });
-
-  export type Component = ReturnType<typeof component>;
 }
 
 export namespace Staking {
@@ -100,10 +93,45 @@ export namespace Staking {
 
   export interface Actions {
     (walletAddress: string): Promise<{
-      stake: Action.Tab[] | Action.Component;
-      unstake: Action.Tab[] | Action.Component;
-      claim: Action.Tab[] | Action.Component;
-      exit: Action.Tab[] | Action.Component;
+      stake: {
+        name: "staking-stake";
+        methods: {
+          symbol: () => string;
+          link: () => string;
+          balanceOf: () => Promise<string>;
+          isApproved: (amount: string) => Promise<boolean>;
+          approve: (amount: string) => Promise<{ tx: ContractTransaction }>;
+          can: (amount: string) => Promise<true | Error>;
+          stake: (amount: string) => Promise<{ tx: ContractTransaction }>;
+        };
+      };
+      unstake: {
+        name: "staking-unstake";
+        methods: {
+          symbol: () => string;
+          link: () => string;
+          balanceOf: () => Promise<string>;
+          can: (amount: string) => Promise<true | Error>;
+          unstake: (amount: string) => Promise<{ tx: ContractTransaction }>;
+        };
+      };
+      claim: {
+        name: "staking-claim";
+        methods: {
+          symbol: () => string;
+          link: () => string;
+          balanceOf: () => Promise<string>;
+          can: (amount: string) => Promise<true | Error>;
+          claim: (amount: string) => Promise<{ tx: ContractTransaction }>;
+        };
+      };
+      exit: {
+        name: "staking-exit";
+        methods: {
+          can: (amount: string) => Promise<true | Error>;
+          exit: (amount: string) => Promise<{ tx: ContractTransaction }>;
+        };
+      };
     }>;
   }
 

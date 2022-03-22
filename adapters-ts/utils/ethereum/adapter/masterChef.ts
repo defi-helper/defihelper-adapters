@@ -191,7 +191,7 @@ export async function buildMasterChefActionTabs(
     signer: ethers.Signer;
     etherscanAddressURL: string;
   }
-): Promise<Staking.Actions> {
+) {
   masterChefProvider.connect(signer);
   const rewardTokenContract = erc20
     .contract(
@@ -212,7 +212,7 @@ export async function buildMasterChefActionTabs(
       stakingTokenContract.decimals().then(toBN),
     ]);
 
-  return async (walletAddress) => ({
+  return async (walletAddress: string) => ({
     stake: [
       Action.tab(
         "Stake",
@@ -371,7 +371,7 @@ export async function buildMasterChefActionTabs(
   });
 }
 
-export async function buildMasterChefActions(
+export async function buildMasterChefStakingActions(
   masterChefProvider: MasterChefProvider,
   {
     poolIndex,
@@ -411,136 +411,154 @@ export async function buildMasterChefActions(
   ]);
 
   return async (walletAddress) => ({
-    stake: Action.component("staking-stake", {
-      symbol: () => stakingTokenSymbol,
-      link: () => `${etherscanAddressURL}/${stakingTokenContract.address}`,
-      balanceOf: () =>
-        stakingTokenContract
-          .balanceOf(walletAddress)
-          .then((v: ethers.BigNumber) =>
-            toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
+    stake: {
+      name: "staking-stake",
+      methods: {
+        symbol: () => stakingTokenSymbol,
+        link: () => `${etherscanAddressURL}/${stakingTokenContract.address}`,
+        balanceOf: () =>
+          stakingTokenContract
+            .balanceOf(walletAddress)
+            .then((v: ethers.BigNumber) =>
+              toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
+            ),
+        isApproved: async (amount: string) => {
+          const allowance = await stakingTokenContract
+            .allowance(walletAddress, masterChefProvider.contract.address)
+            .then(toBN);
+
+          return allowance.isGreaterThanOrEqualTo(
+            new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`)
+          );
+        },
+        approve: async (amount: string) => ({
+          tx: await erc20.approveAll(
+            stakingTokenContract,
+            walletAddress,
+            masterChefProvider.contract.address,
+            new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`).toFixed(0)
           ),
-      isApproved: async (amount: string) => {
-        const allowance = await stakingTokenContract
-          .allowance(walletAddress, masterChefProvider.contract.address)
-          .then(toBN);
+        }),
+        can: async (amount: string) => {
+          if (amount === "") return Error("Invalid amount");
 
-        return allowance.isGreaterThanOrEqualTo(
-          new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`)
-        );
-      },
-      approve: async (amount: string) => ({
-        tx: await erc20.approveAll(
-          stakingTokenContract,
-          walletAddress,
-          masterChefProvider.contract.address,
-          new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`).toFixed(0)
-        ),
-      }),
-      can: async (amount: string) => {
-        const amountInt = new bn(amount).multipliedBy(
-          `1e${stakingTokenDecimals}`
-        );
-        if (amountInt.lte(0)) return Error("Invalid amount");
+          const amountInt = new bn(amount).multipliedBy(
+            `1e${stakingTokenDecimals}`
+          );
+          if (amountInt.isNaN() || amountInt.lte(0))
+            return Error("Invalid amount");
 
-        const balance = await stakingTokenContract
-          .balanceOf(walletAddress)
-          .then(toBN);
-        if (amountInt.gt(balance))
-          return Error("Insufficient funds on the balance");
+          const balance = await stakingTokenContract
+            .balanceOf(walletAddress)
+            .then(toBN);
+          if (amountInt.gt(balance))
+            return Error("Insufficient funds on the balance");
 
-        return true;
-      },
-      stake: async (amount: string) => ({
-        tx: await masterChefProvider.deposit(
-          poolIndex,
-          new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`).toFixed(0)
-        ),
-      }),
-    }),
-    unstake: Action.component("staking-unstake", {
-      symbol: () => stakingTokenSymbol,
-      link: () => `${etherscanAddressURL}/${stakingTokenContract.address}`,
-      balanceOf: () =>
-        masterChefProvider
-          .userInfo(poolIndex, walletAddress)
-          .then(({ amount }) =>
-            amount.div(`1e${stakingTokenDecimals}`).toString(10)
+          return true;
+        },
+        stake: async (amount: string) => ({
+          tx: await masterChefProvider.deposit(
+            poolIndex,
+            new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`).toFixed(0)
           ),
-      can: async (amount) => {
-        const amountInt = new bn(amount).multipliedBy(
-          `1e${stakingTokenDecimals}`
-        );
-        if (amountInt.lte(0)) return Error("Invalid amount");
-
-        const userInfo = await masterChefProvider.userInfo(
-          poolIndex,
-          walletAddress
-        );
-        if (amountInt.isGreaterThan(userInfo.amount)) {
-          return Error("Amount exceeds balance");
-        }
-
-        return true;
+        }),
       },
-      unstake: async (amount) => ({
-        tx: await masterChefProvider.withdraw(
-          poolIndex,
-          new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`).toFixed(0)
-        ),
-      }),
-    }),
-    claim: Action.component("staking-claim", {
-      symbol: () => rewardTokenSymbol,
-      link: () => `${etherscanAddressURL}/${rewardTokenContract.address}`,
-      balanceOf: () =>
-        masterChefProvider
-          .pendingReward(poolIndex, walletAddress)
-          .then((earned) =>
-            earned.div(`1e${rewardTokenDecimals}`).toString(10)
+    },
+    unstake: {
+      name: "staking-unstake",
+      methods: {
+        symbol: () => stakingTokenSymbol,
+        link: () => `${etherscanAddressURL}/${stakingTokenContract.address}`,
+        balanceOf: () =>
+          masterChefProvider
+            .userInfo(poolIndex, walletAddress)
+            .then(({ amount }) =>
+              amount.div(`1e${stakingTokenDecimals}`).toString(10)
+            ),
+        can: async (amount) => {
+          if (amount === "") return Error("Invalid amount");
+
+          const amountInt = new bn(amount).multipliedBy(
+            `1e${stakingTokenDecimals}`
+          );
+          if (amountInt.isNaN() || amountInt.lte(0))
+            return Error("Invalid amount");
+
+          const userInfo = await masterChefProvider.userInfo(
+            poolIndex,
+            walletAddress
+          );
+          if (amountInt.isGreaterThan(userInfo.amount)) {
+            return Error("Amount exceeds balance");
+          }
+
+          return true;
+        },
+        unstake: async (amount) => ({
+          tx: await masterChefProvider.withdraw(
+            poolIndex,
+            new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`).toFixed(0)
           ),
-      can: async () => {
-        const earned = await masterChefProvider.pendingReward(
-          poolIndex,
-          walletAddress
-        );
-        if (earned.isLessThanOrEqualTo(0)) {
-          return Error("No earnings");
-        }
-
-        return true;
+        }),
       },
-      claim: async () => ({
-        tx: await masterChefProvider.deposit(poolIndex, 0),
-      }),
-    }),
-    exit: Action.component("staking-exit", {
-      can: async () => {
-        const earned = await masterChefProvider.pendingReward(
-          poolIndex,
-          walletAddress
-        );
-        const { amount } = await masterChefProvider.userInfo(
-          poolIndex,
-          walletAddress
-        );
-        if (earned.isLessThanOrEqualTo(0) && amount.isLessThanOrEqualTo(0)) {
-          return Error("No staked");
-        }
+    },
+    claim: {
+      name: "staking-claim",
+      methods: {
+        symbol: () => rewardTokenSymbol,
+        link: () => `${etherscanAddressURL}/${rewardTokenContract.address}`,
+        balanceOf: () =>
+          masterChefProvider
+            .pendingReward(poolIndex, walletAddress)
+            .then((earned) =>
+              earned.div(`1e${rewardTokenDecimals}`).toString(10)
+            ),
+        can: async () => {
+          const earned = await masterChefProvider.pendingReward(
+            poolIndex,
+            walletAddress
+          );
+          if (earned.isLessThanOrEqualTo(0)) {
+            return Error("No earnings");
+          }
 
-        return true;
+          return true;
+        },
+        claim: async () => ({
+          tx: await masterChefProvider.deposit(poolIndex, 0),
+        }),
       },
-      exit: async () => {
-        const { amount } = await masterChefProvider.userInfo(
-          poolIndex,
-          walletAddress
-        );
-        if (amount.isGreaterThan(0)) {
-          await masterChefProvider.withdraw(poolIndex, amount.toFixed(0));
-        }
+    },
+    exit: {
+      name: "staking-exit",
+      methods: {
+        can: async () => {
+          const earned = await masterChefProvider.pendingReward(
+            poolIndex,
+            walletAddress
+          );
+          const { amount } = await masterChefProvider.userInfo(
+            poolIndex,
+            walletAddress
+          );
+          if (earned.isLessThanOrEqualTo(0) && amount.isLessThanOrEqualTo(0)) {
+            return Error("No staked");
+          }
 
-        return { tx: await masterChefProvider.deposit(poolIndex, 0) };
+          return true;
+        },
+        exit: async () => {
+          const { amount } = await masterChefProvider.userInfo(
+            poolIndex,
+            walletAddress
+          );
+          if (amount.isGreaterThan(0)) {
+            await masterChefProvider.withdraw(poolIndex, amount.toFixed(0));
+          }
+
+          return { tx: await masterChefProvider.deposit(poolIndex, 0) };
+        },
       },
-    }),
+    },
   });
 }

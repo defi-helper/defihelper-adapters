@@ -5,7 +5,7 @@ import { ReactJsonWrap } from "../components/ReactJsonWrap";
 import * as adaptersGateway from "../common/adapter";
 import { useProvider as useEthProvider } from "../common/ether";
 //import { useProvider as useWavesProvider } from "../common/waves";
-import { AdapterModalSteps } from "../components";
+import { AdapterModalSteps, AdapterModalComponent } from "../components";
 import { useQueryParams } from "../common/useQueryParams";
 import { blockchainEnum } from "../common/constants";
 import { Button } from "../components/Button";
@@ -35,6 +35,7 @@ export function AdapterProtocol(props) {
   const [actionReload, setActionReload] = React.useState(false);
   const [actionResult, setActionResult] = React.useState(null);
   const [actionSteps, setActionSteps] = React.useState([]);
+  const [actionComponent, setActionComponent] = React.useState(null);
 
   React.useEffect(() => {
     const handler = async () => {
@@ -62,7 +63,7 @@ export function AdapterProtocol(props) {
             signer: ethSigner,
           });
           break;
-          /*
+        /*
         case blockchainEnum.waves:
           metrics = await protocol[currentAdapter](wavesProvider, contract, {
             node: await wavesProvider
@@ -107,11 +108,16 @@ export function AdapterProtocol(props) {
 
     setActionReload(true);
     setActionSteps([]);
-    try {
-      setActionSteps(actions[currentAction]);
+    if (actions[currentAction].methods !== undefined) {
+      setActionComponent(actions[currentAction]);
       setActionResult(null);
-    } catch (e) {
-      console.error(e);
+    } else {
+      try {
+        setActionSteps(actions[currentAction]);
+        setActionResult(null);
+      } catch (e) {
+        console.error(e);
+      }
     }
     setActionReload(false);
   };
@@ -229,6 +235,15 @@ export function AdapterProtocol(props) {
               <h3>Action steps</h3>
               <AdapterModalSteps
                 steps={actionSteps}
+                onAction={setActionResult}
+              />
+            </div>
+          )}
+          {!actionComponent || (
+            <div>
+              <h3>Action component</h3>
+              <AdapterModalComponent
+                component={actionComponent}
                 onAction={setActionResult}
               />
             </div>
