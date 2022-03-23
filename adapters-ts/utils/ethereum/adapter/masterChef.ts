@@ -1,9 +1,9 @@
 import type BigNumber from "bignumber.js";
-import type ethers from "ethers";
-import { bignumber as bn } from "../../../lib";
+import type ethersType from "ethers";
+import { bignumber as bn, ethers } from "../../../lib";
 import { toBN, BlockNumber } from "../base";
 import * as erc20 from "../erc20";
-import { Action, Staking } from "./base";
+import { Action, Staking, Deploy } from "./base";
 
 export interface Options {
   blockTag: BlockNumber;
@@ -21,12 +21,12 @@ export interface UserInfo {
 }
 
 export interface MasterChefContext {
-  contract: ethers.Contract;
+  contract: ethersType.Contract;
   options: Options;
 }
 
 export interface MasterChefImplementation {
-  connect(signer: ethers.Signer): MasterChefProvider;
+  connect(signer: ethersType.Signer): MasterChefProvider;
   stakingToken(
     this: MasterChefProvider,
     pool: PoolInfo
@@ -53,12 +53,12 @@ export interface MasterChefImplementation {
     this: MasterChefProvider,
     poolIndex: string | number,
     amount: string | number
-  ): Promise<ethers.ContractTransaction>;
+  ): Promise<ethersType.ContractTransaction>;
   withdraw(
     this: MasterChefProvider,
     poolIndex: string | number,
     amount: string | number
-  ): Promise<ethers.ContractTransaction>;
+  ): Promise<ethersType.ContractTransaction>;
 }
 
 export type MasterChefProvider = MasterChefContext & MasterChefImplementation;
@@ -96,8 +96,8 @@ export const defaultProviderImplementation: Pick<
           amount,
           rewardDebt,
         }: {
-          amount: ethers.BigNumber;
-          rewardDebt: ethers.BigNumber;
+          amount: ethersType.BigNumber;
+          rewardDebt: ethersType.BigNumber;
         }) => ({
           amount: toBN(amount),
           rewardDebt: toBN(rewardDebt),
@@ -121,7 +121,7 @@ type RequiredMethods = Pick<
 >;
 
 export function buildMasterChefProvider(
-  contract: ethers.Contract,
+  contract: ethersType.Contract,
   { blockTag }: Options,
   {
     stakingToken = defaultProviderImplementation.stakingToken,
@@ -188,7 +188,7 @@ export async function buildMasterChefActionTabs(
   }: {
     poolIndex: number;
     poolInfo: PoolInfo;
-    signer: ethers.Signer;
+    signer: ethersType.Signer;
     etherscanAddressURL: string;
   }
 ) {
@@ -223,7 +223,7 @@ export async function buildMasterChefActionTabs(
               placeholder: "amount",
               value: await stakingTokenContract
                 .balanceOf(walletAddress)
-                .then((v: ethers.BigNumber) =>
+                .then((v: ethersType.BigNumber) =>
                   toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
                 ),
             }),
@@ -381,7 +381,7 @@ export async function buildMasterChefStakingActions(
   }: {
     poolIndex: number;
     poolInfo: PoolInfo;
-    signer: ethers.Signer;
+    signer: ethersType.Signer;
     etherscanAddressURL: string;
   }
 ): Promise<Staking.Actions> {
@@ -419,7 +419,7 @@ export async function buildMasterChefStakingActions(
         balanceOf: () =>
           stakingTokenContract
             .balanceOf(walletAddress)
-            .then((v: ethers.BigNumber) =>
+            .then((v: ethersType.BigNumber) =>
               toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
             ),
         isApproved: async (amount: string) => {
@@ -561,4 +561,110 @@ export async function buildMasterChefStakingActions(
       },
     },
   });
+}
+
+export async function buildMasterChefRestakeDeployTabs(
+  signer: ethersType.Signer,
+  factoryAddress: string,
+  prototypeAddress: string,
+  {
+    router,
+    poolIndex,
+    pools,
+    stakingAddress,
+    automateABI,
+  }: {
+    router: string;
+    poolIndex: string;
+    pools: Array<{ index: number }>;
+    stakingAddress: string;
+    automateABI?: any;
+  }
+) {
+  return {
+    deploy: [
+      Action.tab(
+        "Deploy",
+        async () => ({
+          description: "Deploy your own contract",
+          inputs: [
+            Action.input({
+              placeholder: "Liquidity pool router address",
+              value: router,
+            }),
+            Action.input({
+              placeholder: "Target pool index",
+              value: poolIndex,
+            }),
+            Action.input({
+              placeholder: "Slippage (percent)",
+              value: "1",
+            }),
+            Action.input({
+              placeholder: "Deadline (seconds)",
+              value: "300",
+            }),
+          ],
+        }),
+        async (_, pool, slippage, deadline) => {
+          if (!pools.find(({ index }) => index === parseInt(pool, 10)))
+            return new Error("Invalid pool index");
+          if (slippage < 0 || slippage > 100)
+            return new Error("Invalid slippage percent");
+          if (deadline < 0) return new Error("Deadline has already passed");
+
+          return true;
+        },
+        async (router, pool, slippage, deadline) =>
+          Deploy.deploy(
+            signer,
+            factoryAddress,
+            prototypeAddress,
+            new ethers.utils.Interface(
+              automateABI ?? [
+                {
+                  inputs: [
+                    {
+                      internalType: "address",
+                      name: "_staking",
+                      type: "address",
+                    },
+                    {
+                      internalType: "address",
+                      name: "_liquidityRouter",
+                      type: "address",
+                    },
+                    {
+                      internalType: "uint256",
+                      name: "_pool",
+                      type: "uint256",
+                    },
+                    {
+                      internalType: "uint16",
+                      name: "_slippage",
+                      type: "uint16",
+                    },
+                    {
+                      internalType: "uint16",
+                      name: "_deadline",
+                      type: "uint16",
+                    },
+                  ],
+                  name: "init",
+                  outputs: [],
+                  stateMutability: "nonpayable",
+                  type: "function",
+                },
+              ]
+            ).encodeFunctionData("init", [
+              stakingAddress,
+              router,
+              pool,
+              Math.floor(slippage * 100),
+              deadline,
+            ])
+          )
+      ),
+    ],
+  };
 }

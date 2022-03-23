@@ -100,7 +100,7 @@ export namespace Staking {
           link: () => string;
           balanceOf: () => Promise<string>;
           isApproved: (amount: string) => Promise<boolean>;
-          approve: (amount: string) => Promise<{ tx: ContractTransaction }>;
+          approve: (amount: string) => Promise<{ tx: ContractTransaction | null }>;
           can: (amount: string) => Promise<true | Error>;
           stake: (amount: string) => Promise<{ tx: ContractTransaction }>;
         };
@@ -160,6 +160,53 @@ export namespace Staking {
       rewardToken: ContractTokenInfo;
       metrics: ContractMetrics;
       wallet: WalletAdapter;
+      actions: Actions;
+    }>;
+  }
+}
+
+export namespace GovernanceSwap {
+  export interface Actions {
+    (walletAddress: string): Promise<{
+      stake: {
+        name: "governanceSwap-stake";
+        methods: {
+          fromSymbol: () => string;
+          fromLink: () => string;
+          toSymbol: () => string;
+          toLink: () => string;
+          balanceOf: () => Promise<string>;
+          isApproved: (amount: string) => Promise<boolean>;
+          approve: (amount: string) => Promise<{ tx: ContractTransaction | null }>;
+          can: (amount: string) => Promise<true | Error>;
+          stake: (amount: string) => Promise<{ tx: ContractTransaction }>;
+        };
+      };
+      unstake: {
+        name: "governanceSwap-unstake";
+        methods: {
+          fromSymbol: () => string;
+          fromLink: () => string;
+          toSymbol: () => string;
+          toLink: () => string;
+          balanceOf: () => Promise<string>;
+          can: (amount: string) => Promise<true | Error>;
+          unstake: (amount: string) => Promise<{ tx: ContractTransaction }>;
+        };
+      };
+    }>;
+  }
+
+  export interface ContractAdapter {
+    (
+      provider: providers.Provider,
+      contractAddress: string,
+      initOptions: base.Options
+    ): Promise<{
+      stakeToken: Staking.ContractTokenInfo;
+      rewardToken: Staking.ContractTokenInfo;
+      metrics: Staking.ContractMetrics;
+      wallet: Staking.WalletAdapter;
       actions: Actions;
     }>;
   }
@@ -228,30 +275,34 @@ export namespace Automate {
   }
 }
 
+export interface ResolvedContract {
+  name: string;
+  address: string;
+  blockchain: "ethereum" | "waves";
+  network: string;
+  layout: string;
+  adapter: string;
+  description: string;
+  link: string;
+  automate: {
+    adapters?: string[];
+    autorestakeAdapter?: string;
+    buyLiquidity?: {
+      router: string;
+      pair: string;
+    };
+  };
+}
+
 export interface ContractsResolver {
   (provider: providers.Provider, options?: { cacheAuth?: string }): Promise<
-    Array<{
-      name: string;
-      address: string;
-      blockchain: "ethereum" | "waves";
-      network: string;
-      layout: string;
-      adapter: string;
-      description: string;
-      link: string;
-      automate: {
-        adapters?: string[];
-        autorestakeAdapter?: string;
-        buyLiquidity?: {
-          router: string;
-          pair: string;
-        };
-      };
-    }>
+    ResolvedContract[]
   >;
 }
 
 export const stakingAdapter = (v: Staking.ContractAdapter) => v;
+
+export const governanceSwapAdapter = (v: GovernanceSwap.ContractAdapter) => v;
 
 export const contractsResolver = (v: ContractsResolver) => v;
 

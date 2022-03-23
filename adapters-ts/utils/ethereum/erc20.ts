@@ -36,18 +36,14 @@ export async function approveAll(
   owner: string,
   spender: string,
   value: BN | number | string
-) {
-  const allowance = await erc20
-    .allowance(owner, spender)
-    .then((v: BigNumber) => v.toString());
-  if (new bn(allowance).isGreaterThanOrEqualTo(value)) return;
+): Promise<ContractTransaction | null> {
+  const allowance = await erc20.allowance(owner, spender).then(base.toBN);
+  if (new bn(allowance).isGreaterThanOrEqualTo(value)) return null;
   if (new bn(allowance).isGreaterThan(0)) {
     await erc20
       .approve(spender, "0")
       .then((tx: ContractTransaction) => tx.wait());
   }
 
-  return erc20
-    .approve(spender, new bn(2).pow(256).minus(1).toFixed(0))
-    .then((tx: ContractTransaction) => tx.wait());
+  return erc20.approve(spender, new bn(2).pow(256).minus(1).toFixed(0));
 }

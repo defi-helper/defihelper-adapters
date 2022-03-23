@@ -10,13 +10,13 @@ export function StakingStake({ methods }) {
   }, []);
 
   React.useEffect(() => {
-    methods.isApproved().then(setIsApproved);
+    methods.isApproved(amount).then(setIsApproved);
     methods.can(amount).then(setCan);
   }, [amount]);
 
   const onApprove = async () => {
-    await methods.approve(amount).then(({ tx }) => tx.wait());
-    methods.isApproved().then(setIsApproved);
+    await methods.approve(amount).then(({ tx }) => tx?.wait());
+    methods.isApproved(amount).then(setIsApproved);
   };
 
   const onStake = async () => {

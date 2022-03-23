@@ -17,6 +17,7 @@ import * as uniswap from "../utils/ethereum/uniswap";
 import {
   buildMasterChefStakingActions,
   buildMasterChefProvider,
+  buildMasterChefRestakeDeployTabs,
 } from "../utils/ethereum/adapter/masterChef";
 import masterChefABI from "./data/masterChefABI.json";
 import apeRewardV4ABI from "./data/apeRewardV4ABI.json";
@@ -149,14 +150,6 @@ module.exports = {
       const aprYear = aprDay.multipliedBy(365);
 
       return {
-        staking: {
-          token: stakingToken,
-          decimals: stakingTokenDecimals,
-        },
-        reward: {
-          token: rewardToken,
-          decimals: rewardTokenDecimals,
-        },
         stakeToken: {
           address: stakingToken,
           decimals: stakingTokenDecimals,
@@ -384,14 +377,6 @@ module.exports = {
       const aprYear = aprDay.multipliedBy(365);
 
       return {
-        staking: {
-          token: stakingToken,
-          decimals: stakingTokenDecimals,
-        },
-        reward: {
-          token: rewardToken,
-          decimals: rewardTokenDecimals,
-        },
         stakeToken: {
           address: stakingToken,
           decimals: stakingTokenDecimals,
@@ -548,14 +533,6 @@ module.exports = {
       const aprYear = aprDay.multipliedBy(365);
 
       return {
-        staking: {
-          token: stakingToken,
-          decimals: stakingTokenDecimals,
-        },
-        reward: {
-          token: rewardToken,
-          decimals: rewardTokenDecimals,
-        },
         stakeToken: {
           address: stakingToken,
           decimals: stakingTokenDecimals,
@@ -968,63 +945,17 @@ module.exports = {
               )?.index ?? poolIndex;
           }
 
-          return {
-            deploy: [
-              Action.tab(
-                "Deploy",
-                async () => ({
-                  description: "Deploy your own contract",
-                  inputs: [
-                    Action.input({
-                      placeholder: "Liquidity pool router address",
-                      value: "0xcF0feBd3f17CEf5b47b0cD257aCf6025c5BFf3b7",
-                    }),
-                    Action.input({
-                      placeholder: "Target pool index",
-                      value: poolIndex,
-                    }),
-                    Action.input({
-                      placeholder: "Slippage (percent)",
-                      value: "1",
-                    }),
-                    Action.input({
-                      placeholder: "Deadline (seconds)",
-                      value: "300",
-                    }),
-                  ],
-                }),
-                async (_, pool, slippage, deadline) => {
-                  if (
-                    !masterChefSavedPools.find(
-                      ({ index }) => index === parseInt(pool, 10)
-                    )
-                  )
-                    return new Error("Invalid pool index");
-                  if (slippage < 0 || slippage > 100)
-                    return new Error("Invalid slippage percent");
-                  if (deadline < 0)
-                    return new Error("Deadline has already passed");
-
-                  return true;
-                },
-                async (router, pool, slippage, deadline) =>
-                  Deploy.deploy(
-                    signer,
-                    factoryAddress,
-                    prototypeAddress,
-                    new ethers.utils.Interface(
-                      masterChefLpRestakeABI
-                    ).encodeFunctionData("init", [
-                      masterChefAddress,
-                      router,
-                      pool,
-                      Math.floor(slippage * 100),
-                      deadline,
-                    ])
-                  )
-              ),
-            ],
-          };
+          return buildMasterChefRestakeDeployTabs(
+            signer,
+            factoryAddress,
+            prototypeAddress,
+            {
+              router: "0xcF0feBd3f17CEf5b47b0cD257aCf6025c5BFf3b7",
+              poolIndex,
+              pools: masterChefSavedPools,
+              stakingAddress: masterChefAddress,
+            }
+          );
         }
       ),
       MasterChefSingleRestake: deployAdapter(
@@ -1052,63 +983,17 @@ module.exports = {
               )?.index ?? poolIndex;
           }
 
-          return {
-            deploy: [
-              Action.tab(
-                "Deploy",
-                async () => ({
-                  description: "Deploy your own contract",
-                  inputs: [
-                    Action.input({
-                      placeholder: "Liquidity pool router address",
-                      value: "0xcF0feBd3f17CEf5b47b0cD257aCf6025c5BFf3b7",
-                    }),
-                    Action.input({
-                      placeholder: "Target pool index",
-                      value: poolIndex,
-                    }),
-                    Action.input({
-                      placeholder: "Slippage (percent)",
-                      value: "1",
-                    }),
-                    Action.input({
-                      placeholder: "Deadline (seconds)",
-                      value: "300",
-                    }),
-                  ],
-                }),
-                async (_, pool, slippage, deadline) => {
-                  if (
-                    !masterChefSavedPools.find(
-                      ({ index }) => index === parseInt(pool, 10)
-                    )
-                  )
-                    return new Error("Invalid pool index");
-                  if (slippage < 0 || slippage > 100)
-                    return new Error("Invalid slippage percent");
-                  if (deadline < 0)
-                    return new Error("Deadline has already passed");
-
-                  return true;
-                },
-                async (router, pool, slippage, deadline) =>
-                  Deploy.deploy(
-                    signer,
-                    factoryAddress,
-                    prototypeAddress,
-                    new ethers.utils.Interface(
-                      masterChefSingleRestakeABI
-                    ).encodeFunctionData("init", [
-                      masterChefAddress,
-                      router,
-                      pool,
-                      Math.floor(slippage * 100),
-                      deadline,
-                    ])
-                  )
-              ),
-            ],
-          };
+          return buildMasterChefRestakeDeployTabs(
+            signer,
+            factoryAddress,
+            prototypeAddress,
+            {
+              router: "0xcF0feBd3f17CEf5b47b0cD257aCf6025c5BFf3b7",
+              poolIndex,
+              pools: masterChefSavedPools,
+              stakingAddress: masterChefAddress,
+            }
+          );
         }
       ),
       ApeRewardV4Restake: deployAdapter(
