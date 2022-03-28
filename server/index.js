@@ -7,8 +7,8 @@ const glob = require('tiny-glob');
 const fs = require('fs');
 
 const app = Express();
-app.use(Express.static(path.resolve(__dirname, '../adapters-public')));
 app.use(Express.static(path.resolve(__dirname, '../adapters-public-ts')));
+app.use(Express.static(path.resolve(__dirname, '../adapters-public')));
 app.use('/cache', [json()], Express.static(path.resolve(__dirname, './cache')));
 app.post(/^\/cache\/(.+)/i, async (req, res) => {
   const auth = req.header('Auth');

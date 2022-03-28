@@ -1,6 +1,11 @@
+import type BigNumber from "bignumber.js";
 import { AxiosError } from "axios";
 import * as base from "./ethereum/base";
-import { dayjs, axios } from "../lib";
+import { bignumber as bn, dayjs, axios } from "../lib";
+
+export interface PriceFeed {
+  (address: string): Promise<BigNumber>;
+}
 
 export function isAvailablePlatform(
   chainId: number
@@ -40,7 +45,11 @@ export class CoingeckoProvider {
       throw new Error(`Chain "${chainId}" not supported`);
     }
 
-    this.platform = CoingeckoProvider.platformMap[chainId];
+    return this.setPlatform(CoingeckoProvider.platformMap[chainId]);
+  }
+
+  setPlatform(platform: string) {
+    this.platform = platform;
 
     return this;
   }
@@ -54,7 +63,7 @@ export class CoingeckoProvider {
         throw new Error(`Price for "coingecko:${id}" not resolved`);
       }
 
-      return data[id].usd;
+      return new bn(data[id].usd);
     } else {
       const date = dayjs(this.network.block.timestamp).format("DD-MM-YYYY");
       const { data } = await axios
@@ -68,7 +77,7 @@ export class CoingeckoProvider {
         throw new Error(`Price for "coingecko:${id}" not resolved`);
       }
 
-      return data.market_data.current_price.usd;
+      return new bn(data.market_data.current_price.usd);
     }
   }
 
@@ -89,7 +98,7 @@ export class CoingeckoProvider {
         throw new Error(`Price for "coingecko:${address}" not resolved`);
       }
 
-      return data[address].usd;
+      return new bn(data[address].usd);
     } else {
       const { data: contractInfo } = await axios
         .get(`${this.apiURL}/coins/${this.platform}/contract/${address}`)
@@ -104,15 +113,23 @@ export class CoingeckoProvider {
 }
 
 export type IdAlias = { id: string };
-export type AddressAlias = {
+export type NetworkAlias = {
   network: number;
   address: string;
 };
+export type PlatformAlias = {
+  platform: string;
+  address: string;
+};
 
-export type Alias = IdAlias | AddressAlias;
+export type Alias = IdAlias | NetworkAlias | PlatformAlias;
 
 function isIdAlias(alias: Alias): alias is IdAlias {
   return Object.hasOwnProperty.call(alias, "id");
+}
+
+function isNetworkAlias(alias: Alias): alias is NetworkAlias {
+  return Object.hasOwnProperty.call(alias, "network");
 }
 
 export function bridgeWrapperBuild(
@@ -120,19 +137,28 @@ export function bridgeWrapperBuild(
   blockTag: base.BlockNumber,
   block: { timestamp: number },
   network: number
-) {
+): PriceFeed {
   return (address: string) => {
     const alias = aliases[address] ?? aliases[address.toLowerCase()];
 
     if (alias) {
-      return isIdAlias(alias)
-        ? new CoingeckoProvider({ block, blockTag }).price(alias.id)
-        : new CoingeckoProvider({
-            block,
-            blockTag,
-          })
-            .initPlatform(alias.network)
-            .contractPrice(alias.address);
+      if (isIdAlias(alias)) {
+        return new CoingeckoProvider({ block, blockTag }).price(alias.id);
+      } else if (isNetworkAlias(alias)) {
+        return new CoingeckoProvider({
+          block,
+          blockTag,
+        })
+          .initPlatform(alias.network)
+          .contractPrice(alias.address);
+      } else {
+        return new CoingeckoProvider({
+          block,
+          blockTag,
+        })
+          .setPlatform(alias.platform)
+          .contractPrice(alias.address);
+      }
     }
 
     return new CoingeckoProvider({ block, blockTag })

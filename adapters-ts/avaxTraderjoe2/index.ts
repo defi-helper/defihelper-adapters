@@ -1,32 +1,24 @@
 import type ethersType from "ethers";
-import { ethers, bignumber as bn, ethersMulticall, dayjs } from "../lib";
+import { ethers, bignumber as bn, ethersMulticall } from "../lib";
 import * as ethereum from "../utils/ethereum/base";
 import * as erc20 from "../utils/ethereum/erc20";
 import * as uniswap from "../utils/ethereum/uniswap";
 import { bridgeWrapperBuild } from "../utils/coingecko";
-import {
-  buildMasterChefStakingActions,
-  buildMasterChefProvider,
-  buildMasterChefRestakeDeployTabs,
-} from "../utils/ethereum/adapter/masterChef";
+import * as masterChef from "../utils/ethereum/adapter/masterChef";
 import * as cache from "../utils/cache";
+import * as govSwap from "../utils/ethereum/adapter/govSwap";
+import { Staking, ResolvedContract } from "../utils/adapter/base";
 import {
   stakingAdapter,
   contractsResolver,
-  deployAdapter,
-  automateAdapter,
-  Staking,
-  Deploy,
-  Action,
   governanceSwapAdapter,
-  ResolvedContract,
 } from "../utils/ethereum/adapter/base";
 import masterChefV2ABI from "./data/masterChefV2ABI.json";
 import masterChefV3ABI from "./data/masterChefV3ABI.json";
 import xJoeTokenABI from "./data/xJoeTokenABI.json";
-import MasterChefV2LpRestakeABI from "./data/masterChefV2LpRestakeABI.json";
-import MasterChefV2SingleRestakeABI from "./data/masterChefV2SingleRestakeABI.json";
-import MasterChefV3LpRestakeABI from "./data/masterChefV3LpRestakeABI.json";
+import masterChefV2LpRestakeABI from "./data/masterChefV2LpRestakeABI.json";
+import masterChefV2SingleRestakeABI from "./data/masterChefV2SingleRestakeABI.json";
+import masterChefV3LpRestakeABI from "./data/masterChefV3LpRestakeABI.json";
 import bridgeTokens from "./data/bridgeTokens.json";
 
 const masterChefV2Address = "0xd6a4F121CA35509aF06A0Be99093d08462f53052";
@@ -69,7 +61,7 @@ module.exports = {
         throw new Error("Pool is not found");
       }
 
-      const masterChefProvider = buildMasterChefProvider(
+      const masterChefProvider = masterChef.buildMasterChefProvider(
         new ethers.Contract(masterChefV2Address, masterChefV2ABI, provider),
         { blockTag },
         {
@@ -268,21 +260,13 @@ module.exports = {
             ),
           };
         },
-        actions: async (walletAddress) => {
-          if (options.signer === null) {
-            throw new Error(
-              "Signer not found, use options.signer for use actions"
-            );
-          }
-          const { signer } = options;
-
-          return buildMasterChefStakingActions(masterChefProvider, {
-            poolIndex: pool.index,
-            poolInfo,
-            signer,
-            etherscanAddressURL: "https://snowtrace.io/address",
-          }).then((actions) => actions(walletAddress));
-        },
+        actions: masterChef.stakingActionComponents({
+          masterChefProvider,
+          poolIndex: pool.index,
+          poolInfo,
+          signer: options.signer,
+          etherscanAddressURL: "https://snowtrace.io/address",
+        }),
       };
     }
   ),
@@ -319,7 +303,7 @@ module.exports = {
         throw new Error("Pool is not found");
       }
 
-      const masterChefProvider = buildMasterChefProvider(
+      const masterChefProvider = masterChef.buildMasterChefProvider(
         new ethers.Contract(masterChefV2Address, masterChefV2ABI, provider),
         { blockTag },
         {
@@ -499,21 +483,13 @@ module.exports = {
             ),
           };
         },
-        actions: async (walletAddress) => {
-          if (options.signer === null) {
-            throw new Error(
-              "Signer not found, use options.signer for use actions"
-            );
-          }
-          const { signer } = options;
-
-          return buildMasterChefStakingActions(masterChefProvider, {
-            poolIndex: pool.index,
-            poolInfo,
-            signer,
-            etherscanAddressURL: "https://snowtrace.io/address",
-          }).then((actions) => actions(walletAddress));
-        },
+        actions: masterChef.stakingActionComponents({
+          masterChefProvider,
+          poolIndex: pool.index,
+          poolInfo,
+          signer: options.signer,
+          etherscanAddressURL: "https://snowtrace.io/address",
+        }),
       };
     }
   ),
@@ -552,7 +528,7 @@ module.exports = {
         throw new Error("Pool is not found");
       }
 
-      const masterChefProvider = buildMasterChefProvider(
+      const masterChefProvider = masterChef.buildMasterChefProvider(
         new ethers.Contract(masterChefV3Address, masterChefV3ABI, provider),
         { blockTag },
         {
@@ -730,21 +706,13 @@ module.exports = {
             ),
           };
         },
-        actions: async (walletAddress) => {
-          if (options.signer === null) {
-            throw new Error(
-              "Signer not found, use options.signer for use actions"
-            );
-          }
-          const { signer } = options;
-
-          return buildMasterChefStakingActions(masterChefProvider, {
-            poolIndex: pool.index,
-            poolInfo,
-            signer,
-            etherscanAddressURL: "https://snowtrace.io/address",
-          }).then((actions) => actions(walletAddress));
-        },
+        actions: masterChef.stakingActionComponents({
+          masterChefProvider,
+          poolIndex: pool.index,
+          poolInfo,
+          signer: options.signer,
+          etherscanAddressURL: "https://snowtrace.io/address",
+        }),
       };
     }
   ),
@@ -780,7 +748,7 @@ module.exports = {
         joeContract
           .balanceOf(xJoeAddress, { blockTag })
           .then((v: ethersType.BigNumber) =>
-            new bn(v.toString()).div(`1e${joeDecimals}`)
+            ethereum.toBN(v).div(`1e${joeDecimals}`)
           ),
         priceFeed(joeAddress),
       ]);
@@ -867,105 +835,16 @@ module.exports = {
             ),
           };
         },
-        actions: async (walletAddress) => {
-          if (options.signer === null) {
-            throw new Error(
-              "Signer not found, use options.signer for use actions"
-            );
-          }
-          const { signer } = options;
-          joeContract.connect(signer);
-          const etherscanAddressURL = "https://snowtrace.io/address";
-
-          return {
-            stake: {
-              name: "governanceSwap-stake",
-              methods: {
-                fromSymbol: () => "JOE",
-                fromLink: () => `${etherscanAddressURL}/${joeAddress}`,
-                toSymbol: () => "xJOE",
-                toLink: () => `${etherscanAddressURL}/${xJoeAddress}`,
-                balanceOf: () =>
-                  joeContract
-                    .balanceOf(walletAddress)
-                    .then((v: ethersType.BigNumber) =>
-                      ethereum.toBN(v).div(`1e${joeDecimals}`).toString(10)
-                    ),
-                isApproved: async (amount: string) => {
-                  const allowance = await joeContract
-                    .allowance(walletAddress, xJoeContract.contract.address)
-                    .then(ethereum.toBN);
-
-                  return allowance.isGreaterThanOrEqualTo(
-                    new bn(amount).multipliedBy(`1e${joeDecimals}`)
-                  );
-                },
-                approve: async (amount: string) => ({
-                  tx: await erc20.approveAll(
-                    joeContract,
-                    walletAddress,
-                    xJoeContract.contract.address,
-                    new bn(amount).multipliedBy(`1e${joeDecimals}`).toFixed(0)
-                  ),
-                }),
-                can: async (amount: string) => {
-                  const amountInt = new bn(amount).multipliedBy(
-                    `1e${joeDecimals}`
-                  );
-                  if (amountInt.lte(0)) return Error("Invalid amount");
-
-                  const balance = await joeContract
-                    .balanceOf(walletAddress)
-                    .then(ethereum.toBN);
-                  if (amountInt.gt(balance))
-                    return Error("Insufficient funds on the balance");
-
-                  return true;
-                },
-                stake: async (amount: string) => ({
-                  tx: await xJoeContract.deposit(
-                    new bn(amount).multipliedBy(`1e${joeDecimals}`).toFixed(0)
-                  ),
-                }),
-              },
-            },
-            unstake: {
-              name: "governanceSwap-unstake",
-              methods: {
-                fromSymbol: () => "xJOE",
-                fromLink: () => `${etherscanAddressURL}/${xJoeAddress}`,
-                toSymbol: () => "JOE",
-                toLink: () => `${etherscanAddressURL}/${joeAddress}`,
-                balanceOf: () =>
-                  xJoeContract
-                    .balanceOf(walletAddress)
-                    .then((v: ethersType.BigNumber) =>
-                      ethereum.toBN(v).div(`1e${xJoeDecimals}`).toString(10)
-                    ),
-                can: async (amount: string) => {
-                  const amountInt = new bn(amount).multipliedBy(
-                    `1e${xJoeDecimals}`
-                  );
-                  if (amountInt.lte(0)) return Error("Invalid amount");
-
-                  const balance = await xJoeContract
-                    .balanceOf(walletAddress)
-                    .then(ethereum.toBN);
-                  if (amountInt.isGreaterThan(balance)) {
-                    return Error("Amount exceeds balance");
-                  }
-
-                  return true;
-                },
-                unstake: async (amount: string) => ({
-                  tx: await xJoeContract.withdraw(
-                    new bn(amount).multipliedBy(`1e${xJoeDecimals}`).toFixed(0)
-                  ),
-                }),
-              },
-            },
-          };
-        },
+        actions: govSwap.actionComponents({
+          tokenContract: joeContract,
+          govContract: xJoeContract,
+          getTokenSymbol: () => "JOE",
+          getTokenDecimals: () => joeDecimals,
+          getGovSymbol: () => "xJOE",
+          getGovDecimals: () => xJoeDecimals,
+          signer: options.signer,
+          etherscanAddressURL: "https://snowtrace.io/address",
+        }),
       };
     }
   ),
@@ -1155,987 +1034,46 @@ module.exports = {
         return [...poolsV2, ...poolsV3];
       }),
     },
-    /*
     deploy: {
-      MasterChefV2LpRestake: async (
-        signer,
-        factoryAddress,
-        prototypeAddress,
-        contractAddress = undefined
-      ) => {
-        const masterChefSavedPools = await cache.read(
-          "avaxTraderjoe",
-          "masterChefV2Pools"
-        );
-        const firstPoolCandidate = masterChefSavedPools.find(
-          ({ type }) => type === "lp"
-        );
-        let poolIndex = firstPoolCandidate
-          ? firstPoolCandidate.index.toString()
-          : "";
-        if (contractAddress) {
-          poolIndex =
-            masterChefSavedPools.find(
-              ({ stakingToken }) =>
-                stakingToken.toLowerCase() === contractAddress.toLowerCase()
-            )?.index ?? poolIndex;
-        }
-
-        return {
-          deploy: [
-            Action.tab(
-              "Deploy",
-              async () => ({
-                description: "Deploy your own contract",
-                inputs: [
-                  Action.input({
-                    placeholder: "Liquidity pool router address",
-                    value: "0x60aE616a2155Ee3d9A68541Ba4544862310933d4",
-                  }),
-                  Action.input({
-                    placeholder: "Target pool index",
-                    value: poolIndex,
-                  }),
-                  Action.input({
-                    placeholder: "Slippage (percent)",
-                    value: "1",
-                  }),
-                  Action.input({
-                    placeholder: "Deadline (seconds)",
-                    value: "300",
-                  }),
-                ],
-              }),
-              async (router, pool, slippage, deadline) => {
-                if (
-                  !masterChefSavedPools.find(
-                    ({ index }) => index === parseInt(pool, 10)
-                  )
-                )
-                  return new Error("Invalid pool index");
-                if (slippage < 0 || slippage > 100)
-                  return new Error("Invalid slippage percent");
-                if (deadline < 0)
-                  return new Error("Deadline has already passed");
-
-                return true;
-              },
-              async (router, pool, slippage, deadline) =>
-                Action.ethereum.proxyDeploy(
-                  signer,
-                  factoryAddress,
-                  prototypeAddress,
-                  new ethers.utils.Interface(
-                    MasterChefV2LpRestakeABI
-                  ).encodeFunctionData("init", [
-                    masterChefV2Address,
-                    router,
-                    pool,
-                    Math.floor(slippage * 100),
-                    deadline,
-                  ])
-                )
-            ),
-          ],
-        };
-      },
-      MasterChefV2SingleRestake: async (
-        signer,
-        factoryAddress,
-        prototypeAddress,
-        contractAddress = undefined
-      ) => {
-        const masterChefSavedPools = await cache.read(
-          "avaxTraderjoe",
-          "masterChefV2Pools"
-        );
-        const firstPoolCandidate = masterChefSavedPools.find(
-          ({ type }) => type === "single"
-        );
-        let poolIndex = firstPoolCandidate
-          ? firstPoolCandidate.index.toString()
-          : "";
-        if (contractAddress) {
-          poolIndex =
-            masterChefSavedPools.find(
-              ({ stakingToken }) =>
-                stakingToken.toLowerCase() === contractAddress.toLowerCase()
-            )?.index ?? poolIndex;
-        }
-
-        return {
-          deploy: [
-            Action.tab(
-              "Deploy",
-              async () => ({
-                description: "Deploy your own contract",
-                inputs: [
-                  Action.input({
-                    placeholder: "Liquidity pool router address",
-                    value: "0x60aE616a2155Ee3d9A68541Ba4544862310933d4",
-                  }),
-                  Action.input({
-                    placeholder: "Target pool index",
-                    value: poolIndex,
-                  }),
-                  Action.input({
-                    placeholder: "Slippage (percent)",
-                    value: "1",
-                  }),
-                  Action.input({
-                    placeholder: "Deadline (seconds)",
-                    value: "300",
-                  }),
-                ],
-              }),
-              async (router, pool, slippage, deadline) => {
-                if (
-                  !masterChefSavedPools.find(
-                    ({ index }) => index === parseInt(pool, 10)
-                  )
-                )
-                  return new Error("Invalid pool index");
-                if (slippage < 0 || slippage > 100)
-                  return new Error("Invalid slippage percent");
-                if (deadline < 0)
-                  return new Error("Deadline has already passed");
-
-                return true;
-              },
-              async (router, pool, slippage, deadline) =>
-                Action.ethereum.proxyDeploy(
-                  signer,
-                  factoryAddress,
-                  prototypeAddress,
-                  new ethers.utils.Interface(
-                    MasterChefV2SingleRestakeABI
-                  ).encodeFunctionData("init", [
-                    masterChefV2Address,
-                    router,
-                    pool,
-                    Math.floor(slippage * 100),
-                    deadline,
-                  ])
-                )
-            ),
-          ],
-        };
-      },
-      MasterChefV3LpRestake: async (
-        signer,
-        factoryAddress,
-        prototypeAddress,
-        contractAddress = undefined
-      ) => {
-        const masterChefSavedPools = await cache.read(
-          "avaxTraderjoe",
-          "masterChefV3Pools"
-        );
-        const firstPoolCandidate = masterChefSavedPools.find(
-          ({ type }) => type === "lp"
-        );
-        let poolIndex = firstPoolCandidate
-          ? firstPoolCandidate.index.toString()
-          : "";
-        if (contractAddress) {
-          poolIndex =
-            masterChefSavedPools.find(
-              ({ stakingToken }) =>
-                stakingToken.toLowerCase() === contractAddress.toLowerCase()
-            )?.index ?? poolIndex;
-        }
-
-        return {
-          deploy: [
-            Action.tab(
-              "Deploy",
-              async () => ({
-                description: "Deploy your own contract",
-                inputs: [
-                  Action.input({
-                    placeholder: "Liquidity pool router address",
-                    value: "0x60aE616a2155Ee3d9A68541Ba4544862310933d4",
-                  }),
-                  Action.input({
-                    placeholder: "Target pool index",
-                    value: poolIndex,
-                  }),
-                  Action.input({
-                    placeholder: "Slippage (percent)",
-                    value: "1",
-                  }),
-                  Action.input({
-                    placeholder: "Deadline (seconds)",
-                    value: "300",
-                  }),
-                ],
-              }),
-              async (router, pool, slippage, deadline) => {
-                if (
-                  !masterChefSavedPools.find(
-                    ({ index }) => index === parseInt(pool, 10)
-                  )
-                )
-                  return new Error("Invalid pool index");
-                if (slippage < 0 || slippage > 100)
-                  return new Error("Invalid slippage percent");
-                if (deadline < 0)
-                  return new Error("Deadline has already passed");
-
-                return true;
-              },
-              async (router, pool, slippage, deadline) =>
-                Action.ethereum.proxyDeploy(
-                  signer,
-                  factoryAddress,
-                  prototypeAddress,
-                  new ethers.utils.Interface(
-                    MasterChefV3LpRestakeABI
-                  ).encodeFunctionData("init", [
-                    masterChefV3Address,
-                    router,
-                    pool,
-                    Math.floor(slippage * 100),
-                    deadline,
-                  ])
-                )
-            ),
-          ],
-        };
-      },
+      MasterChefV2LpRestake: masterChef.stakingAutomateDeployTabs({
+        liquidityRouter: "0x60aE616a2155Ee3d9A68541Ba4544862310933d4",
+        stakingAddress: masterChefV2Address,
+        poolsLoader: () =>
+          cache
+            .read("avaxTraderjoe", "masterChefV2Pools")
+            .then((pools) => pools.filter(({ type }) => type === "lp")),
+      }),
+      MasterChefV2SingleRestake: masterChef.stakingAutomateDeployTabs({
+        liquidityRouter: "0x60aE616a2155Ee3d9A68541Ba4544862310933d4",
+        stakingAddress: masterChefV2Address,
+        poolsLoader: () =>
+          cache
+            .read("avaxTraderjoe", "masterChefV2Pools")
+            .then((pools) => pools.filter(({ type }) => type === "single")),
+      }),
+      MasterChefV3LpRestake2: masterChef.stakingAutomateDeployTabs({
+        liquidityRouter: "0x60aE616a2155Ee3d9A68541Ba4544862310933d4",
+        stakingAddress: masterChefV3Address,
+        poolsLoader: () =>
+          cache
+            .read("avaxTraderjoe", "masterChefV3Pools")
+            .then((pools) => pools.filter(({ type }) => type === "lp")),
+      }),
     },
-    MasterChefV2LpRestake: async (signer, contractAddress) => {
-      const signerAddress = await signer.getAddress();
-      const automate = new ethers.Contract(
-        contractAddress,
-        MasterChefV2LpRestakeABI,
-        signer
-      );
-      const stakingAddress = await automate.staking();
-      const staking = new ethers.Contract(
-        stakingAddress,
-        masterChefV2ABI,
-        signer
-      );
-      const stakingTokenAddress = await automate.stakingToken();
-      const stakingToken = ethereum.erc20(signer, stakingTokenAddress);
-      const stakingTokenDecimals = await stakingToken
-        .decimals()
-        .then((v) => v.toString());
-      const poolId = await automate.pool().then((v) => v.toString());
-
-      const deposit = [
-        Action.tab(
-          "Transfer",
-          async () => ({
-            description: "Transfer your tokens to your contract",
-            inputs: [
-              Action.input({
-                placeholder: "amount",
-                value: new bn(
-                  await stakingToken
-                    .balanceOf(signerAddress)
-                    .then((v) => v.toString())
-                )
-                  .div(`1e${stakingTokenDecimals}`)
-                  .toString(10),
-              }),
-            ],
-          }),
-          async (amount) => {
-            const signerBalance = await stakingToken
-              .balanceOf(signerAddress)
-              .then((v) => v.toString());
-            const amountInt = new bn(amount).multipliedBy(
-              `1e${stakingTokenDecimals}`
-            );
-            if (amountInt.lte(0)) return Error("Invalid amount");
-            if (amountInt.gt(signerBalance))
-              return Error("Insufficient funds on the balance");
-
-            return true;
-          },
-          async (amount) => ({
-            tx: await stakingToken.transfer(
-              automate.address,
-              new bn(amount)
-                .multipliedBy(`1e${stakingTokenDecimals}`)
-                .toFixed(0)
-            ),
-          })
-        ),
-        Action.tab(
-          "Deposit",
-          async () => ({
-            description: "Stake your tokens to the contract",
-          }),
-          async () => {
-            const automateBalance = new bn(
-              await stakingToken
-                .balanceOf(automate.address)
-                .then((v) => v.toString())
-            );
-            const automateOwner = await automate.owner();
-            if (automateBalance.lte(0))
-              return new Error(
-                "Insufficient funds on the automate contract balance"
-              );
-            if (signerAddress.toLowerCase() !== automateOwner.toLowerCase())
-              return new Error("Someone else contract");
-
-            return true;
-          },
-          async () => ({
-            tx: await automate.deposit(),
-          })
-        ),
-      ];
-      const refund = [
-        Action.tab(
-          "Refund",
-          async () => ({
-            description: "Transfer your tokens from automate",
-          }),
-          async () => {
-            const automateOwner = await automate.owner();
-            if (signerAddress.toLowerCase() !== automateOwner.toLowerCase())
-              return new Error("Someone else contract");
-
-            return true;
-          },
-          async () => ({
-            tx: await automate.refund(),
-          })
-        ),
-      ];
-      const migrate = [
-        Action.tab(
-          "Withdraw",
-          async () => ({
-            description: "Withdraw your tokens from staking",
-          }),
-          async () => {
-            const userInfo = await staking.userInfo(poolId, signerAddress);
-            if (new bn(userInfo.amount.toString()).lte(0))
-              return new Error(
-                "Insufficient funds on the staking contract balance"
-              );
-
-            return true;
-          },
-          async () => {
-            const userInfo = await staking.userInfo(poolId, signerAddress);
-            return {
-              tx: await staking.withdraw(poolId, userInfo.amount.toString()),
-            };
-          }
-        ),
-        ...deposit,
-      ];
-      const runParams = async () => {
-        const provider = signer.provider || signer;
-        const chainId = await provider
-          .getNetwork()
-          .then(({ chainId }) => chainId);
-        const multicall = new ethersMulticall.Provider(signer, chainId);
-        const automateMulticall = new ethersMulticall.Contract(
-          contractAddress,
-          MasterChefV2LpRestakeABI
-        );
-        const stakingTokenMulticall = new ethersMulticall.Contract(
-          stakingTokenAddress,
-          ethereum.uniswap.pairABI
-        );
-
-        const [
-          routerAddress,
-          slippagePercent,
-          deadlineSeconds,
-          token0Address,
-          token1Address,
-          rewardTokenAddress,
-        ] = await multicall.all([
-          automateMulticall.liquidityRouter(),
-          automateMulticall.slippage(),
-          automateMulticall.deadline(),
-          stakingTokenMulticall.token0(),
-          stakingTokenMulticall.token1(),
-          automateMulticall.rewardToken(),
-        ]);
-        const rewardToken = new ethers.Contract(
-          rewardTokenAddress,
-          ethereum.abi.ERC20ABI,
-          provider
-        );
-        const rewardTokenBalance = await rewardToken
-          .balanceOf(contractAddress)
-          .then((v) => v.toString());
-        const pendingReward = await staking
-          .pendingTokens(poolId, contractAddress)
-          .then(({ pendingJoe }) => pendingJoe.toString());
-
-        const earned = new bn(pendingReward).plus(rewardTokenBalance);
-        if (earned.toString(10) === "0") return new Error("No earned");
-        const router = new ethersMulticall.Contract(
-          routerAddress,
-          ethereum.abi.UniswapRouterABI
-        );
-
-        const slippage = 1 - slippagePercent / 10000;
-        const token0AmountIn = new bn(earned.toString(10)).div(2).toFixed(0);
-        const swap0 = [[rewardTokenAddress, token0Address], "0"];
-        if (token0Address.toLowerCase() !== rewardTokenAddress.toLowerCase()) {
-          const { path, amountOut } = await ethereum.uniswap.autoRoute(
-            multicall,
-            router,
-            token0AmountIn,
-            rewardTokenAddress,
-            token0Address,
-            routeTokens
-          );
-          swap0[0] = path;
-          swap0[1] = new bn(amountOut.toString())
-            .multipliedBy(slippage)
-            .toFixed(0);
-        }
-        const token1AmountIn = new bn(earned.toString(10))
-          .minus(token0AmountIn)
-          .toFixed(0);
-        const swap1 = [[rewardTokenAddress, token1Address], "0"];
-        if (token1Address.toLowerCase() !== rewardTokenAddress.toLowerCase()) {
-          const { path, amountOut } = await ethereum.uniswap.autoRoute(
-            multicall,
-            router,
-            token1AmountIn,
-            rewardTokenAddress,
-            token1Address,
-            routeTokens
-          );
-          swap1[0] = path;
-          swap1[1] = new bn(amountOut.toString())
-            .multipliedBy(slippage)
-            .toFixed(0);
-        }
-
-        const deadline = dayjs().add(deadlineSeconds, "seconds").unix();
-
-        const gasLimit = new bn(
-          await automate.estimateGas
-            .run(0, deadline, swap0, swap1)
-            .then((v) => v.toString())
-        )
-          .multipliedBy(1.1)
-          .toFixed(0);
-        const gasPrice = await signer.getGasPrice().then((v) => v.toString());
-        const gasFee = new bn(gasLimit).multipliedBy(gasPrice).toFixed(0);
-
-        await automate.estimateGas.run(gasFee, deadline, swap0, swap1);
-        return {
-          gasPrice,
-          gasLimit,
-          calldata: [gasFee, deadline, swap0, swap1],
-        };
-      };
-      const run = async () => {
-        const { gasPrice, gasLimit, calldata } = await runParams();
-        return automate.run.apply(automate, [
-          ...calldata,
-          {
-            gasPrice,
-            gasLimit,
-          },
-        ]);
-      };
-
-      return {
-        contract: stakingTokenAddress,
-        deposit,
-        refund,
-        migrate,
-        runParams,
-        run,
-      };
-    },
-    MasterChefV2SingleRestake: async (signer, contractAddress) => {
-      const signerAddress = await signer.getAddress();
-      const automate = new ethers.Contract(
-        contractAddress,
-        MasterChefV2SingleRestakeABI,
-        signer
-      );
-      const stakingAddress = await automate.staking();
-      const staking = new ethers.Contract(
-        stakingAddress,
-        masterChefV2ABI,
-        signer
-      );
-      const stakingTokenAddress = await automate.stakingToken();
-      const stakingToken = ethereum.erc20(signer, stakingTokenAddress);
-      const stakingTokenDecimals = await stakingToken
-        .decimals()
-        .then((v) => v.toString());
-      const poolId = await automate.pool().then((v) => v.toString());
-
-      const deposit = [
-        Action.tab(
-          "Transfer",
-          async () => ({
-            description: "Transfer your tokens to your contract",
-            inputs: [
-              Action.input({
-                placeholder: "amount",
-                value: new bn(
-                  await stakingToken
-                    .balanceOf(signerAddress)
-                    .then((v) => v.toString())
-                )
-                  .div(`1e${stakingTokenDecimals}`)
-                  .toString(10),
-              }),
-            ],
-          }),
-          async (amount) => {
-            const signerBalance = await stakingToken
-              .balanceOf(signerAddress)
-              .then((v) => v.toString());
-            const amountInt = new bn(amount).multipliedBy(
-              `1e${stakingTokenDecimals}`
-            );
-            if (amountInt.lte(0)) return Error("Invalid amount");
-            if (amountInt.gt(signerBalance))
-              return Error("Insufficient funds on the balance");
-
-            return true;
-          },
-          async (amount) => ({
-            tx: await stakingToken.transfer(
-              automate.address,
-              new bn(amount)
-                .multipliedBy(`1e${stakingTokenDecimals}`)
-                .toFixed(0)
-            ),
-          })
-        ),
-        Action.tab(
-          "Deposit",
-          async () => ({
-            description: "Stake your tokens to the contract",
-          }),
-          async () => {
-            const automateBalance = new bn(
-              await stakingToken
-                .balanceOf(automate.address)
-                .then((v) => v.toString())
-            );
-            const automateOwner = await automate.owner();
-            if (automateBalance.lte(0))
-              return new Error(
-                "Insufficient funds on the automate contract balance"
-              );
-            if (signerAddress.toLowerCase() !== automateOwner.toLowerCase())
-              return new Error("Someone else contract");
-
-            return true;
-          },
-          async () => ({
-            tx: await automate.deposit(),
-          })
-        ),
-      ];
-      const refund = [
-        Action.tab(
-          "Refund",
-          async () => ({
-            description: "Transfer your tokens from automate",
-          }),
-          async () => {
-            const automateOwner = await automate.owner();
-            if (signerAddress.toLowerCase() !== automateOwner.toLowerCase())
-              return new Error("Someone else contract");
-
-            return true;
-          },
-          async () => ({
-            tx: await automate.refund(),
-          })
-        ),
-      ];
-      const migrate = [
-        Action.tab(
-          "Withdraw",
-          async () => ({
-            description: "Withdraw your tokens from staking",
-          }),
-          async () => {
-            const userInfo = await staking.userInfo(poolId, signerAddress);
-            if (new bn(userInfo.amount.toString()).lte(0))
-              return new Error(
-                "Insufficient funds on the staking contract balance"
-              );
-
-            return true;
-          },
-          async () => {
-            const userInfo = await staking.userInfo(poolId, signerAddress);
-            return {
-              tx: await staking.withdraw(poolId, userInfo.amount.toString()),
-            };
-          }
-        ),
-        ...deposit,
-      ];
-      const runParams = async () => {
-        const provider = signer.provider || signer;
-        const chainId = await provider
-          .getNetwork()
-          .then(({ chainId }) => chainId);
-        const multicall = new ethersMulticall.Provider(signer, chainId);
-        const automateMulticall = new ethersMulticall.Contract(
-          contractAddress,
-          MasterChefV2SingleRestakeABI
-        );
-
-        const [
-          routerAddress,
-          slippagePercent,
-          deadlineSeconds,
-          rewardTokenAddress,
-        ] = await multicall.all([
-          automateMulticall.liquidityRouter(),
-          automateMulticall.slippage(),
-          automateMulticall.deadline(),
-          automateMulticall.rewardToken(),
-        ]);
-
-        const rewardToken = new ethers.Contract(
-          rewardTokenAddress,
-          ethereum.abi.ERC20ABI,
-          provider
-        );
-        const rewardTokenBalance = await rewardToken
-          .balanceOf(contractAddress)
-          .then((v) => v.toString());
-        const pendingReward = await staking
-          .pendingTokens(poolId, contractAddress)
-          .then(({ pendingJoe }) => pendingJoe.toString());
-        const earned = new bn(pendingReward).plus(rewardTokenBalance);
-        if (earned.toString(10) === "0") return new Error("No earned");
-
-        const router = new ethersMulticall.Contract(
-          routerAddress,
-          ethereum.abi.UniswapRouterABI
-        );
-        const slippage = 1 - slippagePercent / 10000;
-        const tokenAmountIn = earned.toFixed(0);
-        const swap = [[rewardTokenAddress, stakingTokenAddress], "0"];
-        if (
-          stakingTokenAddress.toLowerCase() !== rewardTokenAddress.toLowerCase()
-        ) {
-          const { path, amountOut } = await ethereum.uniswap.autoRoute(
-            multicall,
-            router,
-            tokenAmountIn,
-            rewardTokenAddress,
-            stakingTokenAddress,
-            routeTokens
-          );
-          swap[0] = path;
-          swap[1] = new bn(amountOut.toString())
-            .multipliedBy(slippage)
-            .toFixed(0);
-        }
-
-        const deadline = dayjs().add(deadlineSeconds, "seconds").unix();
-
-        const gasLimit = new bn(
-          await automate.estimateGas
-            .run(0, deadline, swap)
-            .then((v) => v.toString())
-        )
-          .multipliedBy(1.1)
-          .toFixed(0);
-        const gasPrice = await signer.getGasPrice().then((v) => v.toString());
-        const gasFee = new bn(gasLimit).multipliedBy(gasPrice).toFixed(0);
-
-        await automate.estimateGas.run(gasFee, deadline, swap);
-        return {
-          gasPrice,
-          gasLimit,
-          calldata: [gasFee, deadline, swap],
-        };
-      };
-      const run = async () => {
-        const { gasPrice, gasLimit, calldata } = await runParams();
-        return automate.run.apply(automate, [
-          ...calldata,
-          {
-            gasPrice,
-            gasLimit,
-          },
-        ]);
-      };
-
-      return {
-        contract: stakingTokenAddress,
-        deposit,
-        refund,
-        migrate,
-        runParams,
-        run,
-      };
-    },
-    MasterChefV3LpRestake: async (signer, contractAddress) => {
-      const signerAddress = await signer.getAddress();
-      const automate = new ethers.Contract(
-        contractAddress,
-        MasterChefV3LpRestakeABI,
-        signer
-      );
-      const stakingAddress = await automate.staking();
-      const staking = new ethers.Contract(
-        stakingAddress,
-        masterChefV3ABI,
-        signer
-      );
-      const stakingTokenAddress = await automate.stakingToken();
-      const stakingToken = ethereum.erc20(signer, stakingTokenAddress);
-      const stakingTokenDecimals = await stakingToken
-        .decimals()
-        .then((v) => v.toString());
-      const poolId = await automate.pool().then((v) => v.toString());
-
-      const deposit = [
-        Action.tab(
-          "Transfer",
-          async () => ({
-            description: "Transfer your tokens to your contract",
-            inputs: [
-              Action.input({
-                placeholder: "amount",
-                value: new bn(
-                  await stakingToken
-                    .balanceOf(signerAddress)
-                    .then((v) => v.toString())
-                )
-                  .div(`1e${stakingTokenDecimals}`)
-                  .toString(10),
-              }),
-            ],
-          }),
-          async (amount) => {
-            const signerBalance = await stakingToken
-              .balanceOf(signerAddress)
-              .then((v) => v.toString());
-            const amountInt = new bn(amount).multipliedBy(
-              `1e${stakingTokenDecimals}`
-            );
-            if (amountInt.lte(0)) return Error("Invalid amount");
-            if (amountInt.gt(signerBalance))
-              return Error("Insufficient funds on the balance");
-
-            return true;
-          },
-          async (amount) => ({
-            tx: await stakingToken.transfer(
-              automate.address,
-              new bn(amount)
-                .multipliedBy(`1e${stakingTokenDecimals}`)
-                .toFixed(0)
-            ),
-          })
-        ),
-        Action.tab(
-          "Deposit",
-          async () => ({
-            description: "Stake your tokens to the contract",
-          }),
-          async () => {
-            const automateBalance = new bn(
-              await stakingToken
-                .balanceOf(automate.address)
-                .then((v) => v.toString())
-            );
-            const automateOwner = await automate.owner();
-            if (automateBalance.lte(0))
-              return new Error(
-                "Insufficient funds on the automate contract balance"
-              );
-            if (signerAddress.toLowerCase() !== automateOwner.toLowerCase())
-              return new Error("Someone else contract");
-
-            return true;
-          },
-          async () => ({
-            tx: await automate.deposit(),
-          })
-        ),
-      ];
-      const refund = [
-        Action.tab(
-          "Refund",
-          async () => ({
-            description: "Transfer your tokens from automate",
-          }),
-          async () => {
-            const automateOwner = await automate.owner();
-            if (signerAddress.toLowerCase() !== automateOwner.toLowerCase())
-              return new Error("Someone else contract");
-
-            return true;
-          },
-          async () => ({
-            tx: await automate.refund(),
-          })
-        ),
-      ];
-      const migrate = [
-        Action.tab(
-          "Withdraw",
-          async () => ({
-            description: "Withdraw your tokens from staking",
-          }),
-          async () => {
-            const userInfo = await staking.userInfo(poolId, signerAddress);
-            if (new bn(userInfo.amount.toString()).lte(0))
-              return new Error(
-                "Insufficient funds on the staking contract balance"
-              );
-
-            return true;
-          },
-          async () => {
-            const userInfo = await staking.userInfo(poolId, signerAddress);
-            return {
-              tx: await staking.withdraw(poolId, userInfo.amount.toString()),
-            };
-          }
-        ),
-        ...deposit,
-      ];
-      const runParams = async () => {
-        const provider = signer.provider || signer;
-        const chainId = await provider
-          .getNetwork()
-          .then(({ chainId }) => chainId);
-        const multicall = new ethersMulticall.Provider(signer, chainId);
-        const automateMulticall = new ethersMulticall.Contract(
-          contractAddress,
-          MasterChefV2LpRestakeABI
-        );
-        const stakingTokenMulticall = new ethersMulticall.Contract(
-          stakingTokenAddress,
-          ethereum.uniswap.pairABI
-        );
-
-        const [
-          routerAddress,
-          slippagePercent,
-          deadlineSeconds,
-          token0Address,
-          token1Address,
-          rewardTokenAddress,
-        ] = await multicall.all([
-          automateMulticall.liquidityRouter(),
-          automateMulticall.slippage(),
-          automateMulticall.deadline(),
-          stakingTokenMulticall.token0(),
-          stakingTokenMulticall.token1(),
-          automateMulticall.rewardToken(),
-        ]);
-        const rewardToken = new ethers.Contract(
-          rewardTokenAddress,
-          ethereum.abi.ERC20ABI,
-          provider
-        );
-        const rewardTokenBalance = await rewardToken
-          .balanceOf(contractAddress)
-          .then((v) => v.toString());
-        const pendingReward = await staking
-          .pendingTokens(poolId, contractAddress)
-          .then(({ pendingJoe }) => pendingJoe.toString());
-
-        const earned = new bn(pendingReward).plus(rewardTokenBalance);
-        if (earned.toString(10) === "0") return new Error("No earned");
-        const router = new ethersMulticall.Contract(
-          routerAddress,
-          ethereum.abi.UniswapRouterABI
-        );
-
-        const slippage = 1 - slippagePercent / 10000;
-        const token0AmountIn = new bn(earned.toString(10)).div(2).toFixed(0);
-        const swap0 = [[rewardTokenAddress, token0Address], "0"];
-        if (token0Address.toLowerCase() !== rewardTokenAddress.toLowerCase()) {
-          const { path, amountOut } = await ethereum.uniswap.autoRoute(
-            multicall,
-            router,
-            token0AmountIn,
-            rewardTokenAddress,
-            token0Address,
-            routeTokens
-          );
-          swap0[0] = path;
-          swap0[1] = new bn(amountOut.toString())
-            .multipliedBy(slippage)
-            .toFixed(0);
-        }
-        const token1AmountIn = new bn(earned.toString(10))
-          .minus(token0AmountIn)
-          .toFixed(0);
-        const swap1 = [[rewardTokenAddress, token1Address], "0"];
-        if (token1Address.toLowerCase() !== rewardTokenAddress.toLowerCase()) {
-          const { path, amountOut } = await ethereum.uniswap.autoRoute(
-            multicall,
-            router,
-            token1AmountIn,
-            rewardTokenAddress,
-            token1Address,
-            routeTokens
-          );
-          swap1[0] = path;
-          swap1[1] = new bn(amountOut.toString())
-            .multipliedBy(slippage)
-            .toFixed(0);
-        }
-
-        const deadline = dayjs().add(deadlineSeconds, "seconds").unix();
-
-        const gasLimit = new bn(
-          await automate.estimateGas
-            .run(0, deadline, swap0, swap1)
-            .then((v) => v.toString())
-        )
-          .multipliedBy(1.1)
-          .toFixed(0);
-        const gasPrice = await signer.getGasPrice().then((v) => v.toString());
-        const gasFee = new bn(gasLimit).multipliedBy(gasPrice).toFixed(0);
-
-        await automate.estimateGas.run(gasFee, deadline, swap0, swap1);
-        return {
-          gasPrice,
-          gasLimit,
-          calldata: [gasFee, deadline, swap0, swap1],
-        };
-      };
-      const run = async () => {
-        const { gasPrice, gasLimit, calldata } = await runParams();
-        return automate.run.apply(automate, [
-          ...calldata,
-          {
-            gasPrice,
-            gasLimit,
-          },
-        ]);
-      };
-
-      return {
-        contract: stakingTokenAddress,
-        deposit,
-        refund,
-        migrate,
-        runParams,
-        run,
-      };
-    },
-    */
+    MasterChefV2LpRestake: masterChef.stakingPairAutomateAdapter({
+      automateABI: masterChefV2LpRestakeABI,
+      stakingABI: masterChefV2ABI,
+      routeTokens,
+    }),
+    MasterChefV2SingleRestake: masterChef.stakingPairAutomateAdapter({
+      automateABI: masterChefV2SingleRestakeABI,
+      stakingABI: masterChefV2ABI,
+      routeTokens,
+    }),
+    MasterChefV3LpRestake: masterChef.stakingPairAutomateAdapter({
+      automateABI: masterChefV3LpRestakeABI,
+      stakingABI: masterChefV3ABI,
+      routeTokens,
+    }),
   },
 };
