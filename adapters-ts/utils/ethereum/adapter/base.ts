@@ -178,7 +178,6 @@ export namespace Automate {
   }
 }
 
-
 export interface ContractsResolver {
   (provider: providers.Provider, options?: { cacheAuth?: string }): Promise<
     adapter.ResolvedContract[]

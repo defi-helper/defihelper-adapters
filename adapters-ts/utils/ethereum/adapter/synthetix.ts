@@ -1,9 +1,10 @@
 import type ethersType from "ethers";
 import { bignumber as bn, ethers, ethersMulticall, dayjs } from "../../../lib";
+import { Action } from "../../adapter/base";
 import { toBN, BlockNumber } from "../base";
 import * as erc20 from "../erc20";
 import * as uniswap from "../uniswap";
-import { Action, Automate, Deploy } from "./base";
+import { Automate, Deploy } from "./base";
 
 export function stakingAutomateDeployTabs({
   liquidityRouter: router,
@@ -21,9 +22,9 @@ export function stakingAutomateDeployTabs({
     contractAddress = undefined
   ) => ({
     deploy: [
-      Action.tab(
-        "Deploy",
-        async () => ({
+      {
+        name: "Deploy",
+        info: async () => ({
           description: "Deploy your own contract",
           inputs: [
             Action.input({
@@ -44,14 +45,14 @@ export function stakingAutomateDeployTabs({
             }),
           ],
         }),
-        async (staking, router, slippage, deadline) => {
+        can: async (staking, router, slippage, deadline) => {
           if (slippage < 0 || slippage > 100)
             return new Error("Invalid slippage percent");
           if (deadline < 0) return new Error("Deadline has already passed");
 
           return true;
         },
-        async (staking, router, slippage, deadline) =>
+        send: async (staking, router, slippage, deadline) =>
           Deploy.deploy(
             signer,
             factoryAddress,
@@ -93,8 +94,8 @@ export function stakingAutomateDeployTabs({
               Math.floor(slippage * 100),
               deadline,
             ])
-          )
-      ),
+          ),
+      },
     ],
   });
 }
@@ -120,9 +121,9 @@ export function stakingPairAutomateAdapter({
       .then((v: ethersType.BigNumber) => Number(v.toString()));
 
     const deposit = [
-      Action.tab(
-        "Transfer",
-        async () => ({
+      {
+        name: "Transfer",
+        info: async () => ({
           description: "Transfer your tokens to your contract",
           inputs: [
             Action.input({
@@ -135,7 +136,7 @@ export function stakingPairAutomateAdapter({
             }),
           ],
         }),
-        async (amount) => {
+        can: async (amount: string) => {
           const signerBalance = await stakingToken
             .balanceOf(signerAddress)
             .then(toBN);
@@ -148,19 +149,19 @@ export function stakingPairAutomateAdapter({
 
           return true;
         },
-        async (amount) => ({
+        send: async (amount: string) => ({
           tx: await stakingToken.transfer(
             automate.address,
             new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`).toFixed(0)
           ),
-        })
-      ),
-      Action.tab(
-        "Deposit",
-        async () => ({
+        }),
+      },
+      {
+        name: "Deposit",
+        info: async () => ({
           description: "Stake your tokens to the contract",
         }),
-        async () => {
+        can: async () => {
           const automateBalance = await stakingToken
             .balanceOf(automate.address)
             .then(toBN);
@@ -174,36 +175,36 @@ export function stakingPairAutomateAdapter({
 
           return true;
         },
-        async () => ({
+        send: async () => ({
           tx: await automate.deposit(),
-        })
-      ),
+        }),
+      },
     ];
     const refund = [
-      Action.tab(
-        "Refund",
-        async () => ({
+      {
+        name: "Refund",
+        info: async () => ({
           description: "Transfer your tokens from automate",
         }),
-        async () => {
+        can: async () => {
           const automateOwner = await automate.owner();
           if (signerAddress.toLowerCase() !== automateOwner.toLowerCase())
             return new Error("Someone else contract");
 
           return true;
         },
-        async () => ({
+        send: async () => ({
           tx: await automate.refund(),
-        })
-      ),
+        }),
+      },
     ];
     const migrate = [
-      Action.tab(
-        "Withdraw",
-        async () => ({
+      {
+        name: "Withdraw",
+        info: async () => ({
           description: "Withdraw your tokens from staking",
         }),
-        async () => {
+        can: async () => {
           const stakingBalance = await staking
             .balanceOf(signerAddress)
             .then(toBN);
@@ -214,12 +215,12 @@ export function stakingPairAutomateAdapter({
 
           return true;
         },
-        async () => {
+        send: async () => {
           return {
             tx: await staking.exit(),
           };
-        }
-      ),
+        },
+      },
       ...deposit,
     ];
     const runParams = async () => {
@@ -233,7 +234,8 @@ export function stakingPairAutomateAdapter({
         stakingAddress,
         stakingABI
       );
-      const stakingTokenMulticall = uniswap.pair.multicallContract(stakingTokenAddress);
+      const stakingTokenMulticall =
+        uniswap.pair.multicallContract(stakingTokenAddress);
       const [
         routerAddress,
         slippagePercent,

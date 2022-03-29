@@ -58,32 +58,28 @@
     "outputs": [],
     "inputs": [{ "type": "address", "name": "addr" }],
     "stateMutability": "nonpayable",
-    "type": "function",
-    "gas": 37597
+    "type": "function"
   },
   {
     "name": "apply_transfer_ownership",
     "outputs": [],
     "inputs": [],
     "stateMutability": "nonpayable",
-    "type": "function",
-    "gas": 38497
+    "type": "function"
   },
   {
     "name": "commit_smart_wallet_checker",
     "outputs": [],
     "inputs": [{ "type": "address", "name": "addr" }],
     "stateMutability": "nonpayable",
-    "type": "function",
-    "gas": 36307
+    "type": "function"
   },
   {
     "name": "apply_smart_wallet_checker",
     "outputs": [],
     "inputs": [],
     "stateMutability": "nonpayable",
-    "type": "function",
-    "gas": 37095
+    "type": "function"
   },
   {
     "name": "get_last_user_slope",
@@ -114,8 +110,7 @@
     "outputs": [],
     "inputs": [],
     "stateMutability": "nonpayable",
-    "type": "function",
-    "gas": 37052342
+    "type": "function"
   },
   {
     "name": "deposit_for",
@@ -125,8 +120,7 @@
       { "type": "uint256", "name": "_value" }
     ],
     "stateMutability": "nonpayable",
-    "type": "function",
-    "gas": 74279891
+    "type": "function"
   },
   {
     "name": "create_lock",
@@ -136,32 +130,28 @@
       { "type": "uint256", "name": "_unlock_time" }
     ],
     "stateMutability": "nonpayable",
-    "type": "function",
-    "gas": 74281465
+    "type": "function"
   },
   {
     "name": "increase_amount",
     "outputs": [],
     "inputs": [{ "type": "uint256", "name": "_value" }],
     "stateMutability": "nonpayable",
-    "type": "function",
-    "gas": 74280830
+    "type": "function"
   },
   {
     "name": "increase_unlock_time",
     "outputs": [],
     "inputs": [{ "type": "uint256", "name": "_unlock_time" }],
     "stateMutability": "nonpayable",
-    "type": "function",
-    "gas": 74281578
+    "type": "function"
   },
   {
     "name": "withdraw",
     "outputs": [],
     "inputs": [],
     "stateMutability": "nonpayable",
-    "type": "function",
-    "gas": 37223566
+    "type": "function"
   },
   {
     "name": "balanceOf",
@@ -216,8 +206,7 @@
     "outputs": [],
     "inputs": [{ "type": "address", "name": "_newController" }],
     "stateMutability": "nonpayable",
-    "type": "function",
-    "gas": 36907
+    "type": "function"
   },
   {
     "name": "token",
