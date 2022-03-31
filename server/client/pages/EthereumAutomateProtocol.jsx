@@ -2,11 +2,10 @@ import React from "react";
 import ReactJson from "react-json-view";
 import networks from "@defihelper/networks/contracts.json";
 import { ethers } from "ethers";
-
 import * as automatesGateway from "../common/automate";
 import * as adaptersGateway from "../common/adapter";
 import { useProvider } from "../common/ether";
-import { AdapterModalSteps } from "../components";
+import { AdapterModalSteps, AdapterModalComponent } from "../components";
 import { ReactJsonWrap } from "../components/ReactJsonWrap";
 import { Button } from "../components/Button";
 
@@ -133,6 +132,7 @@ export function EthereumAutomateProtocol(props) {
   const [actionReload, setActionReload] = React.useState(false);
   const [actionResult, setActionResult] = React.useState(null);
   const [actionSteps, setActionSteps] = React.useState([]);
+  const [actionComponent, setActionComponent] = React.useState(null);
 
   React.useEffect(() => {
     automatesGateway
@@ -181,8 +181,13 @@ export function EthereumAutomateProtocol(props) {
   const onAutomateReload = async ({ protocol }, artifact) => {
     setAutomateArtifact(artifact);
 
-    const protocolAdapters = await adaptersGateway.load(protocol);
-    setAdapters(protocolAdapters.automates);
+    try {
+      const protocolAdapters = await adaptersGateway.load(`${protocol}2`);
+      setAdapters(protocolAdapters.automates);
+    } catch (e) {
+      const protocolAdapters = await adaptersGateway.load(protocol);
+      setAdapters(protocolAdapters.automates);
+    }
   };
 
   const onDeployStepsCall = async () => {
@@ -259,12 +264,14 @@ export function EthereumAutomateProtocol(props) {
         signer,
         instance
       );
-
       if (currentAction === adapterActions.run) {
         const actionResult = await actions.run();
         setActionResult(
           actionResult instanceof Error ? actionResult.toString() : actionResult
         );
+      } else if (actions[currentAction].methods !== undefined) {
+        setActionComponent(actions[currentAction]);
+        setActionResult(null);
       } else {
         setActionSteps(actions[currentAction]);
         setActionResult(null);
@@ -434,6 +441,15 @@ export function EthereumAutomateProtocol(props) {
         <div>
           <h3>Action steps</h3>
           <AdapterModalSteps steps={actionSteps} onAction={setActionResult} />
+        </div>
+      )}
+      {!actionComponent || (
+        <div>
+          <h3>Action component</h3>
+          <AdapterModalComponent
+            component={actionComponent}
+            onAction={setActionResult}
+          />
         </div>
       )}
       {actionResult !== null && (

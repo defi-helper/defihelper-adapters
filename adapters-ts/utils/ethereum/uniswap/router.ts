@@ -2,7 +2,7 @@ import type { Contract } from "ethers";
 import type BN from "bignumber.js";
 import { bignumber as bn } from "../../../lib";
 import * as base from "../base";
-import abi from "./abi/pair.json";
+import abi from "./abi/router.json";
 
 export { abi };
 

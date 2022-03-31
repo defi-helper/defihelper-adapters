@@ -25,7 +25,7 @@ import bridgeTokens from "./data/bridgeTokens.json";
 function masterChefProviderFactory(
   address: string,
   abi: any,
-  provider: ethersType.providers.Provider,
+  provider: ethersType.providers.Provider | ethersType.Signer,
   blockTag: ethereum.BlockNumber,
   avgBlockTime: number
 ) {
@@ -1017,7 +1017,7 @@ module.exports = {
         masterChefProvider: masterChefProviderFactory(
           masterChefAddress,
           masterChefABI,
-          signer.provider,
+          signer,
           "latest",
           avgBlockTime
         ),
@@ -1040,7 +1040,7 @@ module.exports = {
         masterChefProvider: masterChefProviderFactory(
           masterChefAddress,
           masterChefABI,
-          signer.provider,
+          signer,
           "latest",
           avgBlockTime
         ),
@@ -1074,11 +1074,12 @@ module.exports = {
         const deposit: Automate.AdapterActions["deposit"] = {
           name: "automateRestake-deposit",
           methods: {
-            balanceOf: stakingToken
-              .balanceOf(signerAddress)
-              .then((v: ethersType.BigNumber) =>
-                ethereum.toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
-              ),
+            balanceOf: () =>
+              stakingToken
+                .balanceOf(signerAddress)
+                .then((v: ethersType.BigNumber) =>
+                  ethereum.toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
+                ),
             canTransfer: async (amount: string) => {
               const signerBalance = await stakingToken
                 .balanceOf(signerAddress)
@@ -1103,11 +1104,12 @@ module.exports = {
                   .toFixed(0)
               ),
             }),
-            transferred: stakingToken
-              .balanceOf(automate.address)
-              .then((v: ethersType.BigNumber) =>
-                ethereum.toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
-              ),
+            transferred: () =>
+              stakingToken
+                .balanceOf(automate.address)
+                .then((v: ethersType.BigNumber) =>
+                  ethereum.toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
+                ),
             canDeposit: async () => {
               const automateBalance = await stakingToken
                 .balanceOf(automate.address)
@@ -1186,7 +1188,7 @@ module.exports = {
                   ethereum.toBN(amount)
                 );
               if (ownerStaked.lte(0)) {
-                return new Error("Insufficient funds on the balance");
+                return new Error("Insufficient funds on the staking");
               }
 
               return true;

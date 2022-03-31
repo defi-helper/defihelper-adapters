@@ -149,11 +149,201 @@ export function StakingExit({ methods }) {
   );
 }
 
+export function AutomateDeposit({ methods }) {
+  const [balance, setBalance] = React.useState("0");
+  const [canTransfer, setCanTransfer] = React.useState(null);
+  const [transferred, setTransferred] = React.useState("0");
+  const [canDeposit, setCanDeposit] = React.useState(null);
+
+  const fetchBalance = () => methods.balanceOf().then(setBalance);
+  const fetchTransferred = () => methods.transferred().then(setTransferred);
+
+  React.useEffect(() => {
+    fetchBalance();
+    fetchTransferred();
+  }, []);
+
+  React.useEffect(() => {
+    methods.canTransfer(balance).then(setCanTransfer);
+  }, [balance]);
+
+  React.useEffect(() => {
+    methods.canDeposit().then(setCanDeposit);
+  }, [transferred]);
+
+  const onTransfer = async () => {
+    await methods.transfer(balance).then(({ tx }) => tx.wait());
+    fetchBalance();
+    fetchTransferred();
+  };
+
+  const onDeposit = async () => {
+    await methods.deposit().then(({ tx }) => tx.wait());
+    fetchTransferred();
+  };
+
+  return (
+    <div>
+      <div>
+        <div>Balance: {balance}</div>
+        <div>Transferred: {transferred}</div>
+      </div>
+      <div>
+        <div>
+          <label>Transfer amount:</label>
+        </div>
+        <div>
+          <input
+            type="text"
+            value={balance}
+            placeholder="amount"
+            onChange={(e) => setBalance(e.target.value)}
+          />
+        </div>
+        <div>{canTransfer === null || canTransfer.message}</div>
+        <div>{canDeposit === null || canDeposit.message}</div>
+      </div>
+      <div>
+        <button onClick={onTransfer} disabled={canTransfer instanceof Error}>
+          Transfer
+        </button>
+        <button onClick={onDeposit} disabled={canDeposit instanceof Error}>
+          Deposit
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function AutomateRefund({ methods }) {
+  const [staked, setStaked] = React.useState("0");
+  const [can, setCan] = React.useState(null);
+
+  const fetchStaked = () => methods.staked().then(setStaked);
+
+  React.useEffect(() => {
+    fetchStaked();
+  }, []);
+
+  React.useEffect(() => {
+    methods.can().then(setCan);
+  }, [staked]);
+
+  const onRefund = async () => {
+    await methods.refund().then(({ tx }) => tx.wait());
+    fetchStaked();
+  };
+
+  return (
+    <div>
+      <div>
+        <div>Staked: {staked}</div>
+      </div>
+      <div>
+        <div>{can === null || can.message}</div>
+      </div>
+      <div>
+        <button onClick={onRefund} disabled={can instanceof Error}>
+          Refund
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function AutomateMigrate({ methods }) {
+  const [staked, setStaked] = React.useState("0");
+  const [canWithdraw, setCanWithdraw] = React.useState(null);
+  const [balance, setBalance] = React.useState("0");
+  const [canTransfer, setCanTransfer] = React.useState(null);
+  const [transferred, setTransferred] = React.useState("0");
+  const [canDeposit, setCanDeposit] = React.useState(null);
+
+  const fetchStaked = () => methods.staked().then(setStaked);
+  const fetchBalance = () => methods.balanceOf().then(setBalance);
+  const fetchTransferred = () => methods.transferred().then(setTransferred);
+
+  React.useEffect(() => {
+    fetchStaked();
+    fetchBalance();
+    fetchTransferred();
+  }, []);
+
+  React.useEffect(() => {
+    methods.canWithdraw().then(setCanWithdraw);
+  }, [staked]);
+
+  React.useEffect(() => {
+    methods.canTransfer(balance).then(setCanTransfer);
+  }, [balance]);
+
+  React.useEffect(() => {
+    methods.canDeposit().then(setCanDeposit);
+  }, [transferred]);
+
+  const onWithdraw = async () => {
+    await methods.withdraw().then(({ tx }) => tx.wait());
+    fetchStaked();
+    fetchBalance();
+  };
+
+  const onTransfer = async () => {
+    await methods.transfer(balance).then(({ tx }) => tx.wait());
+    fetchBalance();
+    fetchTransferred();
+  };
+
+  const onDeposit = async () => {
+    await methods.deposit().then(({ tx }) => tx.wait());
+    fetchTransferred();
+  };
+
+  return (
+    <div>
+      <div>
+        <div>Staked: {staked}</div>
+        <div>Balance: {balance}</div>
+        <div>Transferred: {transferred}</div>
+      </div>
+      <div>
+        <div>
+          <label>Transfer amount:</label>
+        </div>
+        <div>
+          <input
+            type="text"
+            value={balance}
+            placeholder="amount"
+            onChange={(e) => setBalance(e.target.value)}
+          />
+        </div>
+        <div>{canWithdraw === null || canWithdraw.message}</div>
+        <div>{canTransfer === null || canTransfer.message}</div>
+        <div>{canDeposit === null || canDeposit.message}</div>
+      </div>
+      <div>
+        <button onClick={onWithdraw} disabled={canWithdraw instanceof Error}>
+          Withdraw
+        </button>
+        <button onClick={onTransfer} disabled={canTransfer instanceof Error}>
+          Transfer
+        </button>
+        <button onClick={onDeposit} disabled={canDeposit instanceof Error}>
+          Deposit
+        </button>
+      </div>
+    </div>
+  );
+}
+
 const components = {
   "staking-stake": StakingStake,
   "staking-unstake": StakingUnstake,
   "staking-claim": StakingClaim,
   "staking-exit": StakingExit,
+  "automateRestake-deposit": AutomateDeposit,
+  "automateRestake-refund": AutomateRefund,
+  "automateRestake-migrate": AutomateMigrate,
 };
 
 export function AdapterModalComponent({ component, onAction }) {

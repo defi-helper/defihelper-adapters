@@ -120,119 +120,15 @@ export function stakingPairAutomateAdapter({
       .decimals()
       .then((v: ethersType.BigNumber) => Number(v.toString()));
 
-    /*
-    const deposit = [
-      {
-        name: "Transfer",
-        info: async () => ({
-          description: "Transfer your tokens to your contract",
-          inputs: [
-            Action.input({
-              placeholder: "amount",
-              value: await stakingToken
-                .balanceOf(signerAddress)
-                .then((v: ethersType.BigNumber) =>
-                  toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
-                ),
-            }),
-          ],
-        }),
-        can: async (amount: string) => {
-          const signerBalance = await stakingToken
-            .balanceOf(signerAddress)
-            .then(toBN);
-          const amountInt = new bn(amount).multipliedBy(
-            `1e${stakingTokenDecimals}`
-          );
-          if (amountInt.lte(0)) return Error("Invalid amount");
-          if (amountInt.gt(signerBalance))
-            return Error("Insufficient funds on the balance");
-
-          return true;
-        },
-        send: async (amount: string) => ({
-          tx: await stakingToken.transfer(
-            automate.address,
-            new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`).toFixed(0)
-          ),
-        }),
-      },
-      {
-        name: "Deposit",
-        info: async () => ({
-          description: "Stake your tokens to the contract",
-        }),
-        can: async () => {
-          const automateBalance = await stakingToken
-            .balanceOf(automate.address)
-            .then(toBN);
-          const automateOwner = await automate.owner();
-          if (automateBalance.lte(0))
-            return new Error(
-              "Insufficient funds on the automate contract balance"
-            );
-          if (signerAddress.toLowerCase() !== automateOwner.toLowerCase())
-            return new Error("Someone else contract");
-
-          return true;
-        },
-        send: async () => ({
-          tx: await automate.deposit(),
-        }),
-      },
-    ];
-    const refund = [
-      {
-        name: "Refund",
-        info: async () => ({
-          description: "Transfer your tokens from automate",
-        }),
-        can: async () => {
-          const automateOwner = await automate.owner();
-          if (signerAddress.toLowerCase() !== automateOwner.toLowerCase())
-            return new Error("Someone else contract");
-
-          return true;
-        },
-        send: async () => ({
-          tx: await automate.refund(),
-        }),
-      },
-    ];
-    const migrate = [
-      {
-        name: "Withdraw",
-        info: async () => ({
-          description: "Withdraw your tokens from staking",
-        }),
-        can: async () => {
-          const stakingBalance = await staking
-            .balanceOf(signerAddress)
-            .then(toBN);
-          if (stakingBalance.lte(0))
-            return new Error(
-              "Insufficient funds on the staking contract balance"
-            );
-
-          return true;
-        },
-        send: async () => {
-          return {
-            tx: await staking.exit(),
-          };
-        },
-      },
-      ...deposit,
-    ];
-    */
     const deposit: Automate.AdapterActions["deposit"] = {
       name: "automateRestake-deposit",
       methods: {
-        balanceOf: stakingToken
-          .balanceOf(signerAddress)
-          .then((v: ethersType.BigNumber) =>
-            toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
-          ),
+        balanceOf: () =>
+          stakingToken
+            .balanceOf(signerAddress)
+            .then((v: ethersType.BigNumber) =>
+              toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
+            ),
         canTransfer: async (amount: string) => {
           const signerBalance = await stakingToken
             .balanceOf(signerAddress)
@@ -255,11 +151,12 @@ export function stakingPairAutomateAdapter({
             new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`).toFixed(0)
           ),
         }),
-        transferred: stakingToken
-          .balanceOf(automate.address)
-          .then((v: ethersType.BigNumber) =>
-            toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
-          ),
+        transferred: () =>
+          stakingToken
+            .balanceOf(automate.address)
+            .then((v: ethersType.BigNumber) =>
+              toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
+            ),
         canDeposit: async () => {
           const automateBalance = await stakingToken
             .balanceOf(automate.address)
@@ -327,13 +224,13 @@ export function stakingPairAutomateAdapter({
               toBN(amount).div(`1e${stakingTokenDecimals}`).toString(10)
             );
           if (ownerStaked.lte(0)) {
-            return new Error("Insufficient funds on the balance");
+            return new Error("Insufficient funds on the staking");
           }
 
           return true;
         },
         withdraw: async () => ({
-            tx: await staking.exit(),
+          tx: await staking.exit(),
         }),
         ...deposit.methods,
       },
@@ -358,7 +255,7 @@ export function stakingPairAutomateAdapter({
         token0Address,
         token1Address,
         rewardTokenAddress,
-        earned,
+        pendingReward,
       ] = await multicall.all([
         automateMulticall.liquidityRouter(),
         automateMulticall.slippage(),
@@ -368,6 +265,11 @@ export function stakingPairAutomateAdapter({
         stakingMulticall.rewardsToken(),
         stakingMulticall.earned(contractAddress),
       ]);
+      const rewardTokenBalance = await erc20
+        .contract(provider, rewardTokenAddress)
+        .balanceOf(contractAddress)
+        .then(toBN);
+      const earned = rewardTokenBalance.plus(pendingReward.toString());
       if (earned.toString() === "0") return new Error("No earned");
       const router = uniswap.router.contract(provider, routerAddress);
 

@@ -519,8 +519,6 @@ export function stakingPairAutomateAdapter({
     const provider = signer.provider;
     const signerAddress = await signer.getAddress();
     const automate = new ethers.Contract(contractAddress, automateABI, signer);
-    const stakingAddress = await automate.staking();
-    const staking = new ethers.Contract(stakingAddress, stakingABI, signer);
     const stakingTokenAddress = await automate.stakingToken();
     const stakingToken = erc20.contract(signer, stakingTokenAddress);
     const stakingTokenDecimals = await stakingToken
@@ -533,11 +531,12 @@ export function stakingPairAutomateAdapter({
     const deposit: Automate.AdapterActions["deposit"] = {
       name: "automateRestake-deposit",
       methods: {
-        balanceOf: stakingToken
-          .balanceOf(signerAddress)
-          .then((v: ethersType.BigNumber) =>
-            toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
-          ),
+        balanceOf: () =>
+          stakingToken
+            .balanceOf(signerAddress)
+            .then((v: ethersType.BigNumber) =>
+              toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
+            ),
         canTransfer: async (amount: string) => {
           const signerBalance = await stakingToken
             .balanceOf(signerAddress)
@@ -560,11 +559,12 @@ export function stakingPairAutomateAdapter({
             new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`).toFixed(0)
           ),
         }),
-        transferred: stakingToken
-          .balanceOf(automate.address)
-          .then((v: ethersType.BigNumber) =>
-            toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
-          ),
+        transferred: () =>
+          stakingToken
+            .balanceOf(automate.address)
+            .then((v: ethersType.BigNumber) =>
+              toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
+            ),
         canDeposit: async () => {
           const automateBalance = await stakingToken
             .balanceOf(automate.address)
@@ -630,7 +630,7 @@ export function stakingPairAutomateAdapter({
             .userInfo(poolId, signerAddress)
             .then(({ amount }) => amount);
           if (ownerStaked.lte(0)) {
-            return new Error("Insufficient funds on the balance");
+            return new Error("Insufficient funds on the staking");
           }
 
           return true;
@@ -675,14 +675,13 @@ export function stakingPairAutomateAdapter({
       const rewardToken = erc20.contract(provider, rewardTokenAddress);
       const rewardTokenBalance = await rewardToken
         .balanceOf(contractAddress)
-        .then((v: ethersType.BigNumber) => v.toString());
-      const pendingReward = await staking
-        .pendingTokens(poolId, contractAddress)
-        .then(({ pendingJoe }: { pendingJoe: ethersType.BigNumber }) =>
-          pendingJoe.toString()
-        );
+        .then(toBN);
+      const pendingReward = await masterChefProvider.pendingReward(
+        poolId,
+        contractAddress
+      );
 
-      const earned = new bn(pendingReward).plus(rewardTokenBalance);
+      const earned = pendingReward.plus(rewardTokenBalance);
       if (earned.toString(10) === "0") return new Error("No earned");
       const router = uniswap.router.contract(provider, routerAddress);
 
@@ -794,11 +793,12 @@ export function stakingSingleAutomateAdapter({
     const deposit: Automate.AdapterActions["deposit"] = {
       name: "automateRestake-deposit",
       methods: {
-        balanceOf: stakingToken
-          .balanceOf(signerAddress)
-          .then((v: ethersType.BigNumber) =>
-            toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
-          ),
+        balanceOf: () =>
+          stakingToken
+            .balanceOf(signerAddress)
+            .then((v: ethersType.BigNumber) =>
+              toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
+            ),
         canTransfer: async (amount: string) => {
           const signerBalance = await stakingToken
             .balanceOf(signerAddress)
@@ -821,11 +821,12 @@ export function stakingSingleAutomateAdapter({
             new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`).toFixed(0)
           ),
         }),
-        transferred: stakingToken
-          .balanceOf(automate.address)
-          .then((v: ethersType.BigNumber) =>
-            toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
-          ),
+        transferred: () =>
+          stakingToken
+            .balanceOf(automate.address)
+            .then((v: ethersType.BigNumber) =>
+              toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
+            ),
         canDeposit: async () => {
           const automateBalance = await stakingToken
             .balanceOf(automate.address)
@@ -931,11 +932,13 @@ export function stakingSingleAutomateAdapter({
       const rewardToken = erc20.contract(provider, rewardTokenAddress);
       const rewardTokenBalance = await rewardToken
         .balanceOf(contractAddress)
-        .then((v: ethersType.BigNumber) => v.toString());
-      const pendingReward = await staking
-        .pendingCake(poolId, contractAddress)
-        .then((v: ethersType.BigNumber) => v.toString());
-      const earned = new bn(pendingReward).plus(rewardTokenBalance);
+        .then(toBN);
+      const pendingReward = await masterChefProvider.pendingReward(
+        poolId,
+        contractAddress
+      );
+
+      const earned = pendingReward.plus(rewardTokenBalance);
       if (earned.toString(10) === "0") return new Error("No earned");
 
       const router = uniswap.router.contract(provider, routerAddress);

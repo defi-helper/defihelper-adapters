@@ -68,7 +68,9 @@ app.get('/automates/ethereum', async (req, res) => {
   return res.json(
     automates.map((automate) => {
       const { name, dir } = path.parse(automate);
-      return { protocol: path.parse(dir).name, contract: path.parse(name).name };
+      const protocol = path.parse(dir).name;
+      const contract = path.parse(name).name;
+      return { protocol, contract };
     })
   );
 });

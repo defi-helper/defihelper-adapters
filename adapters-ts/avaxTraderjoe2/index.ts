@@ -24,7 +24,7 @@ import bridgeTokens from "./data/bridgeTokens.json";
 function masterChefProviderFactory(
   address: string,
   abi: any,
-  provider: ethersType.providers.Provider,
+  provider: ethersType.providers.Provider | ethersType.Signer,
   blockTag: ethereum.BlockNumber
 ) {
   return masterChef.buildMasterChefProvider(
@@ -1016,7 +1016,7 @@ module.exports = {
         masterChefProvider: masterChefProviderFactory(
           masterChefV2Address,
           masterChefV2ABI,
-          signer.provider,
+          signer,
           "latest"
         ),
         automateABI: masterChefV2LpRestakeABI,
@@ -1034,7 +1034,7 @@ module.exports = {
         masterChefProvider: masterChefProviderFactory(
           masterChefV2Address,
           masterChefV2ABI,
-          signer.provider,
+          signer,
           "latest"
         ),
         automateABI: masterChefV2SingleRestakeABI,
@@ -1052,7 +1052,7 @@ module.exports = {
         masterChefProvider: masterChefProviderFactory(
           masterChefV3Address,
           masterChefV3ABI,
-          signer.provider,
+          signer,
           "latest"
         ),
         automateABI: masterChefV3LpRestakeABI,
