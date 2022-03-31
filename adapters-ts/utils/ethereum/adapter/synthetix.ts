@@ -120,6 +120,7 @@ export function stakingPairAutomateAdapter({
       .decimals()
       .then((v: ethersType.BigNumber) => Number(v.toString()));
 
+    /*
     const deposit = [
       {
         name: "Transfer",
@@ -223,6 +224,120 @@ export function stakingPairAutomateAdapter({
       },
       ...deposit,
     ];
+    */
+    const deposit: Automate.AdapterActions["deposit"] = {
+      name: "automateRestake-deposit",
+      methods: {
+        balanceOf: stakingToken
+          .balanceOf(signerAddress)
+          .then((v: ethersType.BigNumber) =>
+            toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
+          ),
+        canTransfer: async (amount: string) => {
+          const signerBalance = await stakingToken
+            .balanceOf(signerAddress)
+            .then(toBN);
+          const amountInt = new bn(amount).multipliedBy(
+            `1e${stakingTokenDecimals}`
+          );
+          if (amountInt.lte(0)) {
+            return Error("Invalid amount");
+          }
+          if (amountInt.gt(signerBalance)) {
+            return Error("Insufficient funds on the balance");
+          }
+
+          return true;
+        },
+        transfer: async (amount: string) => ({
+          tx: await stakingToken.transfer(
+            automate.address,
+            new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`).toFixed(0)
+          ),
+        }),
+        transferred: stakingToken
+          .balanceOf(automate.address)
+          .then((v: ethersType.BigNumber) =>
+            toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
+          ),
+        canDeposit: async () => {
+          const automateBalance = await stakingToken
+            .balanceOf(automate.address)
+            .then(toBN);
+          if (automateBalance.lte(0)) {
+            return new Error(
+              "Insufficient funds on the automate contract balance"
+            );
+          }
+          const automateOwner = await automate.owner();
+          if (signerAddress.toLowerCase() !== automateOwner.toLowerCase()) {
+            return new Error("Someone else contract");
+          }
+
+          return true;
+        },
+        deposit: async () => ({
+          tx: await automate.deposit(),
+        }),
+      },
+    };
+    const refund: Automate.AdapterActions["refund"] = {
+      name: "automateRestake-refund",
+      methods: {
+        staked: () =>
+          staking
+            .balanceOf(automate.address)
+            .then((amount: ethersType.BigNumber) =>
+              toBN(amount).div(`1e${stakingTokenDecimals}`).toString(10)
+            ),
+        can: async () => {
+          const automateStaked = await staking
+            .balanceOf(automate.address)
+            .then(toBN);
+          if (automateStaked.lte(0)) {
+            return new Error(
+              "Insufficient funds on the automate contract balance"
+            );
+          }
+          const automateOwner = await automate.owner();
+          if (signerAddress.toLowerCase() !== automateOwner.toLowerCase()) {
+            return new Error("Someone else contract");
+          }
+
+          return true;
+        },
+        refund: async () => ({
+          tx: await automate.refund(),
+        }),
+      },
+    };
+    const migrate: Automate.AdapterActions["migrate"] = {
+      name: "automateRestake-migrate",
+      methods: {
+        staked: () =>
+          staking
+            .balanceOf(signerAddress)
+            .then((amount: ethersType.BigNumber) =>
+              toBN(amount).div(`1e${stakingTokenDecimals}`).toString(10)
+            ),
+        canWithdraw: async () => {
+          const ownerStaked = await staking
+            .balanceOf(signerAddress)
+            .then((amount: ethersType.BigNumber) =>
+              toBN(amount).div(`1e${stakingTokenDecimals}`).toString(10)
+            );
+          if (ownerStaked.lte(0)) {
+            return new Error("Insufficient funds on the balance");
+          }
+
+          return true;
+        },
+        withdraw: async () => ({
+            tx: await staking.exit(),
+        }),
+        ...deposit.methods,
+      },
+    };
     const runParams = async () => {
       const multicall = new ethersMulticall.Provider(provider);
       await multicall.init();

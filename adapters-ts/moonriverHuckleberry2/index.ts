@@ -18,6 +18,52 @@ import tomTokenABI from "./data/tomTokenABI.json";
 import masterChefFinnLpRestakeABI from "./data/masterChefFinnLpRestakeABI.json";
 import bridgeTokens from "./data/bridgeTokens.json";
 
+function masterChefProviderFactory(
+  address: string,
+  abi: any,
+  provider: ethersType.providers.Provider,
+  blockTag: ethereum.BlockNumber
+) {
+  return masterChef.buildMasterChefProvider(
+    new ethers.Contract(address, abi, provider),
+    { blockTag },
+    {
+      rewardToken() {
+        return "0x9a92b5ebf1f6f6f7d93696fcd44e5cf75035a756";
+      },
+      poolInfo(poolIndex) {
+        return this.contract
+          .poolInfo(poolIndex, { blockTag: this.options.blockTag })
+          .then(
+            ({
+              lpToken,
+              allocPoint,
+              accRewardPerShare,
+            }: {
+              lpToken: string;
+              allocPoint: ethersType.BigNumber;
+              accRewardPerShare: ethersType.BigNumber;
+            }) => ({
+              lpToken,
+              allocPoint: ethereum.toBN(allocPoint),
+              accRewardPerShare: ethereum.toBN(accRewardPerShare),
+            })
+          );
+      },
+      rewardPerSecond() {
+        return this.contract
+          .finnPerSecond({ blockTag: this.options.blockTag })
+          .then(ethereum.toBN);
+      },
+      pendingReward(poolIndex, wallet) {
+        return this.contract
+          .pendingReward(poolIndex, wallet)
+          .then(ethereum.toBN);
+      },
+    }
+  );
+}
+
 const masterChefAddress = "0x1f4b7660b6AdC3943b5038e3426B33c1c0e343E6";
 const routeTokens = ["0x98878B06940aE243284CA214f92Bb71a2b032B8A"];
 
@@ -57,43 +103,11 @@ module.exports = {
         throw new Error("Pool is not found");
       }
 
-      const masterChefProvider = masterChef.buildMasterChefProvider(
-        new ethers.Contract(masterChefAddress, masterChefABI, provider),
-        { blockTag },
-        {
-          rewardToken() {
-            return "0x9a92b5ebf1f6f6f7d93696fcd44e5cf75035a756";
-          },
-          poolInfo(poolIndex) {
-            return this.contract
-              .poolInfo(poolIndex, { blockTag: this.options.blockTag })
-              .then(
-                ({
-                  lpToken,
-                  allocPoint,
-                  accRewardPerShare,
-                }: {
-                  lpToken: string;
-                  allocPoint: ethersType.BigNumber;
-                  accRewardPerShare: ethersType.BigNumber;
-                }) => ({
-                  lpToken,
-                  allocPoint: ethereum.toBN(allocPoint),
-                  accRewardPerShare: ethereum.toBN(accRewardPerShare),
-                })
-              );
-          },
-          rewardPerSecond() {
-            return this.contract
-              .finnPerSecond({ blockTag: this.options.blockTag })
-              .then(ethereum.toBN);
-          },
-          pendingReward(poolIndex, wallet) {
-            return this.contract
-              .pendingReward(poolIndex, wallet)
-              .then(ethereum.toBN);
-          },
-        }
+      const masterChefProvider = masterChefProviderFactory(
+        masterChefAddress,
+        masterChefABI,
+        provider,
+        blockTag
       );
       const poolInfo = await masterChefProvider.poolInfo(pool.index);
 
@@ -278,43 +292,11 @@ module.exports = {
         throw new Error("Pool is not found");
       }
 
-      const masterChefProvider = masterChef.buildMasterChefProvider(
-        new ethers.Contract(masterChefAddress, masterChefABI, provider),
-        { blockTag },
-        {
-          rewardToken() {
-            return "0x9a92b5ebf1f6f6f7d93696fcd44e5cf75035a756";
-          },
-          poolInfo(poolIndex) {
-            return this.contract
-              .poolInfo(poolIndex, { blockTag: this.options.blockTag })
-              .then(
-                ({
-                  lpToken,
-                  allocPoint,
-                  accRewardPerShare,
-                }: {
-                  lpToken: string;
-                  allocPoint: ethersType.BigNumber;
-                  accRewardPerShare: ethersType.BigNumber;
-                }) => ({
-                  lpToken,
-                  allocPoint: ethereum.toBN(allocPoint),
-                  accRewardPerShare: ethereum.toBN(accRewardPerShare),
-                })
-              );
-          },
-          rewardPerSecond() {
-            return this.contract
-              .finnPerSecond({ blockTag: this.options.blockTag })
-              .then(ethereum.toBN);
-          },
-          pendingReward(poolIndex, wallet) {
-            return this.contract
-              .pendingReward(poolIndex, wallet)
-              .then(ethereum.toBN);
-          },
-        }
+      const masterChefProvider = masterChefProviderFactory(
+        masterChefAddress,
+        masterChefABI,
+        provider,
+        blockTag
       );
       const poolInfo = await masterChefProvider.poolInfo(pool.index);
 
@@ -680,10 +662,23 @@ module.exports = {
             .then((pools) => pools.filter(({ type }) => type === "lp")),
       }),
     },
-    MasterChefFinnLpRestake: masterChef.stakingPairAutomateAdapter({
-      automateABI: masterChefFinnLpRestakeABI,
-      stakingABI: masterChefABI,
-      routeTokens,
-    }),
+    MasterChefFinnLpRestake: (
+      signer: ethersType.Signer,
+      contractAddress: string
+    ) => {
+      if (!signer.provider) throw new Error("Provider not found");
+
+      return masterChef.stakingPairAutomateAdapter({
+        masterChefProvider: masterChefProviderFactory(
+          masterChefAddress,
+          masterChefABI,
+          signer.provider,
+          "latest"
+        ),
+        automateABI: masterChefFinnLpRestakeABI,
+        stakingABI: masterChefABI,
+        routeTokens,
+      })(signer, contractAddress);
+    },
   },
 };

@@ -159,22 +159,51 @@ export namespace Deploy {
 }
 
 export namespace Automate {
+  export interface AdapterActions {
+    deposit: {
+      name: "automateRestake-deposit";
+      methods: {
+        balanceOf: () => Promise<string>;
+        canTransfer: (amount: string) => Promise<true | Error>;
+        transfer: (amount: string) => Promise<{ tx: ContractTransaction }>;
+        transferred: () => Promise<string>;
+        canDeposit: () => Promise<true | Error>;
+        deposit: () => Promise<{ tx: ContractTransaction }>;
+      };
+    };
+    refund: {
+      name: "automateRestake-refund";
+      methods: {
+        staked: () => Promise<string>;
+        can: () => Promise<true | Error>;
+        refund: () => Promise<{ tx: ContractTransaction }>;
+      };
+    };
+    migrate: {
+      name: "automateRestake-migrate";
+      methods: {
+        staked: () => Promise<string>;
+        canWithdraw: () => Promise<true | Error>;
+        withdraw: () => Promise<{ tx: ContractTransaction }>;
+      } & AdapterActions["deposit"]["methods"];
+    };
+  }
+
   export interface Adapter {
-    (signer: Signer, contractAddress: string): Promise<{
-      contract: string;
-      deposit: adapter.Action.Tab<ContractTransaction>[];
-      refund: adapter.Action.Tab<ContractTransaction>[];
-      migrate: adapter.Action.Tab<ContractTransaction>[];
-      runParams: () => Promise<
-        | {
-            gasPrice: string;
-            gasLimit: string;
-            calldata: any[];
-          }
-        | Error
-      >;
-      run: () => Promise<ContractTransaction | Error>;
-    }>;
+    (signer: Signer, contractAddress: string): Promise<
+      AdapterActions & {
+        contract: string;
+        runParams: () => Promise<
+          | {
+              gasPrice: string;
+              gasLimit: string;
+              calldata: any[];
+            }
+          | Error
+        >;
+        run: () => Promise<ContractTransaction | Error>;
+      }
+    >;
   }
 }
 

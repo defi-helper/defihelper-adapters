@@ -12,6 +12,7 @@ import {
   deployAdapter,
   automateAdapter,
   Deploy,
+  Automate,
 } from "../utils/ethereum/adapter/base";
 import { bridgeWrapperBuild, PriceFeed } from "../utils/coingecko";
 import * as cache from "../utils/cache";
@@ -940,39 +941,31 @@ module.exports = {
         .decimals()
         .then((v: ethersType.BigNumber) => Number(v.toString()));
 
-      const deposit = [
-        {
-          name: "Transfer",
-          info: async () => ({
-            description: "Transfer your tokens to your contract",
-            inputs: [
-              Action.input({
-                placeholder: "amount",
-                value: await stakingToken
-                  .balanceOf(signerAddress)
-                  .then((v: ethersType.BigNumber) =>
-                    ethereum
-                      .toBN(v)
-                      .div(`1e${stakingTokenDecimals}`)
-                      .toString(10)
-                  ),
-              }),
-            ],
-          }),
-          can: async (amount: string) => {
+      const deposit: Automate.AdapterActions["deposit"] = {
+        name: "automateRestake-deposit",
+        methods: {
+          balanceOf: stakingToken
+            .balanceOf(signerAddress)
+            .then((v: ethersType.BigNumber) =>
+              ethereum.toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
+            ),
+          canTransfer: async (amount: string) => {
             const signerBalance = await stakingToken
               .balanceOf(signerAddress)
               .then(ethereum.toBN);
             const amountInt = new bn(amount).multipliedBy(
               `1e${stakingTokenDecimals}`
             );
-            if (amountInt.lte(0)) return Error("Invalid amount");
-            if (amountInt.gt(signerBalance))
+            if (amountInt.lte(0)) {
+              return Error("Invalid amount");
+            }
+            if (amountInt.gt(signerBalance)) {
               return Error("Insufficient funds on the balance");
+            }
 
             return true;
           },
-          send: async (amount: string) => ({
+          transfer: async (amount: string) => ({
             tx: await stakingToken.transfer(
               automate.address,
               new bn(amount)
@@ -980,38 +973,20 @@ module.exports = {
                 .toFixed(0)
             ),
           }),
-        },
-        {
-          name: "Deposit",
-          info: async () => ({
-            description: "Stake your tokens to the contract",
-          }),
-          can: async () => {
+          transferred: stakingToken
+            .balanceOf(automate.address)
+            .then((v: ethersType.BigNumber) =>
+              ethereum.toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
+            ),
+          canDeposit: async () => {
             const automateBalance = await stakingToken
               .balanceOf(automate.address)
               .then(ethereum.toBN);
-            const automateOwner = await automate.owner();
-            if (automateBalance.lte(0))
+            if (automateBalance.lte(0)) {
               return new Error(
                 "Insufficient funds on the automate contract balance"
               );
-            if (signerAddress.toLowerCase() !== automateOwner.toLowerCase())
-              return new Error("Someone else contract");
-
-            return true;
-          },
-          send: async () => ({
-            tx: await automate.deposit(),
-          }),
-        },
-      ];
-      const refund = [
-        {
-          name: "Refund",
-          info: async () => ({
-            description: "Transfer your tokens from automate",
-          }),
-          can: async () => {
+            }
             const automateOwner = await automate.owner();
             if (signerAddress.toLowerCase() !== automateOwner.toLowerCase()) {
               return new Error("Someone else contract");
@@ -1019,41 +994,78 @@ module.exports = {
 
             return true;
           },
-          send: async () => ({
-            tx: await automate.refund(),
+          deposit: async () => ({
+            tx: await automate.deposit(),
           }),
         },
-      ];
-      const migrate = [
-        {
-          name: "Withdraw",
-          info: async () => ({
-            description: "Withdraw your tokens from staking",
-          }),
+      };
+      const refund: Automate.AdapterActions["refund"] = {
+        name: "automateRestake-refund",
+        methods: {
+          staked: () =>
+            staking
+              .balanceOf(automate.address)
+              .then((amount: ethersType.BigNumber) =>
+                ethereum
+                  .toBN(amount)
+                  .div(`1e${stakingTokenDecimals}`)
+                  .toString(10)
+              ),
           can: async () => {
-            const stakingBalance = await staking
-              .balanceOf(signerAddress)
+            const automateStaked = await staking
+              .balanceOf(automate.address)
               .then(ethereum.toBN);
-            if (stakingBalance.lte(0)) {
+            if (automateStaked.lte(0)) {
               return new Error(
-                "Insufficient funds on the staking contract balance"
+                "Insufficient funds on the automate contract balance"
               );
+            }
+            const automateOwner = await automate.owner();
+            if (signerAddress.toLowerCase() !== automateOwner.toLowerCase()) {
+              return new Error("Someone else contract");
             }
 
             return true;
           },
-          send: async () => {
-            const stakingBalance = await staking
+          refund: async () => ({
+            tx: await automate.refund(),
+          }),
+        },
+      };
+      const migrate: Automate.AdapterActions["migrate"] = {
+        name: "automateRestake-migrate",
+        methods: {
+          staked: () =>
+            staking
+              .balanceOf(signerAddress)
+              .then((amount: ethersType.BigNumber) =>
+                ethereum
+                  .toBN(amount)
+                  .div(`1e${stakingTokenDecimals}`)
+                  .toString(10)
+              ),
+          canWithdraw: async () => {
+            const ownerStaked = await staking
+              .balanceOf(signerAddress)
+              .then(ethereum.toBN);
+            if (ownerStaked.lte(0)) {
+              return new Error("Insufficient funds on the balance");
+            }
+
+            return true;
+          },
+          withdraw: async () => {
+            const amount = await staking
               .balanceOf(signerAddress)
               .then(ethereum.toBN);
 
             return {
-              tx: await staking.withdraw(stakingBalance.toFixed(0)),
+              tx: await staking.withdraw(amount.toFixed(0)),
             };
           },
+          ...deposit.methods,
         },
-        ...deposit,
-      ];
+      };
       const runParams = async () => {
         const multicall = new ethersMulticall.Provider(provider);
         await multicall.init();
@@ -1157,39 +1169,31 @@ module.exports = {
         .decimals()
         .then((v: ethersType.BigNumber) => Number(v.toString()));
 
-      const deposit = [
-        {
-          name: "Transfer",
-          info: async () => ({
-            description: "Transfer your tokens to your contract",
-            inputs: [
-              Action.input({
-                placeholder: "amount",
-                value: await stakingToken
-                  .balanceOf(signerAddress)
-                  .then((v: ethersType.BigNumber) =>
-                    ethereum
-                      .toBN(v)
-                      .div(`1e${stakingTokenDecimals}`)
-                      .toString(10)
-                  ),
-              }),
-            ],
-          }),
-          can: async (amount: string) => {
+      const deposit: Automate.AdapterActions["deposit"] = {
+        name: "automateRestake-deposit",
+        methods: {
+          balanceOf: stakingToken
+            .balanceOf(signerAddress)
+            .then((v: ethersType.BigNumber) =>
+              ethereum.toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
+            ),
+          canTransfer: async (amount: string) => {
             const signerBalance = await stakingToken
               .balanceOf(signerAddress)
               .then(ethereum.toBN);
             const amountInt = new bn(amount).multipliedBy(
               `1e${stakingTokenDecimals}`
             );
-            if (amountInt.lte(0)) return Error("Invalid amount");
-            if (amountInt.gt(signerBalance))
+            if (amountInt.lte(0)) {
+              return Error("Invalid amount");
+            }
+            if (amountInt.gt(signerBalance)) {
               return Error("Insufficient funds on the balance");
+            }
 
             return true;
           },
-          send: async (amount: string) => ({
+          transfer: async (amount: string) => ({
             tx: await stakingToken.transfer(
               automate.address,
               new bn(amount)
@@ -1197,40 +1201,20 @@ module.exports = {
                 .toFixed(0)
             ),
           }),
-        },
-        {
-          name: "Deposit",
-          info: async () => ({
-            description: "Stake your tokens to the contract",
-          }),
-          can: async () => {
+          transferred: stakingToken
+            .balanceOf(automate.address)
+            .then((v: ethersType.BigNumber) =>
+              ethereum.toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
+            ),
+          canDeposit: async () => {
             const automateBalance = await stakingToken
               .balanceOf(automate.address)
               .then(ethereum.toBN);
-            const automateOwner = await automate.owner();
             if (automateBalance.lte(0)) {
               return new Error(
                 "Insufficient funds on the automate contract balance"
               );
             }
-            if (signerAddress.toLowerCase() !== automateOwner.toLowerCase()) {
-              return new Error("Someone else contract");
-            }
-
-            return true;
-          },
-          send: async () => ({
-            tx: await automate.deposit(),
-          }),
-        },
-      ];
-      const refund = [
-        {
-          name: "Refund",
-          info: async () => ({
-            description: "Transfer your tokens from automate",
-          }),
-          can: async () => {
             const automateOwner = await automate.owner();
             if (signerAddress.toLowerCase() !== automateOwner.toLowerCase()) {
               return new Error("Someone else contract");
@@ -1238,40 +1222,78 @@ module.exports = {
 
             return true;
           },
-          send: async () => ({
-            tx: await automate.refund(),
+          deposit: async () => ({
+            tx: await automate.deposit(),
           }),
         },
-      ];
-      const migrate = [
-        {
-          name: "Withdraw",
-          info: async () => ({
-            description: "Withdraw your tokens from staking",
-          }),
+      };
+      const refund: Automate.AdapterActions["refund"] = {
+        name: "automateRestake-refund",
+        methods: {
+          staked: () =>
+            staking
+              .balanceOf(automate.address)
+              .then((amount: ethersType.BigNumber) =>
+                ethereum
+                  .toBN(amount)
+                  .div(`1e${stakingTokenDecimals}`)
+                  .toString(10)
+              ),
           can: async () => {
-            const stakingBalance = await staking
-              .balanceOf(signerAddress)
+            const automateStaked = await staking
+              .balanceOf(automate.address)
               .then(ethereum.toBN);
-            if (stakingBalance.lte(0)) {
+            if (automateStaked.lte(0)) {
               return new Error(
-                "Insufficient funds on the staking contract balance"
+                "Insufficient funds on the automate contract balance"
               );
+            }
+            const automateOwner = await automate.owner();
+            if (signerAddress.toLowerCase() !== automateOwner.toLowerCase()) {
+              return new Error("Someone else contract");
             }
 
             return true;
           },
-          send: async () => {
-            const stakingBalance = await staking
+          refund: async () => ({
+            tx: await automate.refund(),
+          }),
+        },
+      };
+      const migrate: Automate.AdapterActions["migrate"] = {
+        name: "automateRestake-migrate",
+        methods: {
+          staked: () =>
+            staking
+              .balanceOf(signerAddress)
+              .then((amount: ethersType.BigNumber) =>
+                ethereum
+                  .toBN(amount)
+                  .div(`1e${stakingTokenDecimals}`)
+                  .toString(10)
+              ),
+          canWithdraw: async () => {
+            const ownerStaked = await staking
               .balanceOf(signerAddress)
               .then(ethereum.toBN);
+            if (ownerStaked.lte(0)) {
+              return new Error("Insufficient funds on the balance");
+            }
+
+            return true;
+          },
+          withdraw: async () => {
+            const amount = await staking
+              .balanceOf(signerAddress)
+              .then(ethereum.toBN);
+
             return {
-              tx: await staking.withdraw(stakingBalance.toFixed(0)),
+              tx: await staking.withdraw(amount.toFixed(0)),
             };
           },
+          ...deposit.methods,
         },
-        ...deposit,
-      ];
+      };
       const runParams = async () => {
         const multicall = new ethersMulticall.Provider(provider);
         await multicall.init();
