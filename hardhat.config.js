@@ -22,12 +22,6 @@ module.exports = {
       },
     },
   },
-  paths: {
-    sources: './automates',
-    artifacts: './automates-public/ethereum/build',
-    tests: './automates',
-    deployments: './automates-public/ethereum/deployment',
-  },
   networks: {
     hardhat: {
       blockGasLimit: 10000000,
