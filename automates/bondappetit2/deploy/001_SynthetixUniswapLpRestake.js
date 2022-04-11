@@ -3,7 +3,7 @@ const { migration } = require('./utils');
 module.exports = migration(async ({ utils: { dfhNetwork, deploy } }) => {
   const { ERC1167, Storage } = dfhNetwork();
 
-  await deploy('bondappetit2SynthetixUniswapLpRestake', {
+  await deploy('bondappetitSynthetixUniswapLpRestake', {
     contract: 'contracts/SynthetixUniswapLpRestake.automate.sol:SynthetixUniswapLpRestake',
     args: [Storage.address],
     libraries: {

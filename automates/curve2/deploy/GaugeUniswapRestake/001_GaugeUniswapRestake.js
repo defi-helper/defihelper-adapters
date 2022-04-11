@@ -3,7 +3,7 @@ const { migration } = require('../utils');
 module.exports = migration(async ({ utils: { dfhNetwork, deploy } }) => {
   const { ERC1167, Storage } = dfhNetwork();
 
-  await deploy('curve2GaugeUniswapRestake', {
+  await deploy('curveGaugeUniswapRestake', {
     contract: 'contracts/GaugeUniswapRestake.automate.sol:GaugeUniswapRestake',
     args: [Storage.address],
     libraries: {

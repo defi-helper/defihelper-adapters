@@ -3,7 +3,7 @@ const { migration } = require('./utils');
 module.exports = migration(async ({ utils: { dfhNetwork, deploy } }) => {
   const { ERC1167, Storage } = dfhNetwork();
 
-  await deploy('bscApeSwap2MasterChefLpRestake', {
+  await deploy('bscApeSwapMasterChefLpRestake', {
     contract: 'contracts/MasterChefLpRestake.automate.sol:MasterChefLpRestake',
     args: [Storage.address],
     libraries: {
