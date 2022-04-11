@@ -43,7 +43,13 @@
     "platform": "binance-smart-chain",
     "address": "0x4338665cbb7b2485a8855a139b75d5e34ab0db94"
   },
-  "0xFfef2639b2Ee39f9C284D0107E567DD2f7b20613": {
+  "0xffef2639b2ee39f9c284d0107e567dd2f7b20613": {
     "id": "wanswap"
+  },
+  "0x41562ae242d194247389152acaa7a9397136b09f": {
+    "id": "wanchain"
+  },
+  "0xC2392DD3e3fED2c8Ed9f7f0bDf6026fcd1348453": {
+    "id": "moonbeans"
   }
 }
