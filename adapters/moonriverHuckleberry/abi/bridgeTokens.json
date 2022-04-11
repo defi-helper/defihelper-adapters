@@ -42,5 +42,8 @@
   "0xdd7f2bc5f0ef210ca183349ae90785fdfb374ae7": {
     "platform": "binance-smart-chain",
     "address": "0x4338665cbb7b2485a8855a139b75d5e34ab0db94"
+  },
+  "0xFfef2639b2Ee39f9C284D0107E567DD2f7b20613": {
+    "id": "wanswap"
   }
 }
