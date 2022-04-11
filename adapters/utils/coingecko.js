@@ -1,4 +1,4 @@
-const { dayjs, axios } = require('../lib');
+const { ethers, dayjs, axios } = require('../lib');
 
 const errorHandler = (e) => {
   const { method, url } = e.config;
@@ -130,7 +130,7 @@ class CoingeckoProvider {
  */
 function bridgeWrapperBuild(aliases, blockTag, block, network) {
   return (address) => {
-    const alias = aliases[address.toLowerCase()];
+    const alias = aliases[address.toLowerCase()] ?? aliases[ethers.utils.getAddress(address)];
     if (typeof alias === 'object') {
       return typeof alias.id === 'string'
         ? new CoingeckoProvider({ block, blockTag }).price(alias.id)
