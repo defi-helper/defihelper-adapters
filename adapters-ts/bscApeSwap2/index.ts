@@ -21,7 +21,6 @@ import masterChefLpRestakeABI from "./data/masterChefLpRestakeABI.json";
 import masterChefSingleRestakeABI from "./data/masterChefSingleRestakeABI.json";
 import apeRewardV4RestakeABI from "./data/apeRewardV4RestakeABI.json";
 import bridgeTokens from "./data/bridgeTokens.json";
-import { BigNumber } from "bignumber.js";
 
 function masterChefProviderFactory(
   address: string,
@@ -84,8 +83,6 @@ module.exports = {
         ...ethereum.defaultOptions(),
         ...initOptions,
       };
-      const gnanaToken = '0xddb3bd8645775f59496c821e4f55a7ea6a6dc299';
-      const bananaToken = '0x603c7f932ed1fc6575303d8fb018fdcbb0f39a95';
       const masterChefSavedPools = await cache.read(
         "bscApeSwap",
         "masterChefPools"
@@ -136,17 +133,8 @@ module.exports = {
         stakingToken,
         options
       );
-      let token0PriceUSD: BigNumber;
-      let token1PriceUSD: BigNumber;
-
-      if(stakingTokenPair.token0 === gnanaToken) {
-        token0PriceUSD = (await priceFeed(bananaToken)).multipliedBy(0.98)
-      } else token0PriceUSD = await priceFeed(stakingTokenPair.token0);
-
-      if(stakingTokenPair.token1 === gnanaToken) {
-        token1PriceUSD = (await priceFeed(bananaToken)).multipliedBy(0.98)
-      } else token1PriceUSD = await priceFeed(stakingTokenPair.token1);
-
+      const token0PriceUSD = await priceFeed(stakingTokenPair.token0);
+      const token1PriceUSD = await priceFeed(stakingTokenPair.token1);
       const stakingTokenPriceUSD = stakingTokenPair.calcPrice(
         token0PriceUSD,
         token1PriceUSD
