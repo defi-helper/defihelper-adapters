@@ -72,6 +72,9 @@ function masterChefProviderFactory(
 const masterChefAddress = "0x5c8D727b265DBAfaba67E050f2f739cAeEB4A6F9";
 const routeTokens = ["0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"];
 
+const gnanaTokenAddress = "0xddb3bd8645775f59496c821e4f55a7ea6a6dc299";
+const bananaTokenAddress = "0x603c7f932ed1fc6575303d8fb018fdcbb0f39a95";
+
 module.exports = {
   masterChefPair: stakingAdapter(
     async (
@@ -83,6 +86,7 @@ module.exports = {
         ...ethereum.defaultOptions(),
         ...initOptions,
       };
+      
       const masterChefSavedPools = await cache.read(
         "bscApeSwap",
         "masterChefPools"
@@ -133,8 +137,17 @@ module.exports = {
         stakingToken,
         options
       );
-      const token0PriceUSD = await priceFeed(stakingTokenPair.token0);
-      const token1PriceUSD = await priceFeed(stakingTokenPair.token1);
+      let token0PriceUSD = new bn(0);
+      let token1PriceUSD = new bn(0);
+
+      if(stakingTokenPair.token0.toLowerCase() === gnanaTokenAddress.toLowerCase()) {
+        token0PriceUSD = (await priceFeed(bananaTokenAddress)).multipliedBy(0.98)
+      } else token0PriceUSD = await priceFeed(stakingTokenPair.token0);
+
+      if(stakingTokenPair.token1.toLowerCase() === gnanaTokenAddress.toLowerCase()) {
+        token1PriceUSD = (await priceFeed(bananaTokenAddress)).multipliedBy(0.98)
+      } else token1PriceUSD = await priceFeed(stakingTokenPair.token1);
+
       const stakingTokenPriceUSD = stakingTokenPair.calcPrice(
         token0PriceUSD,
         token1PriceUSD
@@ -324,8 +337,12 @@ module.exports = {
         .contract(provider, stakingToken)
         .decimals()
         .then((v: ethersType.BigNumber) => Number(v.toString()));
-      const stakingTokenPriceUSD = await priceFeed(stakingToken);
-
+        
+      let stakingTokenPriceUSD = new bn(0);
+      if(stakingToken.toLowerCase() === gnanaTokenAddress.toLowerCase()) {
+        stakingTokenPriceUSD = (await priceFeed(bananaTokenAddress)).multipliedBy(0.98)
+      } else stakingTokenPriceUSD = await priceFeed(stakingToken);
+  
       const totalLocked = await masterChefProvider
         .totalLocked(poolInfo)
         .then((v) => v.div(`1e${stakingTokenDecimals}`));
@@ -473,7 +490,11 @@ module.exports = {
         .contract(provider, stakingToken)
         .decimals()
         .then((v: ethersType.BigNumber) => Number(v.toString()));
-      const stakingTokenPriceUSD = await priceFeed(stakingToken);
+
+      let stakingTokenPriceUSD = new bn(0);
+      if(stakingToken.toLowerCase() === gnanaTokenAddress.toLowerCase()) {
+        stakingTokenPriceUSD = (await priceFeed(bananaTokenAddress)).multipliedBy(0.98)
+      } else stakingTokenPriceUSD = await priceFeed(stakingToken);
 
       const totalLocked = await apeRewardContract
         .totalStaked({ blockTag })
