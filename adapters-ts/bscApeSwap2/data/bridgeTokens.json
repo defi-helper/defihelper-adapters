@@ -46,5 +46,20 @@
   "0x1ba42e5193dfa8b03d15dd1b86a3113bbbef8eeb": {
     "network": 1,
     "address": "0x4a64515e5e1d1073e83f30cb97bed20400b66e10"
+  },
+  "0x0b079b33b6e72311c6be245f9f660cc385029fc3": {
+    "platform": "ethereum",
+    "address": "0x4a64515e5e1d1073e83f30cb97bed20400b66e10"
+  },
+  "0xde4512db1a7a7519818da38db86ec1363d70a711": {
+    "platform": "ethereum",
+    "address": "0x6431fa4b812a2dcc062a38cb55cc7d18135adead"
+  },
+  "0x344a9c3a0961da3cd78a8f5a62bd04a0358178be": {
+    "platform": "ethereum",
+    "address": "0xa0246c9032bc3a600820415ae600c6388619a14d"
+  },
+  "0x06fda0758c17416726f77cb11305eac94c074ec0": {
+    "id": "animal-concerts-token"
   }
 }
