@@ -61,5 +61,40 @@
   },
   "0x06fda0758c17416726f77cb11305eac94c074ec0": {
     "id": "animal-concerts-token"
+  },
+  "0xa75e7928d3de682e3f44da60c26f33117c4e6c5c": {
+    "id": "propel-token"
+  },
+  "0x8623e66Bea0DCe41B6d47f9C44e806A115baBae0": {
+    "platform": "ethereum",
+    "address": "0x3085154623f51b00dedfc6ceeb5197277a66b17b"
+  },
+  "0x1Fa4a73a3F0133f0025378af00236f3aBDEE5D63": {
+    "id": "near"
+  },
+  "0x8C907e0a72C3d55627E853f4ec6a96b0C8771145": {
+    "platform": "ethereum",
+    "address": "0xb2617246d0c6c0087f18703d576831899ca94f01"
+  },
+  "0x3d6545b08693dae087e957cb1180ee38b9e3c25e": {
+    "id": "ethereum-classic"
+  },
+  "0x1fa4a73a3f0133f0025378af00236f3abdee5d63": {
+    "id": "near"
+  },
+  "0xd944f1d1e9d5f9bb90b62f9d45e447d989580782": {
+    "id": "iota"
+  },
+  "0x8c907e0a72c3d55627e853f4ec6a96b0c8771145": {
+    "id": "zignaly"
+  },
+  "0x3cb7378565718c64ab86970802140cc48ef1f969": {
+    "id": "wing-finance"
+  },
+  "0xf0e406c49c63abf358030a299c0e00118c4c6ba5": {
+    "id": "nervenetwork"
+  },
+  "0x3ba5aee47bb7eae40eb3d06124a74eb89da8ffd2": {
+    "id": "rocket-finance"
   }
 }
