@@ -141,11 +141,11 @@ module.exports = {
       let token1PriceUSD = new bn(0);
 
       if(stakingTokenPair.token0.toLowerCase() === gnanaTokenAddress.toLowerCase()) {
-        token0PriceUSD = (await priceFeed(bananaTokenAddress)).multipliedBy(0.98)
+        token0PriceUSD = (await priceFeed(bananaTokenAddress)).multipliedBy(1.389)
       } else token0PriceUSD = await priceFeed(stakingTokenPair.token0);
 
       if(stakingTokenPair.token1.toLowerCase() === gnanaTokenAddress.toLowerCase()) {
-        token1PriceUSD = (await priceFeed(bananaTokenAddress)).multipliedBy(0.98)
+        token1PriceUSD = (await priceFeed(bananaTokenAddress)).multipliedBy(1.389)
       } else token1PriceUSD = await priceFeed(stakingTokenPair.token1);
 
       const stakingTokenPriceUSD = stakingTokenPair.calcPrice(
@@ -340,7 +340,7 @@ module.exports = {
         
       let stakingTokenPriceUSD = new bn(0);
       if(stakingToken.toLowerCase() === gnanaTokenAddress.toLowerCase()) {
-        stakingTokenPriceUSD = (await priceFeed(bananaTokenAddress)).multipliedBy(0.98)
+        stakingTokenPriceUSD = (await priceFeed(bananaTokenAddress)).multipliedBy(1.389)
       } else stakingTokenPriceUSD = await priceFeed(stakingToken);
   
       const totalLocked = await masterChefProvider
