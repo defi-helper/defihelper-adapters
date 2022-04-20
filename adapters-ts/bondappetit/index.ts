@@ -6,7 +6,7 @@ import { bridgeWrapperBuild } from "../utils/coingecko";
 import { Staking } from "../utils/adapter/base";
 import * as ethereum from "../utils/ethereum/base";
 import * as erc20 from "../utils/ethereum/erc20";
-import * as uniswap from "../utils/ethereum/uniswap";
+import { V2 as uniswap } from "../utils/ethereum/uniswap";
 import * as synthetix from "../utils/ethereum/adapter/synthetix";
 import * as waves from "../utils/waves/base";
 import synthetixStakingABI from "./data/stakingABI.json";

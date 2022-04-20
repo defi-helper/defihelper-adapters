@@ -1,9 +1,9 @@
 import type ethersType from "ethers";
 import { bignumber as bn, ethers, ethersMulticall, dayjs } from "../../../lib";
 import { Action } from "../../adapter/base";
-import { toBN, BlockNumber } from "../base";
+import { toBN } from "../base";
 import * as erc20 from "../erc20";
-import * as uniswap from "../uniswap";
+import { V2 as uniswap } from "../uniswap";
 import { Automate, Deploy } from "./base";
 
 export function stakingAutomateDeployTabs({

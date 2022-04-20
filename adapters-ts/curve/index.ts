@@ -15,11 +15,9 @@ import {
   Automate,
 } from "../utils/ethereum/adapter/base";
 import { bridgeWrapperBuild, PriceFeed } from "../utils/coingecko";
-import * as cache from "../utils/cache";
 import * as ethereum from "../utils/ethereum/base";
 import * as erc20 from "../utils/ethereum/erc20";
-import * as uniswap from "../utils/ethereum/uniswap";
-import * as masterChef from "../utils/ethereum/adapter/masterChef";
+import { V2 as uniswap } from "../utils/ethereum/uniswap";
 import registryABI from "./data/registryABI.json";
 import gaugeABI from "./data/gaugeABI.json";
 import poolABI from "./data/poolABI.json";

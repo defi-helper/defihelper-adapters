@@ -1,8 +1,8 @@
 import type { Provider } from "@defihelper/ethers-multicall";
 import type BN from "bignumber.js";
-import { bignumber as bn } from "../../../lib";
-import * as base from "../base";
-import * as erc20 from "../erc20";
+import { bignumber as bn } from "../../../../lib";
+import * as base from "../../base";
+import * as erc20 from "../../erc20";
 import abi from "./abi/pair.json";
 
 export { abi };

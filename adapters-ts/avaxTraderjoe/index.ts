@@ -2,7 +2,7 @@ import type ethersType from "ethers";
 import { ethers, bignumber as bn, ethersMulticall } from "../lib";
 import * as ethereum from "../utils/ethereum/base";
 import * as erc20 from "../utils/ethereum/erc20";
-import * as uniswap from "../utils/ethereum/uniswap";
+import { V2 as uniswap } from "../utils/ethereum/uniswap";
 import { bridgeWrapperBuild } from "../utils/coingecko";
 import * as masterChef from "../utils/ethereum/adapter/masterChef";
 import * as cache from "../utils/cache";
