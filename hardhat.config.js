@@ -18,9 +18,15 @@ module.exports = {
         runs: 1_000_000,
       },
       metadata: {
-        bytecodeHash: "none",
+        bytecodeHash: 'none',
       },
     },
+  },
+  paths: {
+    sources: './automates',
+    artifacts: './automates-public/ethereum/build',
+    tests: './automates',
+    deployments: './automates-public/ethereum/deployment',
   },
   networks: {
     hardhat: {
@@ -94,7 +100,7 @@ module.exports = {
       accounts: [...maybeAccount(process.env.MOONBASE_ALPHA_DEPLOYER)],
     },
     optimistic: {
-      url: process.env.OPTIMISTIC_NODE || "http://127.0.0.1:8545",
+      url: process.env.OPTIMISTIC_NODE || 'http://127.0.0.1:8545',
       chainId: 10,
       gasPrice: 1_000_000,
       blockGasLimit: 6_000_000,
