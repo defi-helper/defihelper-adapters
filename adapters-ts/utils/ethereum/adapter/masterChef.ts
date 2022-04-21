@@ -3,7 +3,7 @@ import type ethersType from "ethers";
 import { bignumber as bn, ethers, ethersMulticall, dayjs } from "../../../lib";
 import { toBN, BlockNumber } from "../base";
 import * as erc20 from "../erc20";
-import * as uniswap from "../uniswap";
+import { V2 as uniswap } from "../uniswap";
 import { Action } from "../../adapter/base";
 import { Staking, Deploy, Automate } from "./base";
 

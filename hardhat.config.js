@@ -93,6 +93,13 @@ module.exports = {
       blockGasLimit: 15_000_000,
       accounts: [...maybeAccount(process.env.MOONBASE_ALPHA_DEPLOYER)],
     },
+    optimistic: {
+      url: process.env.OPTIMISTIC_NODE || "http://127.0.0.1:8545",
+      chainId: 10,
+      gasPrice: 1_000_000,
+      blockGasLimit: 6_000_000,
+      accounts: [...maybeAccount(process.env.OPTIMISTIC_DEPLOYER)],
+    },
   },
   namedAccounts: {
     deployer: {
