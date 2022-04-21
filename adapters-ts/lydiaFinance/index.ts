@@ -6,14 +6,14 @@ import { V2 as uniswap } from "../utils/ethereum/uniswap";
 import { bridgeWrapperBuild } from "../utils/coingecko";
 import * as masterChef from "../utils/ethereum/adapter/masterChef";
 import * as cache from "../utils/cache";
-import * as govSwap from "../utils/ethereum/adapter/govSwap";
 import { Staking, ResolvedContract } from "../utils/adapter/base";
 import {
   stakingAdapter,
   contractsResolver,
-  governanceSwapAdapter,
 } from "../utils/ethereum/adapter/base";
 import croesusABI from "./data/croesusABI.json";
+import croesusLpRestakeABI from "./data/croesusLpRestakeABI.json";
+import croesusSingleRestakeABI from "./data/croesusSingleRestakeABI.json";
 import bridgeTokens from "./data/bridgeTokens.json";
 
 function masterChefProviderFactory(
@@ -56,11 +56,26 @@ function masterChefProviderFactory(
       pendingReward(poolIndex, wallet) {
         return this.contract.pendingLyd(poolIndex, wallet).then(ethereum.toBN);
       },
+      deposit(poolIndex, amount) {
+        if (poolIndex.toString() === "0") {
+          return this.contract.enterStaking(amount);
+        } else {
+          return this.contract.deposit(poolIndex, amount);
+        }
+      },
+      withdraw(poolIndex, amount) {
+        if (poolIndex.toString() === "0") {
+          return this.contract.leaveStaking(amount);
+        } else {
+          return this.contract.withdraw(poolIndex, amount);
+        }
+      },
     }
   );
 }
 
 const croesusAddress = "0xFb26525B14048B7BB1F3794F6129176195Db7766";
+const routeTokens = ["0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7"];
 
 module.exports = {
   croesusPair: stakingAdapter(
@@ -461,7 +476,9 @@ module.exports = {
               description: "",
               automate: {
                 adapters: isPair ? ["croesusPair"] : ["croesusSingle"],
-                autorestakeAdapter: isPair ? "" : undefined,
+                autorestakeAdapter: isPair
+                  ? "CroesusLpRestake"
+                  : "CroesusSingleRestake",
                 buyLiquidity: isPair
                   ? {
                       router: "0xA52aBE4676dbfd04Df42eF7755F01A3c41f28D27",
@@ -488,6 +505,60 @@ module.exports = {
 
         return pools;
       }),
+    },
+    deploy: {
+      MasterChefLpRestake: masterChef.stakingAutomateDeployTabs({
+        liquidityRouter: "0xA52aBE4676dbfd04Df42eF7755F01A3c41f28D27",
+        stakingAddress: croesusAddress,
+        poolsLoader: () =>
+          cache
+            .read("lydiaFinance", "croesusPools")
+            .then((pools) => pools.filter(({ type }) => type === "lp")),
+      }),
+      MasterChefSingleRestake: masterChef.stakingAutomateDeployTabs({
+        liquidityRouter: "0xA52aBE4676dbfd04Df42eF7755F01A3c41f28D27",
+        stakingAddress: croesusAddress,
+        poolsLoader: () =>
+          cache
+            .read("lydiaFinance", "croesusPools")
+            .then((pools) => pools.filter(({ type }) => type === "single")),
+      }),
+    },
+    CroesusLpRestake: async (
+      signer: ethersType.Signer,
+      contractAddress: string
+    ) => {
+      if (!signer.provider) throw new Error("Provider not found");
+
+      return masterChef.stakingPairAutomateAdapter({
+        masterChefProvider: masterChefProviderFactory(
+          croesusAddress,
+          croesusABI,
+          signer,
+          "latest",
+        ),
+        automateABI: croesusLpRestakeABI,
+        stakingABI: croesusABI,
+        routeTokens,
+      })(signer, contractAddress);
+    },
+    MasterChefSingleRestake: async (
+      signer: ethersType.Signer,
+      contractAddress: string
+    ) => {
+      if (!signer.provider) throw new Error("Provider not found");
+
+      return masterChef.stakingPairAutomateAdapter({
+        masterChefProvider: masterChefProviderFactory(
+          croesusAddress,
+          croesusABI,
+          signer,
+          "latest",
+        ),
+        automateABI: croesusSingleRestakeABI,
+        stakingABI: croesusABI,
+        routeTokens,
+      })(signer, contractAddress);
     },
   },
 };

@@ -1033,7 +1033,7 @@ module.exports = {
         "latest"
       );
 
-      return masterChef.stakingPairAutomateAdapter({
+      return masterChef.stakingSingleAutomateAdapter({
         masterChefProvider: masterChefProviderFactory(
           masterChefAddress,
           masterChefABI,
