@@ -13,7 +13,7 @@ import bridgeTokens from "./data/bridgeTokens.json";
 import masterChefABIV1 from "./data/masterChefABIV1.json";
 import { ResolvedContract, Staking } from "../utils/adapter/base";
 import * as erc20 from "../utils/ethereum/erc20";
-import * as uniswap from "../utils/ethereum/uniswap";
+import { V2 as uniswap } from "../utils/ethereum/uniswap";
 
 const MASTER_CHEF_ADDRESS_V1 = "0xc2EdaD668740f1aA35E4D8f227fB8E17dcA888Cd";
 
