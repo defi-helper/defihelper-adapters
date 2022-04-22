@@ -42,6 +42,7 @@ export function ProtocolContractsResolver(props) {
           ? {
               blockNumber: "latest",
               signer: ethSigner,
+              cacheAuth: 'dev',
             }
           : undefined;
 
