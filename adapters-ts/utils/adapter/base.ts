@@ -103,7 +103,6 @@ export namespace Staking {
 }
 
 export interface ResolvedContract {
-  poolIndex: number;
   name: string;
   address: string;
   blockchain: "ethereum" | "waves";

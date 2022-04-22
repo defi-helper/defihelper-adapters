@@ -1598,7 +1598,7 @@ module.exports = {
           )
         );
 
-        const uniswapLiquidityPools: ResolvedContract[] = await Promise.all(
+        const uniswapLiquidityPools: (ResolvedContract & { poolIndex: number })[] = await Promise.all(
           poolsInfo.map(async (info, index) => {
             const stakingTokenSymbol = poolsStakingTokensSymbol[index];
             const isPair = stakingTokenSymbol === "APE-LP";
