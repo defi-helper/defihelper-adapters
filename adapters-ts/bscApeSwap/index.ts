@@ -23,7 +23,6 @@ import masterChefSingleRestakeABI from "./data/masterChefSingleRestakeABI.json";
 import apeRewardV4RestakeABI from "./data/apeRewardV4RestakeABI.json";
 import bridgeTokens from "./data/bridgeTokens.json";
 import { Contract, Provider } from "@defihelper/ethers-multicall";
-import { toBN } from "../utils/ethereum/base";
 
 function masterChefProviderFactory(
   address: string,
@@ -121,7 +120,7 @@ function masterChefPolygonProviderFactory(
         return erc20
           .contract(this.contract.provider, stakingToken)
           .balanceOf(this.contract.address, { blockTag: this.options.blockTag })
-          .then(toBN);
+          .then(ethereum.toBN);
       },
       rewardPerSecond() {
         return this.contract.bananaPerSecond()
@@ -442,7 +441,7 @@ module.exports = {
         masterChefProvider.totalAllocPoint(),
       ]);
 
-      const rewardPerSec = toBN(poolInfo.allocPoint.toNumber())
+      const rewardPerSec = ethereum.toBN(poolInfo.allocPoint.toNumber())
         .multipliedBy(rewardPerSecond.toString())
         .div(totalAllocPoint.toString())
         .div(`1e${rewardTokenDecimals}`);
