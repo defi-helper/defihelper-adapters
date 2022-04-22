@@ -91,7 +91,8 @@ function masterChefPolygonProviderFactory(
   abi: any,
   provider: ethersType.providers.Provider | ethersType.Signer,
   blockTag: ethereum.BlockNumber,
-  multicallInstance: Provider
+  multicallInstance: Provider,
+  poolIndex: number
 ) {
   return masterChef.buildMasterChefProvider(
     new ethers.Contract(address, abi, provider),
@@ -100,13 +101,11 @@ function masterChefPolygonProviderFactory(
       rewardToken() {
         return "0x5d47baba0d66083c52009271faf3f50dcc01023c";
       },
-      stakingToken(pool) {
-        return this.contract.lpToken(pool.poolIndex);
+      stakingToken() {
+        return this.contract.lpToken(poolIndex);
       },
-      async poolInfo(poolIndex) {
-        const masterChiefContract = new ethersMulticall.Contract(
-          address, abi
-        );
+      async poolInfo() {
+        const masterChiefContract = new ethersMulticall.Contract(address, abi);
         const [ poolInfo, lpToken ] = await multicallInstance.all([
           masterChiefContract.poolInfo(poolIndex),
           masterChiefContract.lpToken(poolIndex),
@@ -114,7 +113,6 @@ function masterChefPolygonProviderFactory(
 
         return {
           ...poolInfo,
-          poolIndex,
           lpToken
         }
       },
@@ -148,7 +146,6 @@ const gnanaTokenAddress = "0xddb3bd8645775f59496c821e4f55a7ea6a6dc299";
 const bananaTokenAddress = "0x603c7f932ed1fc6575303d8fb018fdcbb0f39a95";
 
 const masterChefPolygonAddress = "0x54aff400858dcac39797a81894d9920f16972d1d";
-const polygonRouteTokens = ["0xC0788A3aD43d79aa53B09c2EaCc313A787d1d607"];
 
 const polygonGnanaTokenAddress = "0xddb3bd8645775f59496c821e4f55a7ea6a6dc299";
 const polygonBananaTokenAddress = "0x5d47baba0d66083c52009271faf3f50dcc01023c";
@@ -361,7 +358,6 @@ module.exports = {
     }
   ),
 
-
   masterChefPairPolygon: stakingAdapter(
     async (
       provider,
@@ -382,7 +378,6 @@ module.exports = {
         .getNetwork()
         .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
-      const blockNumber = block.number;
       const priceFeed = bridgeWrapperBuild(
         bridgeTokens,
         blockTag,
@@ -404,14 +399,14 @@ module.exports = {
         masterChefPolygonABI,
         provider,
         blockTag,
-        multicall
+        multicall,
+        pool.index
       );
       const poolInfo = await masterChefProvider.poolInfo(pool.index);
 
       const rewardToken = await masterChefProvider.rewardToken();
       const rewardTokenDecimals = 18;
       const rewardTokenPriceUSD = await priceFeed(rewardToken);
-
       
       const stakingToken = await masterChefProvider.stakingToken(poolInfo);
 

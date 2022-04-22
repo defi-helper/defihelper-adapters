@@ -12,7 +12,6 @@ export interface Options {
 }
 
 export interface PoolInfo {
-  poolIndex?: number
   lpToken: string;
   allocPoint: BigNumber;
   accRewardPerShare: BigNumber;
