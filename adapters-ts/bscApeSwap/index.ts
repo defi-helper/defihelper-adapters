@@ -132,18 +132,10 @@ function masterChefPolygonProviderFactory(
         return this.contract.pendingBanana(poolIndex, wallet).then(ethereum.toBN);
       },
       deposit(poolIndex, amount) {
-        if (poolIndex.toString() === "0") {
-          return this.contract.enterStaking(amount);
-        } else {
-          return this.contract.deposit(poolIndex, amount);
-        }
+        return this.contract.deposit(poolIndex, amount);
       },
       withdraw(poolIndex, amount) {
-        if (poolIndex.toString() === "0") {
-          return this.contract.leaveStaking(amount);
-        } else {
-          return this.contract.withdraw(poolIndex, amount);
-        }
+        return this.contract.withdraw(poolIndex, amount);
       },
     }
   );
