@@ -374,8 +374,8 @@ module.exports = {
       };
 
       const masterChefSavedPools = await cache.read(
-        "polygonApeSwap",
-        "masterChefPools"
+        "bscApeSwap",
+        "masterChefPolygonPools"
       );
       const blockTag = options.blockNumber;
       const network = await provider
@@ -1634,8 +1634,8 @@ module.exports = {
         if (options.cacheAuth) {
           cache.write(
             options.cacheAuth,
-            "polygonApeSwap",
-            "masterChefPools",
+            "bscApeSwap",
+            "masterChefPolygonPools",
             uniswapLiquidityPools.map(
               ({ poolIndex, address }) => ({
                 index: poolIndex,
