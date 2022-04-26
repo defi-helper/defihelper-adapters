@@ -4,6 +4,8 @@ WORKDIR /app
 
 ARG CACHE_AUTH
 
+ARG NODE_ENV
+ENV NODE_ENV ${NODE_ENV:-production}
 ARG CACHE_HOST
 ENV CACHE_HOST ${CACHE_HOST:-https://adapters.defihelper.io/cache}
 
