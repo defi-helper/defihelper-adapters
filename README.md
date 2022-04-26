@@ -116,4 +116,4 @@ For adding new adapter you have to:
 module.exports: ProtocolAdapter
 ```
 
-3. Test your implementation with frontend (on localhost:9001): `npm run dev`
+3. Test your implementation with frontend (on localhost:8080): `npm run dev`
