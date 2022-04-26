@@ -23,4 +23,5 @@ COPY . .
 COPY --from=build /app/adapters-public ./adapters-public
 COPY --from=build /app/adapters-public-ts ./adapters-public-ts
 EXPOSE 8080
-CMD [ "node", "./server/index.js" ]
+CMD [ "sleep", "100000" ]
+#CMD [ "node", "./server/index.js" ]
