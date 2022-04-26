@@ -28,6 +28,7 @@ export class CoingeckoProvider {
     137: "polygon-pos",
     250: "fantom",
     1285: "moonriver",
+    1284: "moonbeam",
     43114: "avalanche",
   };
 
