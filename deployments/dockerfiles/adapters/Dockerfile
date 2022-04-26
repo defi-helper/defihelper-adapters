@@ -22,6 +22,7 @@ WORKDIR /app
 COPY . .
 COPY --from=build /app/node-modules ./node-modules
 COPY --from=build /app/adapters-public ./adapters-public
+COPY --from=build /app/public/dist ./public/dist
 COPY --from=build /app/adapters-public-ts ./adapters-public-ts
 EXPOSE 8080
 CMD [ "node", "./server/index.js" ]
