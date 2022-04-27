@@ -1606,7 +1606,6 @@ module.exports = {
               adapter: "masterChefPairPolygon",
               description: "",
               automate: {
-                autorestakeAdapter: "MasterChefLpPolygonRestake",
                 adapters: ["masterChefPairPolygon"],
                 buyLiquidity: isPair
                   ? {
