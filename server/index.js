@@ -42,7 +42,7 @@ app.get('/cache', async (req, res) => {
     await database('cache')
       .where({ protocol, key })
       .first()
-      .then(({ data }) => data)
+      .then((row) => (row ? row.data : []))
   );
 });
 app.post('/cache', [json()], async (req, res) => {
