@@ -1095,17 +1095,18 @@ module.exports = {
       const rewardToken = await apeRewardContract
         .REWARD_TOKEN()
         .then((v: ethersType.BigNumber) => v.toString().toLowerCase());
+
       const rewardTokenDecimals = await erc20
         .contract(provider, rewardToken)
         .decimals()
         .then((v: ethersType.BigNumber) => Number(v.toString()));
+
       const rewardTokenPriceUSD = await priceFeed(rewardToken);
       const rewardTokenPerBlock = await apeRewardContract
         .rewardPerBlock({ blockTag })
         .then((v: ethersType.BigNumber) =>
           ethereum.toBN(v).div(`1e${rewardTokenDecimals}`)
         );
-
 
       const multicall = new ethersMulticall.Provider(provider);
       await multicall.init();
@@ -1115,34 +1116,27 @@ module.exports = {
         multicall, stakingLpAddress, options
       );
       const stakingLpTokenDecimals = await await erc20
-      .contract(provider, rewardToken)
+      .contract(provider, stakingLpAddress)
       .decimals()
 
       const stakingToken0 = stakingLpPairToken.token0;
-      const stakingToken1 = await stakingLpPairToken.token1;
+      const stakingToken1 = stakingLpPairToken.token1;
 
       const [
         stakingToken0Usd, stakingToken1Usd,
-        stakingToken0Decimals, stakingToken1Decimals
       ] = await Promise.all([
         priceFeed(stakingToken0), priceFeed(stakingToken1),
-        erc20
-          .contract(provider, stakingToken0)
-          .decimals()
-          .then((v: ethersType.BigNumber) => Number(v.toString())),
-
-        erc20
-          .contract(provider, stakingToken1)
-          .decimals()
-          .then((v: ethersType.BigNumber) => Number(v.toString())),
       ])
 
+      const stakedLpPairTokenPrice = stakingLpPairToken.calcPrice(
+        stakingToken0Usd, stakingToken1Usd,
+      )
       const totalLocked = await apeRewardContract
         .totalStaked({ blockTag })
         .then((v: ethersType.BigNumber) =>
           ethereum.toBN(v).div(`1e${stakingLpTokenDecimals}`)
         );
-      const tvl = new bn(totalLocked).multipliedBy(stakingToken0Usd.plus(stakingToken1Usd));
+      const tvl = new bn(totalLocked).multipliedBy(stakedLpPairTokenPrice);
 
       let aprBlock = rewardTokenPerBlock
         .multipliedBy(rewardTokenPriceUSD)
