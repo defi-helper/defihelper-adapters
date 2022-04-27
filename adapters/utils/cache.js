@@ -2,7 +2,7 @@ const { axios, env } = require('../lib');
 
 async function read(protocol, key) {
   return axios
-    .get(`${env.CACHE_HOST}/${protocol}/${key}.json`)
+    .get(`${env.CACHE_HOST}?protocol=${protocol}&key=${key}`)
     .then(({ data }) => data)
     .catch((e) => {
       if (e.response) {
@@ -14,7 +14,7 @@ async function read(protocol, key) {
 
 async function write(auth, protocol, key, data) {
   return axios
-    .post(`${env.CACHE_HOST}/${protocol}/${key}.json`, data, {
+    .post(`${env.CACHE_HOST}?protocol=${protocol}&key=${key}`, data, {
       headers: { Auth: auth },
     })
     .catch((e) => {

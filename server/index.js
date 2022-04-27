@@ -4,7 +4,9 @@ const path = require('path');
 const Express = require('express');
 const { json } = require('body-parser');
 const glob = require('tiny-glob');
+const { v4: uuid } = require('uuid');
 const fs = require('fs');
+const knex = require('knex');
 
 function isFileExists(path) {
   return fs.promises
@@ -13,18 +15,52 @@ function isFileExists(path) {
     .catch(() => false);
 }
 
+const databaseSsl = process.env.DATABASE_SSL ?? '';
+const database = knex({
+  client: 'pg',
+  connection: {
+    host: process.env.DATABASE_HOST ?? 'localhost',
+    port: Number(process.env.DATABASE_PORT ?? '5432'),
+    user: process.env.DATABASE_USER ?? '',
+    password: process.env.DATABASE_PASSWORD ?? '',
+    database: process.env.DATABASE_NAME ?? '',
+    ssl: databaseSsl
+      ? {
+          ca: fs.readFileSync(databaseSsl),
+        }
+      : undefined,
+  },
+});
+
 const app = Express();
 app.use(Express.static(path.resolve(__dirname, '../adapters-public-ts')));
 app.use(Express.static(path.resolve(__dirname, '../adapters-public')));
-app.use('/cache', [json()], Express.static(path.resolve(__dirname, './cache')));
-app.post(/^\/cache\/(.+)/i, async (req, res) => {
+app.get('/cache', async (req, res) => {
+  const { protocol, key } = req.query;
+
+  return res.json(
+    await database('cache')
+      .where({ protocol, key })
+      .first()
+      .then(({ data }) => data)
+  );
+});
+app.post('/cache', [json()], async (req, res) => {
   const auth = req.header('Auth');
   if (auth !== process.env.CACHE_AUTH) return res.status(403).send('');
 
-  const { 0: key } = req.params;
+  const { protocol, key } = req.query;
   const data = req.body;
 
-  await fs.promises.writeFile(path.resolve(__dirname, `./cache/${key}`), JSON.stringify(data, null, 4), { flag: 'w' });
+  const cache = {
+    protocol,
+    key,
+    data: JSON.stringify(data, null, 4),
+  };
+  const updated = await database('cache').update(cache).where({ protocol, key });
+  if (updated === 0) {
+    await database('cache').insert({ ...cache, id: uuid() });
+  }
 
   return res.status(200).send('');
 });

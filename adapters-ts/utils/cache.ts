@@ -2,7 +2,7 @@ import { axios, env } from "../lib";
 
 export function read<T = any[]>(protocol: string, key: string) {
   return axios
-    .get<T>(`${env.CACHE_HOST}/${protocol}/${key}.json`)
+    .get<T>(`${env.CACHE_HOST}?protocol=${protocol}&key=${key}`)
     .then(({ data }) => data)
     .catch((e) => {
       if (e.response) {
@@ -16,11 +16,11 @@ export function read<T = any[]>(protocol: string, key: string) {
 
 export function write(auth: string, protocol: string, key: string, data: any) {
   return axios
-    .post(`${env.CACHE_HOST}/${protocol}/${key}.json`, data, {
+    .post(`${env.CACHE_HOST}?protocol=${protocol}&key=${key}`, data, {
       headers: { Auth: auth },
     })
     .catch((e) => {
-        console.log(e.message)
+      console.log(e.message);
       if (e.response) {
         throw new Error(
           `Write cache failed: ${e.response.status} ${e.response.data}`
