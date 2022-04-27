@@ -105,15 +105,15 @@ function masterChefPolygonProviderFactory(
       },
       async poolInfo() {
         const masterChiefContract = new ethersMulticall.Contract(address, abi);
-        const [ poolInfo, lpToken ] = await multicallInstance.all([
+        const [poolInfo, lpToken] = await multicallInstance.all([
           masterChiefContract.poolInfo(poolIndex),
           masterChiefContract.lpToken(poolIndex),
         ]);
 
         return {
           ...poolInfo,
-          lpToken
-        }
+          lpToken,
+        };
       },
       async totalLocked(pool) {
         const stakingToken = await this.stakingToken(pool);
@@ -123,10 +123,12 @@ function masterChefPolygonProviderFactory(
           .then(ethereum.toBN);
       },
       rewardPerSecond() {
-        return this.contract.bananaPerSecond()
+        return this.contract.bananaPerSecond();
       },
       pendingReward(poolIndex, wallet) {
-        return this.contract.pendingBanana(poolIndex, wallet).then(ethereum.toBN);
+        return this.contract
+          .pendingBanana(poolIndex, wallet)
+          .then(ethereum.toBN);
       },
       deposit(poolIndex, amount) {
         return this.contract.deposit(poolIndex, amount);
@@ -214,12 +216,22 @@ module.exports = {
       let token0PriceUSD = new bn(0);
       let token1PriceUSD = new bn(0);
 
-      if(stakingTokenPair.token0.toLowerCase() === gnanaTokenAddress.toLowerCase()) {
-        token0PriceUSD = (await priceFeed(bananaTokenAddress)).multipliedBy(1.389)
+      if (
+        stakingTokenPair.token0.toLowerCase() ===
+        gnanaTokenAddress.toLowerCase()
+      ) {
+        token0PriceUSD = (await priceFeed(bananaTokenAddress)).multipliedBy(
+          1.389
+        );
       } else token0PriceUSD = await priceFeed(stakingTokenPair.token0);
 
-      if(stakingTokenPair.token1.toLowerCase() === gnanaTokenAddress.toLowerCase()) {
-        token1PriceUSD = (await priceFeed(bananaTokenAddress)).multipliedBy(1.389)
+      if (
+        stakingTokenPair.token1.toLowerCase() ===
+        gnanaTokenAddress.toLowerCase()
+      ) {
+        token1PriceUSD = (await priceFeed(bananaTokenAddress)).multipliedBy(
+          1.389
+        );
       } else token1PriceUSD = await priceFeed(stakingTokenPair.token1);
 
       const stakingTokenPriceUSD = stakingTokenPair.calcPrice(
@@ -406,7 +418,7 @@ module.exports = {
       const rewardToken = await masterChefProvider.rewardToken();
       const rewardTokenDecimals = 18;
       const rewardTokenPriceUSD = await priceFeed(rewardToken);
-      
+
       const stakingToken = await masterChefProvider.stakingToken(poolInfo);
 
       const stakingTokenDecimals = 18;
@@ -419,12 +431,22 @@ module.exports = {
       let token0PriceUSD = new bn(0);
       let token1PriceUSD = new bn(0);
 
-      if(stakingTokenPair.token0.toLowerCase() === polygonGnanaTokenAddress.toLowerCase()) {
-        token0PriceUSD = (await priceFeed(polygonBananaTokenAddress)).multipliedBy(1.389)
+      if (
+        stakingTokenPair.token0.toLowerCase() ===
+        polygonGnanaTokenAddress.toLowerCase()
+      ) {
+        token0PriceUSD = (
+          await priceFeed(polygonBananaTokenAddress)
+        ).multipliedBy(1.389);
       } else token0PriceUSD = await priceFeed(stakingTokenPair.token0);
 
-      if(stakingTokenPair.token1.toLowerCase() === polygonGnanaTokenAddress.toLowerCase()) {
-        token1PriceUSD = (await priceFeed(polygonBananaTokenAddress)).multipliedBy(1.389)
+      if (
+        stakingTokenPair.token1.toLowerCase() ===
+        polygonGnanaTokenAddress.toLowerCase()
+      ) {
+        token1PriceUSD = (
+          await priceFeed(polygonBananaTokenAddress)
+        ).multipliedBy(1.389);
       } else token1PriceUSD = await priceFeed(stakingTokenPair.token1);
 
       const stakingTokenPriceUSD = stakingTokenPair.calcPrice(
@@ -441,11 +463,12 @@ module.exports = {
         masterChefProvider.totalAllocPoint(),
       ]);
 
-      const rewardPerSec = ethereum.toBN(poolInfo.allocPoint.toNumber())
+      const rewardPerSec = ethereum
+        .toBN(poolInfo.allocPoint.toNumber())
         .multipliedBy(rewardPerSecond.toString())
         .div(totalAllocPoint.toString())
         .div(`1e${rewardTokenDecimals}`);
-      
+
       const aprSecond = rewardPerSec.multipliedBy(rewardTokenPriceUSD).div(tvl);
       const aprDay = aprSecond.multipliedBy(86400);
       const aprWeek = aprDay.multipliedBy(7);
@@ -620,8 +643,10 @@ module.exports = {
         .then((v: ethersType.BigNumber) => Number(v.toString()));
 
       let stakingTokenPriceUSD = new bn(0);
-      if(stakingToken.toLowerCase() === gnanaTokenAddress.toLowerCase()) {
-        stakingTokenPriceUSD = (await priceFeed(bananaTokenAddress)).multipliedBy(1.389)
+      if (stakingToken.toLowerCase() === gnanaTokenAddress.toLowerCase()) {
+        stakingTokenPriceUSD = (
+          await priceFeed(bananaTokenAddress)
+        ).multipliedBy(1.389);
       } else stakingTokenPriceUSD = await priceFeed(stakingToken);
 
       const totalLocked = await masterChefProvider
@@ -1113,24 +1138,26 @@ module.exports = {
 
       const stakingLpAddress = await apeRewardContract.STAKE_TOKEN();
       const stakingLpPairToken = await uniswap.pair.PairInfo.create(
-        multicall, stakingLpAddress, options
+        multicall,
+        stakingLpAddress,
+        options
       );
       const stakingLpTokenDecimals = await await erc20
-      .contract(provider, stakingLpAddress)
-      .decimals()
+        .contract(provider, stakingLpAddress)
+        .decimals();
 
       const stakingToken0 = stakingLpPairToken.token0;
       const stakingToken1 = stakingLpPairToken.token1;
 
-      const [
-        stakingToken0Usd, stakingToken1Usd,
-      ] = await Promise.all([
-        priceFeed(stakingToken0), priceFeed(stakingToken1),
-      ])
+      const [stakingToken0Usd, stakingToken1Usd] = await Promise.all([
+        priceFeed(stakingToken0),
+        priceFeed(stakingToken1),
+      ]);
 
       const stakedLpPairTokenPrice = stakingLpPairToken.calcPrice(
-        stakingToken0Usd, stakingToken1Usd,
-      )
+        stakingToken0Usd,
+        stakingToken1Usd
+      );
       const totalLocked = await apeRewardContract
         .totalStaked({ blockTag })
         .then((v: ethersType.BigNumber) =>
@@ -1154,7 +1181,6 @@ module.exports = {
           address: stakingLpAddress,
           decimals: stakingLpTokenDecimals,
           priceUSD: stakingToken0Usd.plus(stakingToken1Usd).toString(10),
-
         },
         rewardToken: {
           address: rewardToken,
@@ -1547,6 +1573,16 @@ module.exports = {
             link: "https://apeswap.finance/pools",
           })
         );
+        if (options.cacheAuth) {
+          cache.write(
+            options.cacheAuth,
+            "bscApeSwap",
+            "apeRewardContracts",
+            poolsApeReward.map(({ address }: ResolvedContract) => ({
+              stakingContract: address,
+            }))
+          );
+        }
 
         return [...uniswapLiquidityPools, ...poolsApeReward];
       }),
@@ -1570,15 +1606,20 @@ module.exports = {
           poolsIndex.map((poolIndex) => masterChiefContract.lpToken(poolIndex))
         );
 
-        const poolsInfo = poolsInfoExLp.map((poolExLp, index) => ({ ...poolExLp, lpToken: poolsInfoLpToken[index] }))
-        
+        const poolsInfo = poolsInfoExLp.map((poolExLp, index) => ({
+          ...poolExLp,
+          lpToken: poolsInfoLpToken[index],
+        }));
+
         const poolsStakingTokensSymbol = await multicall.all(
           poolsInfo.map(({ lpToken }) =>
             erc20.multicallContract(lpToken).symbol()
           )
         );
 
-        const uniswapLiquidityPools: (ResolvedContract & { poolIndex: number })[] = await Promise.all(
+        const uniswapLiquidityPools: (ResolvedContract & {
+          poolIndex: number;
+        })[] = await Promise.all(
           poolsInfo.map(async (info, index) => {
             const stakingTokenSymbol = poolsStakingTokensSymbol[index];
             const isPair = stakingTokenSymbol === "APE-LP";
@@ -1623,16 +1664,14 @@ module.exports = {
             options.cacheAuth,
             "bscApeSwap",
             "masterChefPolygonPools",
-            uniswapLiquidityPools.map(
-              ({ poolIndex, address }) => ({
-                index: poolIndex,
-                stakingToken: address,
-                type: "lp",
-              })
-            )
+            uniswapLiquidityPools.map(({ poolIndex, address }) => ({
+              index: poolIndex,
+              stakingToken: address,
+              type: "lp",
+            }))
           );
         }
-        
+
         return uniswapLiquidityPools;
       }),
     },
