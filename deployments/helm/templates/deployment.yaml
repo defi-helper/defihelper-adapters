@@ -39,12 +39,24 @@ spec:
             httpGet:
               path: /
               port: http
+            initialDelaySeconds: 15
+            timeoutSeconds: 1
           readinessProbe:
             httpGet:
               path: /
               port: http
+            initialDelaySeconds: 15
+            timeoutSeconds: 1
+          volumeMounts:
+            - mountPath: /app/configuration
+              name: configuration
+              readOnly: true
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: configuration
+          secret:
+            secretName: config-secrets
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
