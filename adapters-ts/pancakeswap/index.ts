@@ -804,8 +804,8 @@ module.exports = {
             let token0Symbol, token1Symbol;
             if (isPair) {
               const [token0, token1] = await multicall.all([
-                erc20.multicallContract(info.lpToken).token0(),
-                erc20.multicallContract(info.lpToken).token1(),
+                uniswap.pair.multicallContract(info.lpToken).token0(),
+                uniswap.pair.multicallContract(info.lpToken).token1(),
               ]);
               const pairSymbols = await multicall.all([
                 erc20.multicallContract(token0).symbol(),
