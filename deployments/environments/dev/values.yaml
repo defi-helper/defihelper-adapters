@@ -5,7 +5,6 @@
 replicaCount: 1
 
 images:
-  repository: adapters
   tag: latest
   nginx:
     name: nginx
