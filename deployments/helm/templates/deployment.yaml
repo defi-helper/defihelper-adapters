@@ -27,11 +27,13 @@ spec:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: nginx
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           image: "{{ .Values.images.nginx.name }}:{{ .Values.images.tag }}"
           terminationMessagePolicy: FallbackToLogsOnError
           ports:
-            - containerPort: 80
+            - name: http
+              containerPort: 80
+              protocol: TCP
           livenessProbe:
             httpGet:
               path: /
@@ -47,7 +49,7 @@ spec:
           resources:
             {{- toYaml .Values.images.nginx.resources | nindent 12 }}
         - name: app
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           image: "{{ .Values.images.app.name }}:{{ .Values.images.tag }}"
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
