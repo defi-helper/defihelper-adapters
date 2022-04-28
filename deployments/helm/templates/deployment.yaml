@@ -28,7 +28,7 @@ spec:
       containers:
         - name: nginx
           imagePullPolicy: IfNotPresent
-          image: "{{ .Values.image.repository }}/{{ .Values.images.nginx.name }}:{{ .Values.images.tag }}"
+          image: "{{ .Values.images.nginx.name }}:{{ .Values.images.tag }}"
           terminationMessagePolicy: FallbackToLogsOnError
           ports:
             - containerPort: 80
@@ -48,7 +48,7 @@ spec:
             {{- toYaml .Values.images.nginx.resources | nindent 12 }}
         - name: app
           imagePullPolicy: IfNotPresent
-          image: "{{ .Values.image.repository }}/{{ .Values.images.app.name }}:{{ .Values.images.tag }}"
+          image: "{{ .Values.images.app.name }}:{{ .Values.images.tag }}"
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           ports:
