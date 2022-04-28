@@ -149,6 +149,100 @@ export function StakingExit({ methods }) {
   );
 }
 
+export function GovernanceSwapStake({methods}) {
+  const [amount, setAmount] = React.useState("0");
+  const [isApproved, setIsApproved] = React.useState(false);
+  const [can, setCan] = React.useState(null);
+
+  React.useEffect(() => {
+    methods.balanceOf().then(setAmount);
+  }, []);
+
+  React.useEffect(() => {
+    methods.isApproved(amount).then(setIsApproved);
+    methods.can(amount).then(setCan);
+  }, [amount]);
+
+  const onApprove = async () => {
+    await methods.approve(amount).then(({ tx }) => tx?.wait());
+    methods.isApproved(amount).then(setIsApproved);
+  };
+
+  const onStake = async () => {
+    await methods.stake(amount).then(({ tx }) => tx.wait());
+    methods.balanceOf().then(setAmount);
+  };
+
+  return (
+    <div>
+      <div>
+        Swap your <a href={methods.fromLink()}>{methods.fromSymbol()}</a> tokens to <a href={methods.toLink()}>{methods.toSymbol()}</a>
+      </div>
+      <div>
+        <div>
+          <label>Amount:</label>
+        </div>
+        <div>
+          <input
+            type="text"
+            value={amount}
+            placeholder="amount"
+            onChange={(e) => setAmount(e.target.value)}
+          />
+        </div>
+        {can === null || can.message}
+      </div>
+      <div>
+        {isApproved || <button onClick={onApprove}>Approve</button>}
+        {isApproved && <button onClick={onStake}>Stake</button>}
+      </div>
+    </div>
+  );
+}
+
+export function GovernanceSwapUnstake({methods}) {
+  const [amount, setAmount] = React.useState("0");
+  const [can, setCan] = React.useState(null);
+
+  React.useEffect(() => {
+    methods.balanceOf().then(setAmount);
+  }, []);
+
+  React.useEffect(() => {
+    methods.can(amount).then(setCan);
+  }, [amount]);
+
+  const onUnstake = async () => {
+    await methods.unstake(amount).then(({ tx }) => tx.wait());
+    methods.balanceOf().then(setAmount);
+  };
+
+  return (
+    <div>
+      <div>
+        Swap your <a href={methods.fromLink()}>{methods.fromSymbol()}</a> tokens to <a href={methods.toLink()}>{methods.toSymbol()}</a>
+      </div>
+      <div>
+        <div>
+          <label>Amount:</label>
+        </div>
+        <div>
+          <input
+            type="text"
+            value={amount}
+            placeholder="amount"
+            onChange={(e) => setAmount(e.target.value)}
+          />
+        </div>
+        {can === null || can.message}
+      </div>
+      <div>
+        <button onClick={onUnstake}>Unstake</button>
+      </div>
+    </div>
+  );
+}
+
 export function AutomateDeposit({ methods }) {
   const [balance, setBalance] = React.useState("0");
   const [canTransfer, setCanTransfer] = React.useState(null);
@@ -341,6 +435,8 @@ const components = {
   "staking-unstake": StakingUnstake,
   "staking-claim": StakingClaim,
   "staking-exit": StakingExit,
+  "governanceSwap-stake": GovernanceSwapStake,
+  "governanceSwap-unstake": GovernanceSwapUnstake,
   "automateRestake-deposit": AutomateDeposit,
   "automateRestake-refund": AutomateRefund,
   "automateRestake-migrate": AutomateMigrate,
