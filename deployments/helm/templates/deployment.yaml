@@ -26,15 +26,12 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-        - name: {{ .Chart.Name }}
-          securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+        - name: nginx
+          imagePullPolicy: IfNotPresent
+          image: "{{ $.Values.images.repository }}/{{ .Values.images.app.name }}:{{ .Values.images.tag }}"
+          terminationMessagePolicy: FallbackToLogsOnError
           ports:
-            - name: http
-              containerPort: 8080
-              protocol: TCP
+            - containerPort: 80
           livenessProbe:
             httpGet:
               path: /
@@ -45,6 +42,29 @@ spec:
             httpGet:
               path: /
               port: http
+            initialDelaySeconds: 15
+            timeoutSeconds: 1
+          resources:
+            {{- toYaml .Values.nginx.resources | nindent 12 }}
+        - name: app
+          imagePullPolicy: IfNotPresent
+          image: "{{ $.Values.images.repository }}/{{ .Values.images.app.name }}:{{ .Values.images.tag }}"
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 15
+            timeoutSeconds: 1
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
             initialDelaySeconds: 15
             timeoutSeconds: 1
           volumeMounts:
