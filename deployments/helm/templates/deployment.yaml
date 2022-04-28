@@ -28,7 +28,7 @@ spec:
       containers:
         - name: nginx
           imagePullPolicy: Always
-          image: "{{ .Values.images.nginx.name }}:{{ .Values.images.tag }}"
+          image: "{{ .Values.images.nginx.name }}:{{ .Values.image.tag }}"
           terminationMessagePolicy: FallbackToLogsOnError
           ports:
             - name: http
@@ -50,7 +50,7 @@ spec:
             {{- toYaml .Values.images.nginx.resources | nindent 12 }}
         - name: app
           imagePullPolicy: Always
-          image: "{{ .Values.images.app.name }}:{{ .Values.images.tag }}"
+          image: "{{ .Values.images.app.name }}:{{ .Values.image.tag }}"
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           ports:
