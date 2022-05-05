@@ -140,7 +140,14 @@ export function bridgeWrapperBuild(
   network: number
 ): PriceFeed {
   return (address: string) => {
-    const alias = aliases[address] ?? aliases[address.toLowerCase()];
+    const alias =
+      aliases[address] ??
+      aliases[address.toLowerCase()] ??
+      Object.entries(aliases).find(
+        ([aliasAddress]) =>
+          aliasAddress.toLocaleLowerCase() === address.toLowerCase()
+      )?.[1] ??
+      null;
 
     if (alias) {
       if (isIdAlias(alias)) {
