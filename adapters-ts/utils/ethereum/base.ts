@@ -31,6 +31,12 @@ export const getAvgBlockTime = async (
     provider.getBlock(currentBlockNumber - interval),
     provider.getBlock(currentBlockNumber),
   ]);
+  if (currentBlock === null) {
+    throw new Error(`Invalid block: ${currentBlockNumber}`);
+  }
+  if (fiftyBlockEarlier === null) {
+    throw new Error(`Invalid block: ${currentBlockNumber - interval}`);
+  }
 
   return (
     (1000 * (currentBlock.timestamp - fiftyBlockEarlier.timestamp)) /
