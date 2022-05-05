@@ -97,5 +97,8 @@
   "0xe898edc43920f357a93083f1d4460437de6daec2": {
     "network": 1,
     "address": "0x3a8cccb969a61532d1e6005e2ce12c200caece87"
+  },
+  "0x88f1a5ae2a3bf98aeaf342d26b30a79438c9142e": {
+    "id": "yearn-finance"
   }
 }
