@@ -152,7 +152,9 @@ module.exports = {
         .multipliedBy(rewardPerSecond)
         .div(totalAllocPoint)
         .div(`1e${rewardTokenDecimals}`);
-      const aprSecond = rewardPerSec.multipliedBy(rewardTokenPriceUSD).div(tvl);
+      const aprSecond = tvl.gt(0)
+        ? rewardPerSec.multipliedBy(rewardTokenPriceUSD).div(tvl)
+        : new bn(0);
       const aprDay = aprSecond.multipliedBy(86400);
       const aprWeek = aprDay.multipliedBy(7);
       const aprMonth = aprDay.multipliedBy(30);

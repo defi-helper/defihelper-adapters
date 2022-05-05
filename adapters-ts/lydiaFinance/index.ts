@@ -152,7 +152,9 @@ module.exports = {
         .multipliedBy(rewardPerSecond)
         .div(totalAllocPoint)
         .div(`1e${rewardTokenDecimals}`);
-      const aprSecond = rewardPerSec.multipliedBy(rewardTokenPriceUSD).div(tvl);
+      const aprSecond = tvl.gt(0)
+        ? rewardPerSec.multipliedBy(rewardTokenPriceUSD).div(tvl)
+        : new bn(0);
       const aprDay = aprSecond.multipliedBy(86400);
       const aprWeek = aprDay.multipliedBy(7);
       const aprMonth = aprDay.multipliedBy(30);
@@ -332,9 +334,9 @@ module.exports = {
         .multipliedBy(rewardPerSecond)
         .div(totalAllocPoint)
         .div(`1e${rewardTokenDecimals}`);
-      let aprSec = rewardPerSec.multipliedBy(rewardTokenPriceUSD).div(tvl);
-      if (!aprSec.isFinite()) aprSec = new bn(0);
-
+      let aprSec = tvl.gt(0)
+        ? rewardPerSec.multipliedBy(rewardTokenPriceUSD).div(tvl)
+        : new bn(0);
       const aprDay = aprSec.multipliedBy(60 * 60 * 24);
       const aprWeek = aprDay.multipliedBy(7);
       const aprMonth = aprDay.multipliedBy(30);
@@ -535,7 +537,7 @@ module.exports = {
           croesusAddress,
           croesusABI,
           signer,
-          "latest",
+          "latest"
         ),
         automateABI: croesusLpRestakeABI,
         stakingABI: croesusABI,
@@ -553,7 +555,7 @@ module.exports = {
           croesusAddress,
           croesusABI,
           signer,
-          "latest",
+          "latest"
         ),
         automateABI: croesusSingleRestakeABI,
         stakingABI: croesusABI,

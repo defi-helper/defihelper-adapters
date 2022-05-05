@@ -93,8 +93,9 @@ module.exports = {
       );
 
       const tvl = totalSupply.multipliedBy(stakingTokenPriceUSD);
-      let aprBlock = rewardRate.multipliedBy(rewardTokenPriceUSD).div(tvl);
-      if (!aprBlock.isFinite()) aprBlock = new bn(0);
+      const aprBlock = tvl.gt(0)
+        ? rewardRate.multipliedBy(rewardTokenPriceUSD).div(tvl)
+        : new bn(0);
       const aprDay = aprBlock.multipliedBy(blocksPerDay);
       const aprWeek = aprDay.multipliedBy(7);
       const aprMonth = aprDay.multipliedBy(30);

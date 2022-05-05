@@ -142,9 +142,9 @@ module.exports = {
         .multipliedBy(rewardPerSecond)
         .div(totalAllocPoint)
         .div(`1e${rewardTokenDecimals}`);
-      let aprSec = rewardPerSec.multipliedBy(rewardTokenPriceUSD).div(tvl);
-      if (!aprSec.isFinite()) aprSec = new bn(0);
-
+      const aprSec = tvl.gt(0)
+        ? rewardPerSec.multipliedBy(rewardTokenPriceUSD).div(tvl)
+        : new bn(0);
       const aprDay = aprSec.multipliedBy(60 * 60 * 24);
       const aprWeek = aprDay.multipliedBy(7);
       const aprMonth = aprDay.multipliedBy(30);
@@ -346,9 +346,9 @@ module.exports = {
         .multipliedBy(rewardPerSecond)
         .div(totalAllocPoint)
         .div(`1e${rewardTokenDecimals}`);
-      let aprSec = rewardPerSec.multipliedBy(rewardTokenPriceUSD).div(tvl);
-      if (!aprSec.isFinite()) aprSec = new bn(0);
-
+      const aprSec = tvl.gt(0)
+        ? rewardPerSec.multipliedBy(rewardTokenPriceUSD).div(tvl)
+        : new bn(0);
       const aprDay = aprSec.multipliedBy(60 * 60 * 24);
       const aprWeek = aprDay.multipliedBy(7);
       const aprMonth = aprDay.multipliedBy(30);

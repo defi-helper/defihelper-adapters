@@ -253,7 +253,9 @@ module.exports = {
         .div(totalAllocPoint)
         .div(`1e${rewardTokenDecimals}`);
 
-      const aprSecond = rewardPerSec.multipliedBy(rewardTokenPriceUSD).div(tvl);
+      const aprSecond = tvl.gt(0)
+        ? rewardPerSec.multipliedBy(rewardTokenPriceUSD).div(tvl)
+        : new bn(0);
       const aprDay = aprSecond.multipliedBy(86400);
       const aprWeek = aprDay.multipliedBy(7);
       const aprMonth = aprDay.multipliedBy(30);
@@ -469,7 +471,9 @@ module.exports = {
         .div(totalAllocPoint.toString())
         .div(`1e${rewardTokenDecimals}`);
 
-      const aprSecond = rewardPerSec.multipliedBy(rewardTokenPriceUSD).div(tvl);
+      const aprSecond = tvl.gt(0)
+        ? rewardPerSec.multipliedBy(rewardTokenPriceUSD).div(tvl)
+        : new bn(0);
       const aprDay = aprSecond.multipliedBy(86400);
       const aprWeek = aprDay.multipliedBy(7);
       const aprMonth = aprDay.multipliedBy(30);
@@ -662,7 +666,9 @@ module.exports = {
         .multipliedBy(rewardPerSecond)
         .div(totalAllocPoint)
         .div(`1e${rewardTokenDecimals}`);
-      const aprSecond = rewardPerSec.multipliedBy(rewardTokenPriceUSD).div(tvl);
+      const aprSecond = tvl.gt(0)
+        ? rewardPerSec.multipliedBy(rewardTokenPriceUSD).div(tvl)
+        : new bn(0);
       const aprDay = aprSecond.multipliedBy(86400);
       const aprWeek = aprDay.multipliedBy(7);
       const aprMonth = aprDay.multipliedBy(30);
@@ -811,11 +817,9 @@ module.exports = {
         );
       const tvl = new bn(totalLocked).multipliedBy(stakingTokenPriceUSD);
 
-      let aprBlock = rewardTokenPerBlock
-        .multipliedBy(rewardTokenPriceUSD)
-        .div(tvl);
-      if (!aprBlock.isFinite()) aprBlock = new bn(0);
-
+      const aprBlock = tvl.gt(0)
+        ? rewardTokenPerBlock.multipliedBy(rewardTokenPriceUSD).div(tvl)
+        : new bn(0);
       const blocksPerDay = new bn((1000 * 60 * 60 * 24) / avgBlockTime);
       const aprDay = aprBlock.multipliedBy(blocksPerDay);
       const aprWeek = aprDay.multipliedBy(7);
@@ -1165,11 +1169,9 @@ module.exports = {
         );
       const tvl = new bn(totalLocked).multipliedBy(stakedLpPairTokenPrice);
 
-      let aprBlock = rewardTokenPerBlock
-        .multipliedBy(rewardTokenPriceUSD)
-        .div(tvl);
-      if (!aprBlock.isFinite()) aprBlock = new bn(0);
-
+      const aprBlock = tvl.gt(0)
+        ? rewardTokenPerBlock.multipliedBy(rewardTokenPriceUSD).div(tvl)
+        : new bn(0);
       const blocksPerDay = new bn((1000 * 60 * 60 * 24) / avgBlockTime);
       const aprDay = aprBlock.multipliedBy(blocksPerDay);
       const aprWeek = aprDay.multipliedBy(7);

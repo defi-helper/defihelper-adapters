@@ -17,6 +17,7 @@ export function ProtocolContractsResolver(props) {
     []
   );
   const [currentResolver, setCurrentResolver] = React.useState("default");
+  const [cacheAuth, setCacheAuth] = React.useState("");
 
   React.useEffect(() => {
     const handler = async () => {
@@ -42,6 +43,7 @@ export function ProtocolContractsResolver(props) {
           ? {
               blockNumber: "latest",
               signer: ethSigner,
+              cacheAuth: cacheAuth !== "" ? cacheAuth : undefined,
             }
           : undefined;
 
@@ -88,6 +90,15 @@ export function ProtocolContractsResolver(props) {
               </option>
             ))}
           </select>
+        </div>
+        <div className="column">
+          <label>Cache auth:</label>
+          <div>
+            <input
+              value={cacheAuth}
+              onChange={(e) => setCacheAuth(e.target.value)}
+            />
+          </div>
         </div>
         <div className="column">
           <Button onClick={onContractReload} loading={contractReload}>
