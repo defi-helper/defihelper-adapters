@@ -795,10 +795,12 @@ module.exports = {
       const rewardTokenPerBlock = await apeRewardContract
         .rewardPerBlock({ blockTag })
         .then((v: ethersType.BigNumber) =>
-          ethereum.toBN(v).div(`1e${rewardTokenDecimals}`)
-          .multipliedBy(bonusEndBlock.lte(blockNumber) ? 0 : 1)
+          ethereum
+            .toBN(v)
+            .div(`1e${rewardTokenDecimals}`)
+            .multipliedBy(bonusEndBlock.lte(blockNumber) ? 0 : 1)
         );
-        
+
       const stakingToken = await apeRewardContract
         .STAKE_TOKEN()
         .then((v: ethersType.BigNumber) => v.toString().toLowerCase());
