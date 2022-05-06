@@ -784,6 +784,9 @@ module.exports = {
       const rewardToken = await apeRewardContract
         .REWARD_TOKEN()
         .then((v: ethersType.BigNumber) => v.toString().toLowerCase());
+      const isBonusEndBlockReached = await apeRewardContract
+        .bonusEndBlock()
+        .then((v: ethersType.BigNumber) => v.lte(blockNumber));
       const rewardTokenDecimals = await erc20
         .contract(provider, rewardToken)
         .decimals()
@@ -817,14 +820,22 @@ module.exports = {
         );
       const tvl = new bn(totalLocked).multipliedBy(stakingTokenPriceUSD);
 
-      const aprBlock = tvl.gt(0)
-        ? rewardTokenPerBlock.multipliedBy(rewardTokenPriceUSD).div(tvl)
-        : new bn(0);
-      const blocksPerDay = new bn((1000 * 60 * 60 * 24) / avgBlockTime);
-      const aprDay = aprBlock.multipliedBy(blocksPerDay);
-      const aprWeek = aprDay.multipliedBy(7);
-      const aprMonth = aprDay.multipliedBy(30);
-      const aprYear = aprDay.multipliedBy(365);
+      let aprDay = new bn(0);
+      let aprWeek = new bn(0);
+      let aprMonth = new bn(0);
+      let aprYear = new bn(0);
+
+      if(!isBonusEndBlockReached) {
+        const blocksPerDay = new bn((1000 * 60 * 60 * 24) / avgBlockTime);
+        const aprBlock = tvl.gt(0)
+          ? rewardTokenPerBlock.multipliedBy(rewardTokenPriceUSD).div(tvl)
+          : new bn(0);
+        
+        aprDay = aprBlock.multipliedBy(blocksPerDay);
+        aprWeek = aprDay.multipliedBy(7);
+        aprMonth = aprDay.multipliedBy(30);
+        aprYear = aprDay.multipliedBy(365);
+      }
 
       return {
         stakeToken: {
