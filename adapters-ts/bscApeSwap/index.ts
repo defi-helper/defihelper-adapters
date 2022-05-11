@@ -13,6 +13,7 @@ import { bridgeWrapperBuild } from "../utils/coingecko";
 import * as cache from "../utils/cache";
 import * as ethereum from "../utils/ethereum/base";
 import * as erc20 from "../utils/ethereum/erc20";
+import * as dfh from "../utils/dfh";
 import { V2 as uniswap } from "../utils/ethereum/uniswap";
 import * as masterChef from "../utils/ethereum/adapter/masterChef";
 import masterChefABI from "./data/masterChefABI.json";
@@ -21,8 +22,7 @@ import apeRewardV4ABI from "./data/apeRewardV4ABI.json";
 import masterChefLpRestakeABI from "./data/masterChefLpRestakeABI.json";
 import masterChefSingleRestakeABI from "./data/masterChefSingleRestakeABI.json";
 import apeRewardV4RestakeABI from "./data/apeRewardV4RestakeABI.json";
-import bridgeTokens from "./data/bridgeTokens.json";
-import { Contract, Provider } from "@defihelper/ethers-multicall";
+import { Provider } from "@defihelper/ethers-multicall";
 
 function masterChefProviderFactory(
   address: string,
@@ -174,7 +174,7 @@ module.exports = {
       const block = await provider.getBlock(blockTag);
       const blockNumber = block.number;
       const priceFeed = bridgeWrapperBuild(
-        bridgeTokens,
+        await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network
@@ -205,7 +205,6 @@ module.exports = {
       const rewardToken = await masterChefProvider.rewardToken();
       const rewardTokenDecimals = 18;
       const rewardTokenPriceUSD = await priceFeed(rewardToken);
-
       const stakingToken = await masterChefProvider.stakingToken(poolInfo);
       const stakingTokenDecimals = 18;
       const stakingTokenPair = await uniswap.pair.PairInfo.create(
@@ -370,7 +369,6 @@ module.exports = {
       };
     }
   ),
-
   masterChefPairPolygon: stakingAdapter(
     async (
       provider,
@@ -392,7 +390,7 @@ module.exports = {
         .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
       const priceFeed = bridgeWrapperBuild(
-        bridgeTokens,
+        await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network
@@ -420,16 +418,13 @@ module.exports = {
       const rewardToken = await masterChefProvider.rewardToken();
       const rewardTokenDecimals = 18;
       const rewardTokenPriceUSD = await priceFeed(rewardToken);
-
       const stakingToken = await masterChefProvider.stakingToken(poolInfo);
-
       const stakingTokenDecimals = 18;
       const stakingTokenPair = await uniswap.pair.PairInfo.create(
         multicall,
         stakingToken,
         options
       );
-
       let token0PriceUSD = new bn(0);
       let token1PriceUSD = new bn(0);
 
@@ -588,7 +583,6 @@ module.exports = {
       };
     }
   ),
-
   masterChefSingle: stakingAdapter(
     async (
       provider,
@@ -610,7 +604,7 @@ module.exports = {
       const block = await provider.getBlock(blockTag);
       const blockNumber = block.number;
       const priceFeed = bridgeWrapperBuild(
-        bridgeTokens,
+        await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network
@@ -639,13 +633,11 @@ module.exports = {
       const rewardToken = await masterChefProvider.rewardToken();
       const rewardTokenDecimals = 18;
       const rewardTokenPriceUSD = await priceFeed(rewardToken);
-
       const stakingToken = contractAddress.toLowerCase();
       const stakingTokenDecimals = await erc20
         .contract(provider, stakingToken)
         .decimals()
         .then((v: ethersType.BigNumber) => Number(v.toString()));
-
       let stakingTokenPriceUSD = new bn(0);
       if (stakingToken.toLowerCase() === gnanaTokenAddress.toLowerCase()) {
         stakingTokenPriceUSD = (
@@ -766,7 +758,7 @@ module.exports = {
       const block = await provider.getBlock(blockTag);
       const blockNumber = block.number;
       const priceFeed = bridgeWrapperBuild(
-        bridgeTokens,
+        await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network
@@ -789,12 +781,6 @@ module.exports = {
         .decimals()
         .then((v: ethersType.BigNumber) => Number(v.toString()));
       const rewardTokenPriceUSD = await priceFeed(rewardToken);
-      const rewardTokenPerBlock = await apeRewardContract
-        .rewardPerBlock({ blockTag })
-        .then((v: ethersType.BigNumber) =>
-          ethereum.toBN(v).div(`1e${rewardTokenDecimals}`)
-        );
-
       const stakingToken = await apeRewardContract
         .STAKE_TOKEN()
         .then((v: ethersType.BigNumber) => v.toString().toLowerCase());
@@ -802,7 +788,11 @@ module.exports = {
         .contract(provider, stakingToken)
         .decimals()
         .then((v: ethersType.BigNumber) => Number(v.toString()));
-
+      const rewardTokenPerBlock = await apeRewardContract
+        .rewardPerBlock({ blockTag })
+        .then((v: ethersType.BigNumber) =>
+          ethereum.toBN(v).div(`1e${rewardTokenDecimals}`)
+        );
       let stakingTokenPriceUSD = new bn(0);
       if (stakingToken.toLowerCase() === gnanaTokenAddress.toLowerCase()) {
         stakingTokenPriceUSD = (
@@ -1088,7 +1078,6 @@ module.exports = {
       };
     }
   ),
-
   apeRewardV4StakingLp: stakingAdapter(
     async (
       provider,
@@ -1106,7 +1095,7 @@ module.exports = {
       const block = await provider.getBlock(blockTag);
       const blockNumber = block.number;
       const priceFeed = bridgeWrapperBuild(
-        bridgeTokens,
+        await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network
@@ -1124,22 +1113,18 @@ module.exports = {
       const rewardToken = await apeRewardContract
         .REWARD_TOKEN()
         .then((v: ethersType.BigNumber) => v.toString().toLowerCase());
-
       const rewardTokenDecimals = await erc20
         .contract(provider, rewardToken)
         .decimals()
         .then((v: ethersType.BigNumber) => Number(v.toString()));
-
-      const rewardTokenPriceUSD = await priceFeed(rewardToken);
       const rewardTokenPerBlock = await apeRewardContract
         .rewardPerBlock({ blockTag })
         .then((v: ethersType.BigNumber) =>
           ethereum.toBN(v).div(`1e${rewardTokenDecimals}`)
         );
-
+      const rewardTokenPriceUSD = await priceFeed(rewardToken);
       const multicall = new ethersMulticall.Provider(provider);
       await multicall.init();
-
       const stakingLpAddress = await apeRewardContract.STAKE_TOKEN();
       const stakingLpPairToken = await uniswap.pair.PairInfo.create(
         multicall,
@@ -1149,15 +1134,12 @@ module.exports = {
       const stakingLpTokenDecimals = await await erc20
         .contract(provider, stakingLpAddress)
         .decimals();
-
       const stakingToken0 = stakingLpPairToken.token0;
       const stakingToken1 = stakingLpPairToken.token1;
-
       const [stakingToken0Usd, stakingToken1Usd] = await Promise.all([
         priceFeed(stakingToken0),
         priceFeed(stakingToken1),
       ]);
-
       const stakedLpPairTokenPrice = stakingLpPairToken.calcPrice(
         stakingToken0Usd,
         stakingToken1Usd

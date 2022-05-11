@@ -13,6 +13,7 @@ import { bridgeWrapperBuild } from "../utils/coingecko";
 import * as cache from "../utils/cache";
 import * as ethereum from "../utils/ethereum/base";
 import * as erc20 from "../utils/ethereum/erc20";
+import * as dfh from "../utils/dfh";
 import { V2 as uniswap } from "../utils/ethereum/uniswap";
 import * as masterChef from "../utils/ethereum/adapter/masterChef";
 import masterChefABI from "./data/masterChefABI.json";
@@ -20,7 +21,6 @@ import smartChefInitializableABI from "./data/smartChefInitializableABI.json";
 import smartChefInitializableRestakeABI from "./data/smartChefInitializableRestakeABI.json";
 import masterChefSingleRestakeABI from "./data/masterChefSingleRestakeABI.json";
 import masterChefLpRestakeABI from "./data/masterChefLpRestakeABI.json";
-import bridgeTokens from "./data/bridgeTokens.json";
 
 function masterChefProviderFactory(
   address: string,
@@ -94,7 +94,7 @@ module.exports = {
       const block = await provider.getBlock(blockTag);
       const blockNumber = block.number;
       const priceFeed = bridgeWrapperBuild(
-        bridgeTokens,
+        await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network
@@ -291,7 +291,7 @@ module.exports = {
       const block = await provider.getBlock(blockTag);
       const blockNumber = block.number;
       const priceFeed = bridgeWrapperBuild(
-        bridgeTokens,
+        await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network
@@ -441,7 +441,7 @@ module.exports = {
       const block = await provider.getBlock(blockTag);
       const blockNumber = block.number;
       const priceFeed = bridgeWrapperBuild(
-        bridgeTokens,
+        await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network

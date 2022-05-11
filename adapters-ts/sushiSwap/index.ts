@@ -1,5 +1,4 @@
 import type ethersType from "ethers";
-
 import {
   contractsResolver,
   stakingAdapter,
@@ -7,9 +6,9 @@ import {
 import * as masterChef from "../utils/ethereum/adapter/masterChef";
 import * as ethereum from "../utils/ethereum/base";
 import * as cache from "../utils/cache";
+import * as dfh from "../utils/dfh";
 import { bignumber as bn, ethers, ethersMulticall } from "../lib";
 import { bridgeWrapperBuild } from "../utils/coingecko";
-import bridgeTokens from "./data/bridgeTokens.json";
 import masterChefABIV1 from "./data/masterChefABIV1.json";
 import { ResolvedContract, Staking } from "../utils/adapter/base";
 import * as erc20 from "../utils/ethereum/erc20";
@@ -88,15 +87,14 @@ module.exports = {
         .getNetwork()
         .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
-      const multicall = new ethersMulticall.Provider(provider, network);
-      await multicall.init();
-
       const priceFeed = bridgeWrapperBuild(
-        bridgeTokens,
+        await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network
       );
+      const multicall = new ethersMulticall.Provider(provider, network);
+      await multicall.init();
 
       const masterChefSavedPools = await cache.read(
         "sushiSwap",

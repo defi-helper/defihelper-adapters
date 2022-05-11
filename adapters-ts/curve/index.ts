@@ -17,6 +17,7 @@ import {
 import { bridgeWrapperBuild, PriceFeed } from "../utils/coingecko";
 import * as ethereum from "../utils/ethereum/base";
 import * as erc20 from "../utils/ethereum/erc20";
+import * as dfh from "../utils/dfh";
 import { V2 as uniswap } from "../utils/ethereum/uniswap";
 import registryABI from "./data/registryABI.json";
 import gaugeABI from "./data/gaugeABI.json";
@@ -244,7 +245,7 @@ function stakingAdapterFactory(poolABI: any) {
       const block = await provider.getBlock(blockTag);
       const multicall = new ethersMulticall.Provider(provider, network);
       const priceFeed = bridgeWrapperBuild(
-        bridgeTokens,
+        await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network
@@ -628,7 +629,7 @@ module.exports = {
     const block = await provider.getBlock(blockTag);
     const multicall = new ethersMulticall.Provider(provider, network);
     const priceFeed = bridgeWrapperBuild(
-      bridgeTokens,
+      await dfh.getPriceFeeds(network),
       blockTag,
       block,
       network

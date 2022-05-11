@@ -22,6 +22,7 @@ export default glob(path.resolve(__dirname, './*/index.ts')).then((files) => {
         }),
         replace({
           'process.env': JSON.stringify({
+            DFH_HOST: process.env.DFH_HOST,
             CACHE_HOST: process.env.CACHE_HOST,
             CACHE_AUTH: process.env.CACHE_AUTH,
           }),

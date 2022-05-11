@@ -6,6 +6,7 @@ import { V2 as uniswap } from "../utils/ethereum/uniswap";
 import { bridgeWrapperBuild } from "../utils/coingecko";
 import * as masterChef from "../utils/ethereum/adapter/masterChef";
 import * as cache from "../utils/cache";
+import * as dfh from "../utils/dfh";
 import * as govSwap from "../utils/ethereum/adapter/govSwap";
 import { Staking, ResolvedContract } from "../utils/adapter/base";
 import {
@@ -19,7 +20,6 @@ import xJoeTokenABI from "./data/xJoeTokenABI.json";
 import masterChefV2LpRestakeABI from "./data/masterChefV2LpRestakeABI.json";
 import masterChefV2SingleRestakeABI from "./data/masterChefV2SingleRestakeABI.json";
 import masterChefV3LpRestakeABI from "./data/masterChefV3LpRestakeABI.json";
-import bridgeTokens from "./data/bridgeTokens.json";
 
 function masterChefProviderFactory(
   address: string,
@@ -94,7 +94,7 @@ module.exports = {
         .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
       const priceFeed = bridgeWrapperBuild(
-        bridgeTokens,
+        await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network
@@ -120,7 +120,6 @@ module.exports = {
       const rewardToken = await masterChefProvider.rewardToken();
       const rewardTokenDecimals = 18;
       const rewardTokenPriceUSD = await priceFeed(rewardToken);
-
       const stakingToken = await masterChefProvider.stakingToken(poolInfo);
       const stakingTokenDecimals = 18;
       const stakingTokenPair = await uniswap.pair.PairInfo.create(
@@ -306,7 +305,7 @@ module.exports = {
         .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
       const priceFeed = bridgeWrapperBuild(
-        bridgeTokens,
+        await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network
@@ -330,7 +329,6 @@ module.exports = {
       const rewardToken = await masterChefProvider.rewardToken();
       const rewardTokenDecimals = 18;
       const rewardTokenPriceUSD = await priceFeed(rewardToken);
-
       const stakingToken = await masterChefProvider.stakingToken(poolInfo);
       const stakingTokenDecimals = await erc20
         .contract(provider, stakingToken)
@@ -497,7 +495,7 @@ module.exports = {
         .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
       const priceFeed = bridgeWrapperBuild(
-        bridgeTokens,
+        await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network
@@ -523,7 +521,6 @@ module.exports = {
       const rewardToken = await masterChefProvider.rewardToken();
       const rewardTokenDecimals = 18;
       const rewardTokenPriceUSD = await priceFeed(rewardToken);
-
       const stakingToken = await masterChefProvider.stakingToken(poolInfo);
       const stakingTokenDecimals = 18;
       const stakingTokenPair = await uniswap.pair.PairInfo.create(
@@ -680,7 +677,7 @@ module.exports = {
         .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
       const priceFeed = bridgeWrapperBuild(
-        bridgeTokens,
+        await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network

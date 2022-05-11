@@ -19,6 +19,7 @@ const commonjsGlobal =
     : ({} as any);
 
 export const env = process.env as {
+  DFH_HOST: string;
   CACHE_HOST: string;
   CACHE_AUTH: string;
 };

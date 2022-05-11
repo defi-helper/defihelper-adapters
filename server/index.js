@@ -199,6 +199,60 @@ app.get('/automates/waves', async (req, res) => {
     })
   );
 });
+app.get('/token-bridges', async (req, res) => {
+  const platformMap = {
+    1: 'ethereum',
+    56: 'binance-smart-chain',
+    128: 'huobi-token',
+    137: 'polygon-pos',
+    250: 'fantom',
+    1285: 'moonriver',
+    1284: 'moonbeam',
+    43114: 'avalanche',
+  };
+  const bridgesFiles = await glob(path.resolve(__dirname, '../adapters-ts/**/data/bridgeTokens.json'));
+
+  return res.json(
+    await bridgesFiles.reduce(async (result, file) => {
+      const bridges = JSON.parse(await fs.promises.readFile(file));
+      const network = bridges.meta.network;
+
+      return [
+        ...(await result),
+        ...Object.entries(bridges).reduce((result, [address, alias]) => {
+          if (typeof alias.id === 'string') {
+            return [...result, { network, address, priceFeed: { type: 'coingeckoId', id: alias.id } }];
+          }
+          if (typeof alias.platrofm === 'string' && typeof alias.address === 'string') {
+            return [
+              ...result,
+              {
+                network,
+                address,
+                priceFeed: { type: 'coingeckoAddress', platform: alias.platform, address: alias.address },
+              },
+            ];
+          }
+          if (
+            typeof alias.network === 'number' &&
+            typeof alias.address === 'string' &&
+            platformMap[alias.network] !== undefined
+          ) {
+            return [
+              ...result,
+              {
+                network,
+                address,
+                priceFeed: { type: 'coingeckoAddress', platform: platformMap[alias.network], address: alias.address },
+              },
+            ];
+          }
+          return result;
+        }, []),
+      ];
+    }, [])
+  );
+});
 app.get('/', async (req, res) => {
   const adapters = await glob(path.resolve(__dirname, '../adapters-public/*.js')).then((adapters) =>
     adapters.map((adapter) => path.parse(adapter).name)
