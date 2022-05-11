@@ -776,11 +776,23 @@ module.exports = {
       const rewardToken = await apeRewardContract
         .REWARD_TOKEN()
         .then((v: ethersType.BigNumber) => v.toString().toLowerCase());
+      const bonusEndBlock = await apeRewardContract
+        .bonusEndBlock({ blockTag })
+        .then(ethereum.toBN);
       const rewardTokenDecimals = await erc20
         .contract(provider, rewardToken)
         .decimals()
         .then((v: ethersType.BigNumber) => Number(v.toString()));
       const rewardTokenPriceUSD = await priceFeed(rewardToken);
+      const rewardTokenPerBlock = await apeRewardContract
+        .rewardPerBlock({ blockTag })
+        .then((v: ethersType.BigNumber) =>
+          ethereum
+            .toBN(v)
+            .div(`1e${rewardTokenDecimals}`)
+            .multipliedBy(bonusEndBlock.lte(blockNumber) ? 0 : 1)
+        );
+
       const stakingToken = await apeRewardContract
         .STAKE_TOKEN()
         .then((v: ethersType.BigNumber) => v.toString().toLowerCase());
@@ -788,11 +800,6 @@ module.exports = {
         .contract(provider, stakingToken)
         .decimals()
         .then((v: ethersType.BigNumber) => Number(v.toString()));
-      const rewardTokenPerBlock = await apeRewardContract
-        .rewardPerBlock({ blockTag })
-        .then((v: ethersType.BigNumber) =>
-          ethereum.toBN(v).div(`1e${rewardTokenDecimals}`)
-        );
       let stakingTokenPriceUSD = new bn(0);
       if (stakingToken.toLowerCase() === gnanaTokenAddress.toLowerCase()) {
         stakingTokenPriceUSD = (
