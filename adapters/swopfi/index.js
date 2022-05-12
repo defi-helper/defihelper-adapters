@@ -681,17 +681,19 @@ module.exports = {
         const node = waves.nodes[netByte] ?? waves.nodes.main;
         const deploySeed = wavesTransaction.libs.crypto.randomSeed();
         const deployAddress = wavesTransaction.libs.crypto.address(deploySeed, netByte);
+        const contractSigner = new wavesSigner({ NODE_URL: node });
+        await contractSigner.setProvider(new wavesSeedProvider(deploySeed));
 
         return {
           deploy: [
             AutomateActions.tab(
               'Transfer',
               async () => ({
-                description: `Transfer 0.01 Waves tokens to contract wallet ${deployAddress}`,
+                description: `Transfer 0.011 Waves tokens to contract wallet ${deployAddress}`,
               }),
               async () => {
                 const wavesBalance = await getWavesBalance(node, signer.currentProvider.user.address);
-                if (wavesBalance.lt(1e6)) {
+                if (wavesBalance.lt(11e5)) {
                   return Error('Exceeds balance');
                 }
 
@@ -700,7 +702,7 @@ module.exports = {
               async () => {
                 const tx = await signer
                   .transfer({
-                    amount: 1e6, // 0.01 WAVES
+                    amount: 11e5, // 0.011 WAVES
                     recipient: deployAddress,
                   })
                   .broadcast();
@@ -708,26 +710,6 @@ module.exports = {
                 return {
                   tx,
                   wait: () => signer.waitTxConfirm(tx, 1),
-                };
-              }
-            ),
-            AutomateActions.tab(
-              'Deploy',
-              async () => ({
-                description: 'Deploy your own contract',
-              }),
-              async () => {
-                return true;
-              },
-              async () => {
-                const contractSigner = new wavesSigner({ NODE_URL: node });
-                await contractSigner.setProvider(new wavesSeedProvider(deploySeed));
-                const tx = await contractSigner.setScript({ script: `base64:${dAppBase64}` }).broadcast();
-
-                return {
-                  tx,
-                  wait: () => contractSigner.waitTxConfirm(tx, 1),
-                  getAddress: () => deployAddress,
                 };
               }
             ),
@@ -745,18 +727,44 @@ module.exports = {
                 return true;
               },
               async () => {
-                const tx = await signer.invokeScript({
-                  dApp: deployAddress,
-                  fee: 500000,
-                  call: {
-                    function: 'init',
-                    args: [],
-                  }
-                 }).broadcast();
+                const tx = await contractSigner
+                  .data({
+                    data: [
+                      {
+                        type: 'string',
+                        key: 'owner',
+                        value: signer.currentProvider.user.address,
+                      },
+                      {
+                        type: 'boolean',
+                        key: 'is_dapp_active',
+                        value: true,
+                      },
+                    ],
+                  })
+                  .broadcast();
 
                 return {
                   tx,
-                  wait: () => signer.waitTxConfirm(tx, 1),
+                  wait: () => contractSigner.waitTxConfirm(tx, 1),
+                  getAddress: () => deployAddress,
+                };
+              }
+            ),
+            AutomateActions.tab(
+              'Deploy',
+              async () => ({
+                description: 'Deploy your own contract',
+              }),
+              async () => {
+                return true;
+              },
+              async () => {
+                const tx = await contractSigner.setScript({ script: `base64:${dAppBase64}` }).broadcast();
+
+                return {
+                  tx,
+                  wait: () => contractSigner.waitTxConfirm(tx, 1),
                   getAddress: () => deployAddress,
                 };
               }

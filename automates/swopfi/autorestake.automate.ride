@@ -15,12 +15,10 @@ let admin4 = oracle.getString("admin_4").valueOrElse("Empty key admin_4").addres
 let admin5 = oracle.getString("admin_5").valueOrElse("Empty key admin_5").addressFromStringValue()
 let isProtocolActive = oracle.getBoolean("is_protocol_active").valueOrErrorMessage("Empty key is_protocol_active")
 
-
-let keyOwner = "owner"
 let keyIsDappActive = "is_dapp_active"
-
+let keyAutomateOwner = "owner"
 let isDappActive = this.getBoolean(keyIsDappActive).valueOrErrorMessage("Empty key is_dapp_active")
-let ownerStr = this.getString(keyOwner).valueOrErrorMessage("Empty keyOwner")
+let ownerStr = this.getString(keyAutomateOwner).valueOrErrorMessage("Empty keyAutomateOwner")
 let owner = ownerStr.addressFromString()
 
 # START Part from 'https://github.com/swopfi/swopfi-smart-contracts/blob/master/dApps/SWOP/governance.ride'
@@ -63,27 +61,6 @@ func claimCalc(caller:Address) = {
 # END Part from 'https://github.com/swopfi/swopfi-smart-contracts/blob/master/dApps/SWOP/governance.ride'
 
 @Callable(i)
-func init() = if !isProtocolActive then throw("Protol stopped by admin") else {
-    if this.getString(keyOwner).isDefined() then throw("Automate already initialized") else
-    if i.payments.size() == 0 then # If user initialized without payment
-      [
-        StringEntry(keyOwner, i.caller.toString()),
-        BooleanEntry(keyIsDappActive, true)
-      ]
-    else if i.payments.size() == 1 then # If user initialized with SWOP payment
-        let (pmtAmount, pmtAssetId) = (i.payments[0].amount, i.payments[0].assetId)
-        if pmtAssetId != SWOP then 
-            throw("Only SWOP payment available in init()") 
-        else 
-          strict z = invoke(SWOPgovernanceAdr, "lockSWOP", [], [AttachedPayment(SWOP, pmtAmount)])
-          [
-            StringEntry(keyOwner, i.caller.toString()),
-            BooleanEntry(keyIsDappActive, true)
-          ]
-    else throw("Incorrect paymemt. You should attach SWOP or empty payment")
-}
-
-@Callable(i)
 func governanceLockSWOP() = if !(isProtocolActive && isDappActive) then throw("Protol stopped by admin") else {
     let (pmtAmount, pmtAssetId) = (i.payments[0].amount, i.payments[0].assetId)
     if pmtAssetId != SWOP then 
@@ -99,9 +76,13 @@ func governanceClaimAndStake(minSWOPreward: Int) =  if !(isProtocolActive && isD
     let claimAmount = claimCalc(this)._2
     if (claimAmount < minSWOPreward) then throw("Amount to claim is less than minSWOPreward") else
     let isFeeExtract = if i.caller == owner then false else true
-    strict z = invoke(SWOPgovernanceAdr, "claimAndStakeSWOP", [], [])
-    strict y = invoke(balance, "extractFee", [ownerStr,isFeeExtract], [])
-    []
+    if isFeeExtract then 
+        strict z = invoke(SWOPgovernanceAdr, "claimAndStakeSWOP", [], [])
+        strict y = invoke(balance, "extractFee", [], [])
+        []
+    else 
+        strict z = invoke(SWOPgovernanceAdr, "claimAndStakeSWOP", [], [])
+        []
 }
 
 @Callable(i)
