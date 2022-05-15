@@ -15,6 +15,7 @@ variables:
   APP_NAMESPACE: "${CI_PROJECT_ROOT_NAMESPACE}-${CI_PROJECT_NAME}"
   ENVIRONMENT: dev
   KUBECONFIG_B64: $DEV_KUBECONFIG_B64
+  CONFIG: $DEV_CONFIG
 
 stages:
   - build
@@ -23,11 +24,11 @@ stages:
 build:app:
   stage: build
   variables:
-    APP_NAME: "app"
     KUBERNETES_CPU_REQUEST: 500m
     KUBERNETES_CPU_LIMIT: 2
     KUBERNETES_MEMORY_REQUEST: 2048Mi
     KUBERNETES_MEMORY_LIMIT: 4096Mi
+    APP_NAME: "app"
   extends: .build_image
   rules:
     - if: $CI_COMMIT_REF_NAME == "master"
@@ -58,14 +59,12 @@ deploy:
   extends: .helm_upgrade
   stage: deploy
   rules:
-    - if: $CI_COMMIT_REF_NAME == "master"
-      variables:
-        CONFIG: $DEV_CONFIG
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: manual
     - if: '$CI_COMMIT_REF_NAME == "release"'
       variables:
         KUBECONFIG_B64: $PROD_KUBECONFIG_B64
         ENVIRONMENT: prod
+        CONFIG: $PROD_CONFIG
     - if: '$CI_COMMIT_REF_NAME == "master"'
 
