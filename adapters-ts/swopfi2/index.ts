@@ -510,7 +510,7 @@ module.exports = {
             fee: 5e6,
             payment: [],
             call: {
-              function: "governanceLockSWOP",
+              function: "governanceClaimAndStake",
               args: params.calldata,
             },
           })
