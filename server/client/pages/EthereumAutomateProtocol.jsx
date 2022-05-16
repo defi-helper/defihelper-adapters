@@ -8,6 +8,7 @@ import { useProvider } from "../common/ether";
 import { AdapterModalSteps, AdapterModalComponent } from "../components";
 import { ReactJsonWrap } from "../components/ReactJsonWrap";
 import { Button } from "../components/Button";
+import { blockchainEnum } from "../common/constants";
 
 function txMinimal({ hash, type, from, data, r, s, v }) {
   return {
@@ -447,6 +448,7 @@ export function EthereumAutomateProtocol(props) {
         <div>
           <h3>Action component</h3>
           <AdapterModalComponent
+            blockchain={blockchainEnum.ethereum}
             component={actionComponent}
             onAction={setActionResult}
           />

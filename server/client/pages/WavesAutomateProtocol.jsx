@@ -1,11 +1,11 @@
 import React from "react";
 import ReactJson from "react-json-view";
-
 import * as automatesGateway from "../common/automate";
 import * as adaptersGateway from "../common/adapter";
 import { useProvider } from "../common/waves";
-import { AdapterModalSteps } from "../components";
+import { AdapterModalSteps, AdapterModalComponent } from "../components";
 import { Button } from "../components/Button";
+import { blockchainEnum } from "../common/constants";
 
 function AutomateArtifactSelector({ automates, onReload }) {
   const [current = null, setCurrent] = React.useState(automates[0]);
@@ -73,7 +73,7 @@ function automateReducer(state, { type, value }) {
   }
 }
 
-const automateAdapterActions = ["migrate", "deposit", "refund", "run"];
+const automateAdapterActions = ["deposit", "refund", "run"];
 
 export function WavesAutomateProtocol(props) {
   const [provider, signer] = useProvider();
@@ -90,6 +90,7 @@ export function WavesAutomateProtocol(props) {
   const [actionReload, setActionReload] = React.useState(false);
   const [actionResult, setActionResult] = React.useState(null);
   const [actionSteps, setActionSteps] = React.useState([]);
+  const [actionComponent, setActionComponent] = React.useState(null);
 
   React.useEffect(() => {
     automatesGateway
@@ -110,18 +111,15 @@ export function WavesAutomateProtocol(props) {
 
     const deployFactory =
       protocolAdapters.automates.deploy[artifact.contractName];
-    setDeploySteps(
-      await deployFactory(signer, artifact.base64).then(({ deploy }) => deploy)
-    );
+    const { deploy, contract } = await deployFactory(signer, artifact.base64);
+    setDeploySteps(deploy);
+    setInstance(contract);
   };
 
   const onAutomateDeploy = async (data) => {
     if (typeof data === "object") {
       if (typeof data.wait === "function") {
         await data.wait();
-      }
-      if (typeof data.getAddress === "function") {
-        setInstance(await data.getAddress());
       }
 
       setDeployResult({ tx: data.tx });
@@ -145,10 +143,11 @@ export function WavesAutomateProtocol(props) {
         setActionResult(
           actionResult instanceof Error ? actionResult.toString() : actionResult
         );
+      } else if (actions[currentAction].methods !== undefined) {
+        setActionComponent(actions[currentAction]);
+        setActionResult(null);
       } else {
         setActionSteps(actions[currentAction]);
-        const firstStep = actions[currentAction][0];
-        if (!firstStep) return;
         setActionResult(null);
       }
     } catch (e) {
@@ -228,6 +227,16 @@ export function WavesAutomateProtocol(props) {
         <div>
           <h3>Action steps</h3>
           <AdapterModalSteps steps={actionSteps} onAction={setActionResult} />
+        </div>
+      )}
+      {!actionComponent || (
+        <div>
+          <h3>Action component</h3>
+          <AdapterModalComponent
+            blockchain={blockchainEnum.waves}
+            component={actionComponent}
+            onAction={setActionResult}
+          />
         </div>
       )}
       {actionResult !== null && (

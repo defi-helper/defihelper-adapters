@@ -481,6 +481,54 @@ module.exports = {
             tokens: {},
           };
         },
+        actions: async (walletAddress) => {
+          return {
+            stake: {
+              name: "staking-stake",
+              methods: {
+                symbol: () => "",
+                link: () => "",
+                balanceOf: async () => "0",
+                can: async () => new Error("Action not implemented"),
+                stake: async () => {
+                  throw new Error("Action not implemented");
+                },
+              },
+            },
+            unstake: {
+              name: "staking-unstake",
+              methods: {
+                symbol: () => "",
+                link: () => "",
+                balanceOf: async () => "0",
+                can: async () => new Error("Action not implemented"),
+                unstake: async () => {
+                  throw new Error("Action not implemented");
+                },
+              },
+            },
+            claim: {
+              name: "staking-claim",
+              methods: {
+                symbol: () => "",
+                link: () => "",
+                can: async () => new Error("Action not implemented"),
+                claim: async () => {
+                  throw new Error("Action not implemented");
+                },
+              },
+            },
+            exit: {
+              name: "staking-exit",
+              methods: {
+                can: async () => new Error("Action not implemented"),
+                exit: async () => {
+                  throw new Error("Action not implemented");
+                },
+              },
+            },
+          };
+        },
       };
     }
   ),
