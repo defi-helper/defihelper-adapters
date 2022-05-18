@@ -214,7 +214,6 @@ app.get('/token-bridges', async (req, res) => {
 
   return res.json(
     await bridgesFiles.reduce(async (result, file) => {
-      console.log(file)
       const bridges = JSON.parse(await fs.promises.readFile(file));
       const network = bridges.meta.network;
 
