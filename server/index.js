@@ -214,6 +214,7 @@ app.get('/token-bridges', async (req, res) => {
 
   return res.json(
     await bridgesFiles.reduce(async (result, file) => {
+      console.log(file)
       const bridges = JSON.parse(await fs.promises.readFile(file));
       const network = bridges.meta.network;
 
@@ -223,7 +224,7 @@ app.get('/token-bridges', async (req, res) => {
           if (typeof alias.id === 'string') {
             return [...result, { network, address, priceFeed: { type: 'coingeckoId', id: alias.id } }];
           }
-          if (typeof alias.platrofm === 'string' && typeof alias.address === 'string') {
+          if (typeof alias.platform === 'string' && typeof alias.address === 'string') {
             return [
               ...result,
               {
@@ -253,6 +254,8 @@ app.get('/token-bridges', async (req, res) => {
     }, [])
   );
 });
+
+0x5f3b5dfeb7b28cdbd7faba78963ee202a494e2a2
 app.get('/', async (req, res) => {
   const adapters = await glob(path.resolve(__dirname, '../adapters-public/*.js')).then((adapters) =>
     adapters.map((adapter) => path.parse(adapter).name)
