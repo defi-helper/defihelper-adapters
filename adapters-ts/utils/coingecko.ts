@@ -8,7 +8,7 @@ export class PriceNotResolvedError extends Error {
     public readonly address: string,
     public readonly network: number
   ) {
-    super(`Contract id for "coingecko:${address}" not resolved`);
+    super(`Price "coingecko:${network}:${address}" not resolved`);
   }
 }
 
