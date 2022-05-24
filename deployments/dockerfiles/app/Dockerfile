@@ -4,6 +4,9 @@ WORKDIR /app
 
 ARG NODE_ENV
 ENV NODE_ENV ${NODE_ENV:-production}
+ARG DFH_HOST
+ARG CACHE_HOST
+ARG CACHE_AUTH
 
 RUN apk --update add python3 build-base
 COPY package*.json ./
