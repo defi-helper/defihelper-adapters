@@ -21,8 +21,8 @@ export namespace Staking {
         methods: {
           symbol: () => string;
           link: () => string;
-          balanceOf: () => Promise<string>;
-          can: (amount: string) => Promise<boolean | Error>;
+          balanceOf: () => Promise<string> | string;
+          can: (amount: string) => Promise<boolean | Error> | boolean | Error;
           stake: (amount: string) => Promise<{
             tx: BroadcastedTx<SignedTx<[SignerInvokeTx]>> & WaitingTx;
           }>;
@@ -33,8 +33,8 @@ export namespace Staking {
         methods: {
           symbol: () => string;
           link: () => string;
-          balanceOf: () => Promise<string>;
-          can: (amount: string) => Promise<boolean | Error>;
+          balanceOf: () => Promise<string> | string;
+          can: (amount: string) => Promise<boolean | Error> | boolean | Error;
           unstake: (amount: string) => Promise<{
             tx: BroadcastedTx<SignedTx<[SignerInvokeTx]>> & WaitingTx;
           }>;
@@ -45,7 +45,7 @@ export namespace Staking {
         methods: {
           symbol: () => string;
           link: () => string;
-          can: () => Promise<boolean | Error>;
+          can: () => Promise<boolean | Error> | boolean | Error;
           claim: () => Promise<{
             tx: BroadcastedTx<SignedTx<[SignerInvokeTx]>> & WaitingTx;
           }>;
@@ -54,7 +54,7 @@ export namespace Staking {
       exit: {
         name: "staking-exit";
         methods: {
-          can: (amount: string) => Promise<boolean | Error>;
+          can: (amount: string) => Promise<boolean | Error> | boolean | Error;
           exit: (amount: string) => Promise<{
             tx: BroadcastedTx<SignedTx<[SignerInvokeTx]>> & WaitingTx;
           }>;

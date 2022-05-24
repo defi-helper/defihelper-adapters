@@ -399,356 +399,533 @@ module.exports = {
       };
     }
   ),
-  /*
-  farming: async (provider, contractAddress, initOptions = waves.defaultOptions()) => {
-    const options = {
-      ...waves.defaultOptions(),
-      ...initOptions,
-    };
-    const lpRes = await axios.get(`https://backend.swop.fi/exchangers/${contractAddress}`);
-    const { stakingIncome, lpFees24, totalLiquidity } = lpRes.data.data;
+  farming: waves.stakingAdapter(
+    async (provider, contractAddress, initOptions = defaultOptions()) => {
+      const options = {
+        ...defaultOptions(),
+        ...initOptions,
+      };
+      const lpRes = await axios.get(
+        `https://backend.swop.fi/exchangers/${contractAddress}`
+      );
+      const { stakingIncome, lpFees24, totalLiquidity } = lpRes.data.data;
 
-    const farmingRes = await axios.get('https://backend.swop.fi/farming/info');
-    let { shareToken, totalShareTokensLoked } = farmingRes.data.data.find(({ pool }) => pool === contractAddress) || {
-      pool: contractAddress,
-      shareToken: '',
-      totalShareTokensLoked: '0',
-    };
-    totalShareTokensLoked = toFloat(totalShareTokensLoked, 6);
+      const farmingRes = await axios.get<{
+        data: Array<{
+          pool: string;
+          shareToken: string;
+          totalShareTokensLoked: string;
+        }>;
+      }>("https://backend.swop.fi/farming/info");
+      let { shareToken, totalShareTokensLoked } = farmingRes.data.data.find(
+        ({ pool }) => pool === contractAddress
+      ) ?? {
+        pool: contractAddress,
+        shareToken: "",
+        totalShareTokensLoked: "0",
+      };
+      totalShareTokensLoked = new bn(totalShareTokensLoked)
+        .div("1e6")
+        .toString(10);
 
-    const shareTokenInfoRes = await axios.get(`https://nodes.wavesnodes.com/assets/details/${shareToken}`);
-    const { decimals: shareTokenDecimals } = shareTokenInfoRes.data || {
-      decimals: 6,
-    };
+      const shareTokenInfoRes = await axios.get(
+        `https://nodes.wavesnodes.com/assets/details/${shareToken}`
+      );
+      const { decimals: shareTokenDecimals } = shareTokenInfoRes.data ?? {
+        decimals: 6,
+      };
 
-    const ratesRes = await axios.get('https://backend.swop.fi/assets/rates');
-    let { rate: swopRate } = ratesRes.data.data[swopTokenId] || { rate: '0' };
-    swopRate = toFloat(swopRate, 6);
-    let { rate: shareRate } = ratesRes.data.data[shareToken] || { rate: '' };
-    shareRate = toFloat(shareRate, shareTokenDecimals);
+      const ratesRes = await axios.get("https://backend.swop.fi/assets/rates");
+      let { rate: swopRate } = ratesRes.data.data[swopTokenId] ?? { rate: "0" };
+      swopRate = new bn(swopRate).div("1e6").toString(10);
+      let { rate: shareRate } = ratesRes.data.data[shareToken] ?? { rate: "" };
+      shareRate = new bn(shareRate).div(`1e${shareTokenDecimals}`);
 
-    const governanceRes = await axios.get('https://backend.swop.fi/governance');
-    let { value: poolWeight } = governanceRes.data.data.find(
-      ({ key }) => key === `${contractAddress}_current_pool_fraction_reward`
-    ) || {
-      key: `${contractAddress}_current_pool_fraction_reward`,
-      type: 'int',
-      value: '0',
-    };
-    poolWeight = toFloat(poolWeight, 10);
+      const governanceRes = await axios.get<{
+        data: Array<{ key: string; value: string }>;
+      }>("https://backend.swop.fi/governance");
+      let { value: poolWeight } = governanceRes.data.data.find(
+        ({ key }) => key === `${contractAddress}_current_pool_fraction_reward`
+      ) ?? {
+        key: `${contractAddress}_current_pool_fraction_reward`,
+        type: "int",
+        value: "0",
+      };
+      poolWeight = new bn(poolWeight).div("1e10").toString(10);
 
-    const swopAPY =
-      totalShareTokensLoked !== '0' && shareRate !== '0'
-        ? new bn(1000000).multipliedBy(poolWeight).multipliedBy(swopRate).div(totalShareTokensLoked).div(shareRate)
-        : new bn('0');
-    const aprDay = new bn(stakingIncome).plus(lpFees24).div(totalLiquidity);
-    const aprWeek = aprDay.multipliedBy(7);
-    const aprMonth = aprDay.multipliedBy(30);
-    const aprYear = aprDay.multipliedBy(365);
+      const swopAPY =
+        totalShareTokensLoked !== "0" && shareRate !== "0"
+          ? new bn(1000000)
+              .multipliedBy(poolWeight)
+              .multipliedBy(swopRate)
+              .div(totalShareTokensLoked)
+              .div(shareRate)
+          : new bn("0");
+      const aprDay = new bn(stakingIncome).plus(lpFees24).div(totalLiquidity);
+      const aprWeek = aprDay.multipliedBy(7);
+      const aprMonth = aprDay.multipliedBy(30);
+      const aprYear = aprDay.multipliedBy(365);
 
-    return {
-      staking: {
-        token: shareToken,
-      },
-      reward: {
-        token: swopTokenId,
-      },
-      metrics: {
-        tvl: toFloat(totalLiquidity, 6).toString(10),
-        aprDay: aprDay.plus(swopAPY).toString(10),
-        aprWeek: aprWeek.plus(swopAPY).toString(10),
-        aprMonth: aprMonth.plus(swopAPY).toString(10),
-        aprYear: aprYear.plus(swopAPY).toString(10),
-      },
-      wallet: async (walletAddress) => {
-        const assets = (await axios.get('https://backend.swop.fi/assets')).data.data;
-        const exchanger = (await axios.get('https://backend.swop.fi/exchangers/data')).data.data;
-        const walletFarmingData = (await axios.get(`https://backend.swop.fi/farming/${walletAddress}`)).data.data;
+      return {
+        stakeToken: {
+          address: shareToken,
+          decimals: shareTokenDecimals,
+          priceUSD: "0",
+        },
+        rewardToken: {
+          address: swopTokenId,
+          decimals: 6,
+          priceUSD: "0",
+        },
+        metrics: {
+          tvl: new bn(totalLiquidity).div("1e6").toString(10),
+          aprDay: aprDay.plus(swopAPY).toString(10),
+          aprWeek: aprWeek.plus(swopAPY).toString(10),
+          aprMonth: aprMonth.plus(swopAPY).toString(10),
+          aprYear: aprYear.plus(swopAPY).toString(10),
+        },
+        wallet: async (walletAddress) => {
+          const assets = (await axios.get("https://backend.swop.fi/assets"))
+            .data.data;
+          const exchanger = (
+            await axios.get("https://backend.swop.fi/exchangers/data")
+          ).data.data;
+          const sharedExchangerData = exchanger[contractAddress];
+          const tokenA = assets[sharedExchangerData.A_asset_id];
+          const tokenB = assets[sharedExchangerData.B_asset_id];
+          const swopToken = assets[swopTokenId];
+          const walletFarmingData = await axios
+            .get<{ data: Array<{ key: string; value: string }> }>(
+              `https://backend.swop.fi/farming/${walletAddress}`
+            )
+            .then(({ data }) => data.data);
 
-        if (!walletFarmingData.find((w) => w.key === `${contractAddress}_${walletAddress}_share_tokens_locked`)) {
+          if (
+            !walletFarmingData.find(
+              (w) =>
+                w.key ===
+                `${contractAddress}_${walletAddress}_share_tokens_locked`
+            )
+          ) {
+            return {
+              staked: {
+                [tokenA.id]: {
+                  balance: "0",
+                  usd: "0",
+                },
+                [tokenB.id]: {
+                  balance: "0",
+                  usd: "0",
+                },
+              },
+              earned: {
+                [swopTokenId]: {
+                  balance: "0",
+                  usd: "0",
+                },
+              },
+              metrics: {
+                staking: "0",
+                stakingUSD: "0",
+                earned: "0",
+                earnedUSD: "0",
+              },
+              tokens: Staking.tokens(
+                {
+                  token: tokenA.id,
+                  data: {
+                    balance: "0",
+                    usd: "0",
+                  },
+                },
+                {
+                  token: tokenB.id,
+                  data: {
+                    balance: "0",
+                    usd: "0",
+                  },
+                },
+                {
+                  token: swopTokenId,
+                  data: {
+                    balance: "0",
+                    usd: "0",
+                  },
+                }
+              ),
+            };
+          }
+
+          const totalSharedLocked = new bn(
+            walletFarmingData.find(
+              (w) =>
+                w.key ===
+                `${contractAddress}_${walletAddress}_share_tokens_locked`
+            )?.value ?? 0
+          ).div("1e8");
+
+          const tokenAAmountInShared = new bn(
+            sharedExchangerData.A_asset_balance
+          ).div(`1e${tokenA.precision}`);
+          const tokenBAmountInShared = new bn(
+            sharedExchangerData.B_asset_balance
+          ).div(`1e${tokenB.precision}`);
+
+          const tokenAAmountInLocked = tokenAAmountInShared.multipliedBy(
+            totalSharedLocked.div(
+              new bn(sharedExchangerData.share_asset_supply).div("1e8")
+            )
+          );
+          const tokenBAmountInLocked = tokenBAmountInShared.multipliedBy(
+            totalSharedLocked.div(
+              new bn(sharedExchangerData.share_asset_supply).div("1e8")
+            )
+          );
+
+          const tokenAAmountInLockedUsd = tokenAAmountInLocked.multipliedBy(
+            await getUsdPriceOfToken(tokenA.id)
+          );
+          const tokenBAmountInLockedUsd = tokenBAmountInLocked.multipliedBy(
+            await getUsdPriceOfToken(tokenB.id)
+          );
+
+          const lastInterest = new bn(
+            walletFarmingData.find(
+              (w) => w.key === `${contractAddress}_last_interest`
+            )?.value ?? "0"
+          ).div(`1e${swopToken.precision}`);
+          const lastUserInterest = new bn(
+            walletFarmingData.find(
+              (w) =>
+                w.key === `${contractAddress}_${walletAddress}_last_interest`
+            )?.value ?? "0"
+          ).div(`1e${swopToken.precision}`);
+
+          const earned = totalSharedLocked.multipliedBy(
+            lastInterest.minus(lastUserInterest)
+          );
+          const earnedUSD = earned.multipliedBy(
+            await getUsdPriceOfToken(swopToken.id)
+          );
+
           return {
-            staked: {},
-            earned: {},
-            metrics: {
-              staking: '0',
-              stakingUSD: '0',
-              earned: '0',
-              earnedUSD: '0',
-              withdrawn: '0',
-            },
-            tokens: tokens(),
-          };
-        }
-
-        const sharedExchangerData = exchanger[contractAddress];
-        const totalSharedLocked = toFloat(
-          walletFarmingData.find((w) => w.key === `${contractAddress}_${walletAddress}_share_tokens_locked`)?.value ||
-            0,
-          8
-        );
-
-        const tokenA = assets[sharedExchangerData.A_asset_id];
-        const tokenB = assets[sharedExchangerData.B_asset_id];
-        const swopToken = assets[swopTokenId];
-
-        const tokenAAmountInShared = toFloat(sharedExchangerData.A_asset_balance, tokenA.precision);
-        const tokenBAmountInShared = toFloat(sharedExchangerData.B_asset_balance, tokenB.precision);
-
-        const tokenAAmountInLocked = tokenAAmountInShared.multipliedBy(
-          totalSharedLocked.div(toFloat(sharedExchangerData.share_asset_supply, 8))
-        );
-        const tokenBAmountInLocked = tokenBAmountInShared.multipliedBy(
-          totalSharedLocked.div(toFloat(sharedExchangerData.share_asset_supply, 8))
-        );
-
-        const tokenAAmountInLockedUsd = tokenAAmountInLocked.multipliedBy(await getUsdPriceOfToken(tokenA.id));
-        const tokenBAmountInLockedUsd = tokenBAmountInLocked.multipliedBy(await getUsdPriceOfToken(tokenB.id));
-
-        const lastInterest = toFloat(
-          walletFarmingData.find((w) => w.key === `${contractAddress}_last_interest`).value,
-          swopToken.precision
-        );
-        const lastUserInterest = toFloat(
-          walletFarmingData.find((w) => w.key === `${contractAddress}_${walletAddress}_last_interest`).value,
-          swopToken.precision
-        );
-
-        const earned = totalSharedLocked.multipliedBy(lastInterest.minus(lastUserInterest));
-        const earnedUSD = earned.multipliedBy(await getUsdPriceOfToken(swopToken.id));
-
-        return {
-          staked: {
-            [tokenA.id]: {
-              balance: tokenAAmountInLocked.toString(10),
-              usd: tokenAAmountInLockedUsd.toString(10),
-            },
-            [tokenB.id]: {
-              balance: tokenBAmountInLocked.toString(10),
-              usd: tokenBAmountInLockedUsd.toString(10),
-            },
-          },
-          earned: {
-            [swopTokenId]: {
-              balance: earned.toString(10),
-              usd: earnedUSD.toString(10),
-            },
-          },
-          metrics: {
-            staking: totalSharedLocked.toString(10),
-            stakingUSD: tokenAAmountInLockedUsd.plus(tokenBAmountInLockedUsd).toString(10),
-            earned: earned.toString(10),
-            earnedUSD: earnedUSD.toString(10),
-          },
-          tokens: tokens(
-            {
-              token: tokenA.id,
-              data: {
+            staked: {
+              [tokenA.id]: {
                 balance: tokenAAmountInLocked.toString(10),
                 usd: tokenAAmountInLockedUsd.toString(10),
               },
-            },
-            {
-              token: tokenB.id,
-              data: {
+              [tokenB.id]: {
                 balance: tokenBAmountInLocked.toString(10),
                 usd: tokenBAmountInLockedUsd.toString(10),
               },
             },
-            {
-              token: swopTokenId,
-              data: {
+            earned: {
+              [swopTokenId]: {
                 balance: earned.toString(10),
                 usd: earnedUSD.toString(10),
               },
-            }
-          ),
-        };
-      },
-      actions: async (walletAddress) => {
-        if (options.signer === null) {
-          throw new Error('Signer not found, use options.signer for use actions');
-        }
-        const { signer } = options;
-
-        const assets = await axios.get('https://backend.swop.fi/assets').then((res) => res.data.data);
-        const exchanger = await axios.get('https://backend.swop.fi/exchangers/data').then((res) => res.data.data);
-        const stakingToken = assets[exchanger[contractAddress].share_asset_id];
-
-        return {
-          stake: [
-            AutomateActions.tab(
-              'Stake',
-              async () => {
-                const balance = await getBalance(stakingToken.id, walletAddress);
-
-                return {
-                  description: `Stake your [${stakingToken.name}](https://wavesexplorer.com/assets/${stakingToken.id}) tokens to contract`,
-                  inputs: [
-                    AutomateActions.input({
-                      placeholder: 'amount',
-                      value: balance.div(`1e${stakingToken.precision}`).toString(10),
-                    }),
-                  ],
-                };
+            },
+            metrics: {
+              staking: totalSharedLocked.toString(10),
+              stakingUSD: tokenAAmountInLockedUsd
+                .plus(tokenBAmountInLockedUsd)
+                .toString(10),
+              earned: earned.toString(10),
+              earnedUSD: earnedUSD.toString(10),
+            },
+            tokens: Staking.tokens(
+              {
+                token: tokenA.id,
+                data: {
+                  balance: tokenAAmountInLocked.toString(10),
+                  usd: tokenAAmountInLockedUsd.toString(10),
+                },
               },
-              async (amount) => {
-                const amountInt = new bn(amount).multipliedBy(`1e${stakingToken.precision}`);
-                if (amountInt.lte(0)) return Error('Invalid amount');
-
-                const balance = await getBalance(stakingToken.id, walletAddress);
-                if (amountInt.gt(balance.toString())) {
-                  return Error('Amount exceeds balance');
-                }
-
-                return true;
+              {
+                token: tokenB.id,
+                data: {
+                  balance: tokenBAmountInLocked.toString(10),
+                  usd: tokenBAmountInLockedUsd.toString(10),
+                },
               },
-              async (amount) => {
-                const amountInt = new bn(amount).multipliedBy(`1e${stakingToken.precision}`);
-                const tx = await signer
-                  .invoke({
-                    dApp: farmingContract,
-                    fee: 5e6,
-                    payment: [
-                      {
-                        assetId: stakingToken.id,
-                        amount: amountInt.toFixed(0),
-                      },
+              {
+                token: swopTokenId,
+                data: {
+                  balance: earned.toString(10),
+                  usd: earnedUSD.toString(10),
+                },
+              }
+            ),
+          };
+        },
+        actions: async (walletAddress) => {
+          if (options.signer === null) {
+            throw new Error(
+              "Signer not found, use options.signer for use actions"
+            );
+          }
+          const { signer } = options;
+
+          const assets = await axios
+            .get("https://backend.swop.fi/assets")
+            .then((res) => res.data.data);
+          const exchanger = await axios
+            .get("https://backend.swop.fi/exchangers/data")
+            .then((res) => res.data.data);
+          const stakingToken =
+            assets[exchanger[contractAddress].share_asset_id];
+
+          return {
+            stake: {
+              name: "staking-stake",
+              methods: {
+                symbol: () => "",
+                link: () => "",
+                balanceOf: () => "0",
+                can: () => false,
+                stake: () => {
+                  throw new Error("Not implemented");
+                },
+              },
+            },
+            unstake: {
+              name: "staking-unstake",
+              methods: {
+                symbol: () => "",
+                link: () => "",
+                balanceOf: () => "0",
+                can: () => false,
+                unstake: () => {
+                  throw new Error("Not implemented");
+                },
+              },
+            },
+            claim: {
+              name: "staking-claim",
+              methods: {
+                symbol: () => "",
+                link: () => "",
+                can: () => false,
+                claim: () => {
+                  throw new Error("Not implemented");
+                },
+              },
+            },
+            exit: {
+              name: "staking-exit",
+              methods: {
+                can: () => false,
+                exit: () => {
+                  throw new Error("Not implemented");
+                },
+              },
+            },
+            /*
+            stake: [
+              AutomateActions.tab(
+                "Stake",
+                async () => {
+                  const balance = await getBalance(
+                    stakingToken.id,
+                    walletAddress
+                  );
+
+                  return {
+                    description: `Stake your [${stakingToken.name}](https://wavesexplorer.com/assets/${stakingToken.id}) tokens to contract`,
+                    inputs: [
+                      AutomateActions.input({
+                        placeholder: "amount",
+                        value: balance
+                          .div(`1e${stakingToken.precision}`)
+                          .toString(10),
+                      }),
                     ],
-                    call: {
-                      function: 'lockShareTokens',
-                      args: [{ type: 'string', value: contractAddress }],
-                    },
-                  })
-                  .broadcast();
+                  };
+                },
+                async (amount) => {
+                  const amountInt = new bn(amount).multipliedBy(
+                    `1e${stakingToken.precision}`
+                  );
+                  if (amountInt.lte(0)) return Error("Invalid amount");
 
-                return {
-                  tx,
-                  wait: () => signer.waitTxConfirm(tx, 1),
-                };
-              }
-            ),
-          ],
-          unstake: [
-            AutomateActions.tab(
-              'Unstake',
-              async () => {
-                const staked = await getStaked(contractAddress, walletAddress);
+                  const balance = await getBalance(
+                    stakingToken.id,
+                    walletAddress
+                  );
+                  if (amountInt.gt(balance.toString())) {
+                    return Error("Amount exceeds balance");
+                  }
 
-                return {
-                  description: `Unstake your [${stakingToken.name}](https://wavesexplorer.com/assets/${stakingToken.id}) tokens from contract`,
-                  inputs: [
-                    AutomateActions.input({
-                      placeholder: 'amount',
-                      value: staked.div(`1e${stakingToken.precision}`).toString(10),
-                    }),
-                  ],
-                };
-              },
-              async (amount) => {
-                const amountInt = new bn(amount).multipliedBy(`1e${stakingToken.precision}`);
-                if (amountInt.lte(0)) return Error('Invalid amount');
-
-                const staked = await getStaked(contractAddress, walletAddress);
-                if (amountInt.isGreaterThan(staked)) {
-                  return Error('Amount exceeds balance');
-                }
-
-                return true;
-              },
-              async (amount) => {
-                const amountInt = new bn(amount).multipliedBy(`1e${stakingToken.precision}`);
-                const tx = await signer
-                  .invoke({
-                    dApp: farmingContract,
-                    fee: 5e6,
-                    payment: [],
-                    call: {
-                      function: 'withdrawShareTokens',
-                      args: [
-                        { type: 'string', value: contractAddress },
-                        { type: 'integer', value: amountInt.toFixed(0) },
+                  return true;
+                },
+                async (amount) => {
+                  const amountInt = new bn(amount).multipliedBy(
+                    `1e${stakingToken.precision}`
+                  );
+                  const tx = await signer
+                    .invoke({
+                      dApp: farmingContract,
+                      fee: 5e6,
+                      payment: [
+                        {
+                          assetId: stakingToken.id,
+                          amount: amountInt.toFixed(0),
+                        },
                       ],
-                    },
-                  })
-                  .broadcast();
+                      call: {
+                        function: "lockShareTokens",
+                        args: [{ type: "string", value: contractAddress }],
+                      },
+                    })
+                    .broadcast();
 
-                return {
-                  tx,
-                  wait: () => signer.waitTxConfirm(tx, 1),
-                };
-              }
-            ),
-          ],
-          claim: [
-            AutomateActions.tab(
-              'Claim',
-              async () => ({
-                description: `Claim your [SWOP](https://wavesexplorer.com/assets/Ehie5xYpeN8op1Cctc6aGUrqx8jq3jtf1DSjXDbfm7aT) reward`,
-              }),
-              async () => true,
-              async () => {
-                const tx = await signer
-                  .invoke({
-                    dApp: farmingContract,
-                    fee: 5e6,
-                    payment: [],
-                    call: {
-                      function: 'claim',
-                      args: [{ type: 'string', value: contractAddress }],
-                    },
-                  })
-                  .broadcast();
-
-                return {
-                  tx,
-                  wait: () => signer.waitTxConfirm(tx, 1),
-                };
-              }
-            ),
-          ],
-          exit: [
-            AutomateActions.tab(
-              'Exit',
-              async () => ({
-                description: 'Get all tokens from contract',
-              }),
-              async () => {
-                const staked = await getStaked(contractAddress, walletAddress);
-                if (amountInt.isGreaterThan(staked)) {
-                  return Error('Amount exceeds balance');
+                  return {
+                    tx,
+                    wait: () => signer.waitTxConfirm(tx, 1),
+                  };
                 }
+              ),
+            ],
+            unstake: [
+              AutomateActions.tab(
+                "Unstake",
+                async () => {
+                  const staked = await getStaked(
+                    contractAddress,
+                    walletAddress
+                  );
 
-                return true;
-              },
-              async () => {
-                const staked = await getStaked(contractAddress, walletAddress);
-                const tx = await signer
-                  .invoke({
-                    dApp: farmingContract,
-                    fee: 5e6,
-                    payment: [],
-                    call: {
-                      function: 'withdrawShareTokens',
-                      args: [
-                        { type: 'string', value: contractAddress },
-                        { type: 'integer', value: staked.toFixed(0) },
-                      ],
-                    },
-                  })
-                  .broadcast();
+                  return {
+                    description: `Unstake your [${stakingToken.name}](https://wavesexplorer.com/assets/${stakingToken.id}) tokens from contract`,
+                    inputs: [
+                      AutomateActions.input({
+                        placeholder: "amount",
+                        value: staked
+                          .div(`1e${stakingToken.precision}`)
+                          .toString(10),
+                      }),
+                    ],
+                  };
+                },
+                async (amount) => {
+                  const amountInt = new bn(amount).multipliedBy(
+                    `1e${stakingToken.precision}`
+                  );
+                  if (amountInt.lte(0)) return Error("Invalid amount");
 
-                return {
-                  tx,
-                  wait: () => signer.waitTxConfirm(tx, 1),
-                };
-              }
-            ),
-          ],
-        };
-      },
-    };
-  },
-  */
+                  const staked = await getStaked(
+                    contractAddress,
+                    walletAddress
+                  );
+                  if (amountInt.isGreaterThan(staked)) {
+                    return Error("Amount exceeds balance");
+                  }
+
+                  return true;
+                },
+                async (amount) => {
+                  const amountInt = new bn(amount).multipliedBy(
+                    `1e${stakingToken.precision}`
+                  );
+                  const tx = await signer
+                    .invoke({
+                      dApp: farmingContract,
+                      fee: 5e6,
+                      payment: [],
+                      call: {
+                        function: "withdrawShareTokens",
+                        args: [
+                          { type: "string", value: contractAddress },
+                          { type: "integer", value: amountInt.toFixed(0) },
+                        ],
+                      },
+                    })
+                    .broadcast();
+
+                  return {
+                    tx,
+                    wait: () => signer.waitTxConfirm(tx, 1),
+                  };
+                }
+              ),
+            ],
+            claim: [
+              AutomateActions.tab(
+                "Claim",
+                async () => ({
+                  description: `Claim your [SWOP](https://wavesexplorer.com/assets/Ehie5xYpeN8op1Cctc6aGUrqx8jq3jtf1DSjXDbfm7aT) reward`,
+                }),
+                async () => true,
+                async () => {
+                  const tx = await signer
+                    .invoke({
+                      dApp: farmingContract,
+                      fee: 5e6,
+                      payment: [],
+                      call: {
+                        function: "claim",
+                        args: [{ type: "string", value: contractAddress }],
+                      },
+                    })
+                    .broadcast();
+
+                  return {
+                    tx,
+                    wait: () => signer.waitTxConfirm(tx, 1),
+                  };
+                }
+              ),
+            ],
+            exit: [
+              AutomateActions.tab(
+                "Exit",
+                async () => ({
+                  description: "Get all tokens from contract",
+                }),
+                async () => {
+                  const staked = await getStaked(
+                    contractAddress,
+                    walletAddress
+                  );
+                  if (amountInt.isGreaterThan(staked)) {
+                    return Error("Amount exceeds balance");
+                  }
+
+                  return true;
+                },
+                async () => {
+                  const staked = await getStaked(
+                    contractAddress,
+                    walletAddress
+                  );
+                  const tx = await signer
+                    .invoke({
+                      dApp: farmingContract,
+                      fee: 5e6,
+                      payment: [],
+                      call: {
+                        function: "withdrawShareTokens",
+                        args: [
+                          { type: "string", value: contractAddress },
+                          { type: "integer", value: staked.toFixed(0) },
+                        ],
+                      },
+                    })
+                    .broadcast();
+
+                  return {
+                    tx,
+                    wait: () => signer.waitTxConfirm(tx, 1),
+                  };
+                }
+              ),
+            ],
+            */
+          };
+        },
+      };
+    }
+  ),
   automates: {
     deploy: {
       autorestake: waves.deployAdapter(async (signer, dAppBase64) => {
