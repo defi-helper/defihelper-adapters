@@ -32,6 +32,7 @@ export class CoingeckoProvider {
 
   static platformMap = {
     1: "ethereum",
+    10: "optimistic-ethereum",
     56: "binance-smart-chain",
     128: "huobi-token",
     137: "polygon-pos",

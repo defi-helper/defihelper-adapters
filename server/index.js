@@ -1,4 +1,5 @@
 require('dotenv').config();
+const cla = require('command-line-args');
 const hardhat = require('hardhat');
 const path = require('path');
 const Express = require('express');
@@ -254,7 +255,6 @@ app.get('/token-bridges', async (req, res) => {
   );
 });
 
-0x5f3b5dfeb7b28cdbd7faba78963ee202a494e2a2
 app.get('/', async (req, res) => {
   const adapters = await glob(path.resolve(__dirname, '../adapters-public/*.js')).then((adapters) =>
     adapters.map((adapter) => path.parse(adapter).name)
@@ -270,5 +270,5 @@ app.get(/^\/client/, (req, res) => {
   return res.sendFile(path.resolve(__dirname, '../public/index.html'));
 });
 
-const port = 8080;
+const { port } = cla([{ name: 'port', alias: 'p', type: Number, defaultValue: 8080 }]);
 app.listen(port, () => console.log(`Listen ${port}`));

@@ -3,6 +3,8 @@ import type Dayjs from "dayjs";
 import type Axios from "axios";
 import type Ethers from "ethers";
 import type EthersMulticall from "@defihelper/ethers-multicall";
+import type * as Uniswap3Core from "@uniswap/sdk-core";
+import type * as Uniswap3SDK from "@uniswap/v3-sdk";
 import type WavesSigner from "@waves/signer";
 import type WavesProviderSeed from "@waves/provider-seed";
 import type WavesTransaction from "@waves/waves-transactions";
@@ -29,6 +31,10 @@ export const axios = commonjsGlobal.axios as typeof Axios;
 export const ethers = commonjsGlobal.ethers as typeof Ethers.ethers;
 export const ethersMulticall =
   commonjsGlobal.ethersMulticall as typeof EthersMulticall;
+export const uniswap3 = {
+  core: commonjsGlobal.uniswap3.core as typeof Uniswap3Core,
+  sdk: commonjsGlobal.uniswap3.sdk as typeof Uniswap3SDK,
+};
 export const wavesSigner =
   commonjsGlobal.wavesSigner as typeof WavesSigner.Signer;
 export const wavesSeedProvider =

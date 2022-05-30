@@ -39,6 +39,8 @@
     "@rollup/plugin-json": "^4.1.0",
     "@rollup/plugin-node-resolve": "^13.0.4",
     "@rollup/plugin-replace": "^3.0.1",
+    "@uniswap/sdk-core": "^3.0.1",
+    "@uniswap/v3-sdk": "^3.8.2",
     "@waves.exchange/provider-web": "^1.1.1",
     "@waves/provider-seed": "^0.2.0",
     "@waves/ride-js": "^2.1.4",

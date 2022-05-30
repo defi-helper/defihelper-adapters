@@ -1,134 +1,102 @@
 import type {
-  Contract,
-  providers,
-  Signer,
-  BigNumber as EthersBN,
-  ContractTransaction,
-} from "ethers";
+  Provider as MulticallProvider,
+  Contract as MulticallContract,
+} from "@defihelper/ethers-multicall";
 import BN from "bignumber.js";
-import { ethers } from "../../../../lib";
+import { ethers, uniswap3 } from "../../../../lib";
+import * as ethereum from "../../../ethereum/base";
+import * as erc20 from "../../../ethereum/erc20";
 import { toBN } from "../../base";
 import poolABI from "./abi/pool.json";
 
-export class Pool {
-  public static MIN_TICK: number = -887272;
-
-  public static MAX_TICK: number = -Pool.MIN_TICK;
-
-  public readonly contract: Contract;
-
-  static nearestUsableTick(tick: BN, tickSpacing: BN) {
-    if (tick.lt(Pool.MIN_TICK) || tick.gt(Pool.MAX_TICK)) {
-      throw new Error(`Invalid tick "${tick.toString(10)}"`);
-    }
-    if (tickSpacing.lte(0)) {
-      throw new Error(`Invalid tick spacing "${tickSpacing.toString(10)}"`);
-    }
-
-    const rounded = tick
-      .div(tickSpacing)
-      .integerValue(BN.ROUND_HALF_UP)
-      .multipliedBy(tickSpacing);
-
-    if (rounded.lt(Pool.MIN_TICK)) return rounded.plus(tickSpacing);
-    else if (rounded.gt(Pool.MAX_TICK)) return rounded.minus(tickSpacing);
-    else return rounded;
+export async function getPoolInfo(
+  multicall: MulticallProvider,
+  pool: MulticallContract | string
+) {
+  if (typeof pool === "string") {
+    pool = ethereum.multicallContract(poolABI)(pool);
   }
 
-  constructor(address: string, provider: providers.Provider | Signer) {
-    this.contract = new ethers.Contract(address, poolABI, provider);
-  }
+  const [
+    factory,
+    token0,
+    token1,
+    fee,
+    tickSpacing,
+    maxLiquidityPerTick,
+    liquidity,
+    slot,
+  ] = await multicall.all([
+    pool.factory(),
+    pool.token0(),
+    pool.token1(),
+    pool.fee(),
+    pool.tickSpacing(),
+    pool.maxLiquidityPerTick(),
+    pool.liquidity(),
+    pool.slot0(),
+  ]);
 
-  // token1Price = priceFloat * 10 ^ (token1.decimals - token0.decimals)
-  async init(token1Price: BN) {
-    const { unlocked } = await this.contract.slot0();
-    if (unlocked) {
-      throw new Error(`Pool "${this.contract.address}" already initialized`);
-    }
+  return {
+    factory,
+    token0,
+    token1,
+    fee,
+    tickSpacing,
+    maxLiquidityPerTick,
+    liquidity,
+    sqrtPriceX96: slot[0],
+    tick: slot[1],
+    observationIndex: slot[2],
+    observationCardinality: slot[3],
+    observationCardinalityNext: slot[4],
+    feeProtocol: slot[5],
+    unlocked: slot[6],
+  };
+}
 
-    return this.contract.initialize(
-      token1Price.sqrt().multipliedBy(toBN(2).pow(96)).toFixed(0)
-    );
-  }
+export async function getPool(
+  chainId: number,
+  multicall: MulticallProvider,
+  pool: MulticallContract | string
+) {
+  const [info] = await Promise.all([getPoolInfo(multicall, pool)]);
+  const token0 = erc20.multicallContract(info.token0);
+  const token1 = erc20.multicallContract(info.token1);
+  const [
+    token0Name,
+    token0Symbol,
+    token0Decimals,
+    token1Name,
+    token1Symbol,
+    token1Decimals,
+  ] = await multicall.all([
+    token0.name(),
+    token0.symbol(),
+    token0.decimals(),
+    token1.name(),
+    token1.symbol(),
+    token1.decimals(),
+  ]);
 
-  async position(owner: string, tickLower: BN, tickUpper: BN) {
-
-  }
-
-  async buy(recipient: string, amount: BN, sqrtPriceLimitX96: BN) {
-    const { amount0, amount1 } = await this.contract.swap(
-      recipient,
-      true,
-      amount.toFixed(0),
-      sqrtPriceLimitX96,
-      "0x00"
-    );
-
-    return { amount0: toBN(amount0), amount1: toBN(amount1) };
-  }
-
-  async sell(recipient: string, amount: BN, sqrtPriceLimitX96: BN) {
-    const { amount0, amount1 } = await this.contract.swap(
-      recipient,
-      false,
-      amount.toFixed(0),
-      sqrtPriceLimitX96,
-      "0x00"
-    );
-
-    return { amount0: toBN(amount0), amount1: toBN(amount1) };
-  }
-
-  async mint(recipient: string, ticksDown: BN, ticksUp: BN, amount: BN) {
-    const [tick, tickSpacing] = await Promise.all([
-      this.contract.slot0().then(({ tick }: { tick: EthersBN }) => toBN(tick)),
-      this.contract.tickSpacing().then(toBN),
-    ]);
-
-    const nearestUsableTick = Pool.nearestUsableTick(tick, tickSpacing);
-
-    const receipt = await this.contract
-      .mint(
-        recipient,
-        nearestUsableTick.minus(tickSpacing.multipliedBy(ticksDown)).toFixed(0),
-        nearestUsableTick.plus(tickSpacing.multipliedBy(ticksUp)).toFixed(0),
-        amount.toFixed(0),
-        "0x00"
-      )
-      .then((tx: ContractTransaction) => tx.wait());
-
-    console.log(receipt.logs[0]);
-    //return { amount0: toBN(amount0), amount1: toBN(amount1) };
-  }
-
-  async burn(tickLower: BN, tickUpper: BN, amount: BN) {
-    const { amount0, amount1 } = await this.contract.burn(
-      tickLower.toFixed(0),
-      tickUpper.toFixed(0),
-      amount.toFixed(0),
-      "0x00"
-    );
-
-    return { amount0: toBN(amount0), amount1: toBN(amount1) };
-  }
-
-  async buyPrice(amount: BN) {
-    const sqrtPriceX96 = await this.contract
-      .slot0()
-      .then(({ sqrtPriceX96 }: { sqrtPriceX96: EthersBN }) =>
-        toBN(sqrtPriceX96)
-      );
-
-    return sqrtPriceX96.pow(2).div(toBN(2).pow(192)).multipliedBy(amount);
-  }
-
-  async sellPrice(amount: BN) {
-    const sqrtPriceX96 = await this.contract
-      .slot0()
-      .then(({ sqrtPriceX96 }: { sqrtPriceX96: EthersBN }) =>
-        toBN(sqrtPriceX96)
-      );
-
-    return toBN(2).pow(192).div(sqrtPriceX96.pow(2)).multipliedBy(amount);
-  }
+  return new uniswap3.sdk.Pool(
+    new uniswap3.core.Token(
+      chainId,
+      info.token0,
+      token0Decimals,
+      token0Symbol,
+      token0Name
+    ),
+    new uniswap3.core.Token(
+      chainId,
+      info.token1,
+      token1Decimals,
+      token1Symbol,
+      token1Name
+    ),
+    info.fee,
+    info.sqrtPriceX96.toString(),
+    info.liquidity.toString(),
+    info.tick
+  );
 }
