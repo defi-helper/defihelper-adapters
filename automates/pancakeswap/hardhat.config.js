@@ -12,5 +12,6 @@ module.exports = {
     artifacts: path.resolve(__dirname, './artifacts/build'),
     deployments: path.resolve(__dirname, './artifacts/deploy'),
     tests: path.resolve(__dirname, './test'),
+    deploy: path.resolve(__dirname, './deploy')
   },
 };
