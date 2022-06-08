@@ -35,7 +35,7 @@ export async function autoRoute(
   from: string,
   to: string,
   withTokens: string[]
-) {
+): Promise<{ path: string[]; amountOut: string }> {
   const paths = [
     [from, to],
     ...withTokens
