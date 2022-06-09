@@ -1,4 +1,6 @@
+import type BigNumber from "bignumber.js";
 import type { Contract, Signer, providers } from "ethers";
+import type { Contract as MulticallContract } from "@defihelper/ethers-multicall";
 import { bignumber as bn, uniswap3, ethersMulticall } from "../lib";
 import {
   stakingAdapter,
@@ -81,13 +83,16 @@ namespace OrderBook {
       provider: Signer | providers.Provider,
       network: keyof typeof address
     ) {
-      return new Provider(contract(provider, address[network]));
+      return new Provider(
+        contract(provider, address[network]),
+        multicallContract(address[network])
+      );
     }
 
-    constructor(public readonly contract: Contract) {}
-
-    // getOpenOrderIds(user, vETH) - список пулов в которых user заливал ликвидность
-    // getOpenOrderById(id) - по данным из getOpenOrderIds возвращается инфа по залитой ликвидности юзера
+    constructor(
+      public readonly contract: Contract,
+      public readonly multicallContract: MulticallContract
+    ) {}
   }
 }
 
@@ -152,10 +157,13 @@ module.exports = {
       );
       const token0PriceUSD = await priceFeed(pool.token0.address);
       const token1PriceUSD = await priceFeed(pool.token1.address);
-      const [token0TotalLocked, token1TotalLocked] = await multicall.all([
-        erc20.multicallContract(pool.token0.address).balanceOf(poolAddress),
-        erc20.multicallContract(pool.token1.address).balanceOf(poolAddress),
-      ]);
+      const [token0TotalLocked, token1TotalLocked] = await multicall.all(
+        [
+          erc20.multicallContract(pool.token0.address).balanceOf(poolAddress),
+          erc20.multicallContract(pool.token1.address).balanceOf(poolAddress),
+        ],
+        { blockTag }
+      );
       const token0TotalLockedUSD = ethereum
         .toBN(token0TotalLocked)
         .div(`1e${pool.token0.decimals}`)
@@ -198,40 +206,104 @@ module.exports = {
         },
         wallet: async (walletAddress) => {
           const orderBook = OrderBook.Provider.create(provider, "optimism");
-          const positionIds = await orderBook.contract.getOpenOrderIds(
-            walletAddress,
-            contractAddress
-          );
-          if (positionIds.length === 0) throw new Error("Positions not found");
-          const { liquidity, lowerTick, upperTick } =
-            await orderBook.contract.getOpenOrderById(positionIds[0]);
+          const positionIds: string[] =
+            await orderBook.contract.getOpenOrderIds(
+              walletAddress,
+              contractAddress
+            );
+          if (positionIds.length === 0) {
+            return {
+              staked: {
+                [pool.token0.address]: {
+                  balance: "0",
+                  usd: "0",
+                },
+                [pool.token1.address]: {
+                  balance: "0",
+                  usd: "0",
+                },
+              },
+              earned: {},
+              metrics: {
+                staking: "0",
+                stakingUSD: "0",
+                earned: "0",
+                earnedUSD: "0",
+              },
+              tokens: Staking.tokens(
+                {
+                  token: pool.token0.address,
+                  data: {
+                    balance: "0",
+                    usd: "0",
+                  },
+                },
+                {
+                  token: pool.token1.address,
+                  data: {
+                    balance: "0",
+                    usd: "0",
+                  },
+                }
+              ),
+            };
+          }
 
-          const position = new uniswap3.sdk.Position({
-            pool,
-            liquidity: liquidity.toString(),
-            tickLower: lowerTick,
-            tickUpper: upperTick,
-          });
-          const token0Balance = position.amount0.toSignificant();
-          const token0USD = token0PriceUSD.multipliedBy(token0Balance);
-          const token1Balance = position.amount1.toSignificant();
-          const token1USD = token1PriceUSD.multipliedBy(token1Balance);
+          const orders = await multicall.all(
+            positionIds.map((positionId) =>
+              orderBook.multicallContract.getOpenOrderById(positionId)
+            ),
+            { blockTag }
+          );
+          const balances = positionIds.reduce(
+            (result, _, i) => {
+              const position = new uniswap3.sdk.Position({
+                pool,
+                liquidity: orders[i].liquidity.toString(),
+                tickLower: orders[i].lowerTick,
+                tickUpper: orders[i].upperTick,
+              });
+              const token0Balance = position.amount0.toSignificant();
+              const token1Balance = position.amount1.toSignificant();
+
+              return {
+                token0: {
+                  balance: result.token0.balance.plus(token0Balance),
+                  usd: result.token0.usd.plus(
+                    token0PriceUSD.multipliedBy(token0Balance)
+                  ),
+                },
+                token1: {
+                  balance: result.token1.balance.plus(token1Balance),
+                  usd: result.token1.usd.plus(
+                    token1PriceUSD.multipliedBy(token1Balance)
+                  ),
+                },
+              };
+            },
+            {
+              token0: { balance: new bn(0), usd: new bn(0) },
+              token1: { balance: new bn(0), usd: new bn(0) },
+            }
+          );
 
           return {
             staked: {
               [pool.token0.address]: {
-                balance: token0Balance,
-                usd: token0USD.toString(10),
+                balance: balances.token0.balance.toString(10),
+                usd: balances.token0.usd.toString(10),
               },
               [pool.token1.address]: {
-                balance: token1Balance,
-                usd: token1USD.toString(10),
+                balance: balances.token1.balance.toString(10),
+                usd: balances.token1.usd.toString(10),
               },
             },
             earned: {},
             metrics: {
               staking: "0",
-              stakingUSD: token0USD.plus(token1USD).toString(10),
+              stakingUSD: balances.token0.usd
+                .plus(balances.token1.usd)
+                .toString(10),
               earned: "0",
               earnedUSD: "0",
             },
@@ -239,15 +311,15 @@ module.exports = {
               {
                 token: pool.token0.address,
                 data: {
-                  balance: token0Balance,
-                  usd: token0USD.toString(10),
+                  balance: balances.token0.balance.toString(10),
+                  usd: balances.token0.usd.toString(10),
                 },
               },
               {
                 token: pool.token1.address,
                 data: {
-                  balance: token1Balance,
-                  usd: token1USD.toString(10),
+                  balance: balances.token1.balance.toString(10),
+                  usd: balances.token1.usd.toString(10),
                 },
               }
             ),
