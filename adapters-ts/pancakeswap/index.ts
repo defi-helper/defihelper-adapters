@@ -1828,10 +1828,7 @@ module.exports = {
               routeTokens
             );
             swap[0] = path;
-            swap[1] = ethereum
-              .toBN(amountOut)
-              .multipliedBy(slippage)
-              .toFixed(0);
+            swap[1] = new bn(amountOut).multipliedBy(slippage).toFixed(0);
           }
 
           const deadline = dayjs().add(deadlineSeconds, "seconds").unix();
