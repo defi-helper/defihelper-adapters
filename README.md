@@ -123,3 +123,9 @@ module.exports: ProtocolAdapter
 ```
 npx hardhat deploy --config ./automates/pancakeswap/hardhat.config.js --tags Protocol,Governance,GovernanceOwner --network bsc
 ```
+
+### Verify automate
+
+```
+npx hardhat etherscan-verify --config ./automates/pancakeswap/hardhat.config.js --network ${NETWORK} --api-key ${KEY}
+```
