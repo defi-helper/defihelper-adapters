@@ -1,7 +1,7 @@
 {
   "_format": "hh-sol-artifact-1",
   "contractName": "IMasterChefFinnV2",
-  "sourceName": "automates/moonriverHuckleberry/IMasterChefFinnV2.sol",
+  "sourceName": "contracts/IMasterChefFinnV2.sol",
   "abi": [
     {
       "inputs": [
