@@ -61,7 +61,7 @@ contract MasterChef2SingleRestake is Automate {
     if (!_initialized) {
       address lpToken = staking.lpToken(pool);
       stakingToken = IERC20(lpToken);
-      rewardToken = IERC20(staking.cake());
+      rewardToken = IERC20(staking.CAKE());
     }
   }
 

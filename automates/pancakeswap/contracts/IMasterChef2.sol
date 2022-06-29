@@ -14,7 +14,8 @@ interface IMasterChef2 {
     bool isRegular;
   }
 
-  function cake() external view returns (address);
+  // solhint-disable-next-line func-name-mixedcase
+  function CAKE() external view returns (address);
 
   function poolInfo(uint256 pool) external view returns (PoolInfo memory);
 

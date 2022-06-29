@@ -5,7 +5,7 @@
   "abi": [
     {
       "inputs": [],
-      "name": "cake",
+      "name": "CAKE",
       "outputs": [
         {
           "internalType": "address",
