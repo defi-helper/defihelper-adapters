@@ -74,7 +74,7 @@ module.exports = {
     avalanche: {
       url: process.env.AVALANCHE_NODE || 'http://127.0.0.1:8545',
       chainId: 43114,
-      gasPrice: 25_000_000_000,
+      gasPrice: 27_000_000_000,
       blockGasLimit: 8_000_000,
       accounts: [...maybeAccount(process.env.AVALANCHE_DEPLOYER)],
     },
