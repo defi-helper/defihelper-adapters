@@ -60,7 +60,7 @@ module.exports = {
     bsc: {
       url: process.env.BSC_NODE || 'http://127.0.0.1:8545',
       chainId: 56,
-      gasPrice: 7_000_000_000,
+      gasPrice: 5_000_000_000,
       blockGasLimit: 6_000_000,
       accounts: [...maybeAccount(process.env.BSC_DEPLOYER)],
     },
