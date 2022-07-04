@@ -259,7 +259,7 @@ app.get('/', async (req, res) => {
     adapters.map((adapter) => path.parse(adapter).name)
   );
 
-  return res.json([...adapters, ...adaptersTS]);
+  return res.json([...adaptersTS]);
 });
 app.use(Express.static(path.resolve(__dirname, '../public')));
 app.get(/^\/client/, (req, res) => {
