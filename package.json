@@ -11,8 +11,6 @@
     "automates:deploy": "hardhat deploy --deploy-scripts ./automates/deploy --tags Automate,GovernanceOwner",
     "automates:etherscan-verify": "scripts/etherscan-verify.sh",
     "automates:waves:build": "node ./scripts/ride-compile.js",
-    "adapters:build": "rollup -c adapters.rollup.js",
-    "adapters:build-dev": "rollup -c adapters.rollup.js",
     "adapters:watch": "rollup -c adapters.rollup.js -w",
     "adapters-ts:build": "rollup -c ./adapters-ts/rollup.js",
     "adapters-ts:watch": "rollup -c ./adapters-ts/rollup.js -w",

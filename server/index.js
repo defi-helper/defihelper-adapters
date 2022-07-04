@@ -35,7 +35,6 @@ const database = knex({
 
 const app = Express();
 app.use(Express.static(path.resolve(__dirname, '../adapters-public-ts')));
-app.use(Express.static(path.resolve(__dirname, '../adapters-public')));
 app.get('/cache', async (req, res) => {
   const { protocol, key } = req.query;
 
@@ -256,9 +255,6 @@ app.get('/token-bridges', async (req, res) => {
 });
 
 app.get('/', async (req, res) => {
-  const adapters = await glob(path.resolve(__dirname, '../adapters-public/*.js')).then((adapters) =>
-    adapters.map((adapter) => path.parse(adapter).name)
-  );
   const adaptersTS = await glob(path.resolve(__dirname, '../adapters-public-ts/*.js')).then((adapters) =>
     adapters.map((adapter) => path.parse(adapter).name)
   );
