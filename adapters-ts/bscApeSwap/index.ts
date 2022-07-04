@@ -1526,7 +1526,7 @@ module.exports = {
         }
 
         const poolsJsonRaw = (
-          await axios.get("http://api.apeswap.finance/stats")
+          await axios.get("https://api.apeswap.finance/stats")
         ).data.incentivizedPools.filter(
           (v: { address: string; active: boolean }) => {
             return (
