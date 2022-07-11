@@ -340,8 +340,6 @@ module.exports = {
               token1Symbol = pairSymbols[1];
             }
 
-            const autorestakeAdapter = "masterChefV1";
-
             return {
               poolIndex: index,
               stakingToken: info.lpToken,
@@ -355,7 +353,6 @@ module.exports = {
               adapter: "masterChefV1",
               description: "",
               automate: {
-                autorestakeAdapter,
                 adapters: ["masterChefV1"],
                 buyLiquidity: isPair
                   ? {
