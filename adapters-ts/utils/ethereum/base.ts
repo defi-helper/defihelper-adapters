@@ -1,7 +1,9 @@
-import type { Signer, providers, BigNumber } from "ethers";
+import { Signer, providers, BigNumber } from "ethers";
 import { bignumber as bn, ethers, ethersMulticall } from "../../lib";
 
 export type BlockNumber = "latest" | number;
+
+export type ProviderOrSigner = providers.Provider | Signer;
 
 export type Options = {
   blockNumber: BlockNumber;

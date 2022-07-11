@@ -25,15 +25,21 @@ import masterChefLpRestakeABI from "./data/masterChefLpRestakeABI.json";
 import masterChef2SingleRestakeABI from "./data/masterChef2SingleRestakeABI.json";
 import masterChef2LpRestakeABI from "./data/masterChef2LpRestakeABI.json";
 
+const masterChefAddress = "0x73feaa1ee314f8c655e354234017be2193c9e24e";
+const masterChef2Address = "0xa5f8C5Dbd5F286960b9d90548680aE5ebFf07652";
+const routeTokens = ["0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"];
+
 function masterChefProviderFactory(
-  address: string,
-  abi: any,
-  provider: ethersType.providers.Provider | ethersType.Signer,
-  blockTag: ethereum.BlockNumber,
-  avgBlockTime: number
+  providerOrSigner: ethereum.ProviderOrSigner,
+  blockTag: ethereum.BlockNumber
 ) {
+  const provider = ethers.providers.Provider.isProvider(providerOrSigner)
+    ? providerOrSigner
+    : providerOrSigner.provider;
+  if (!provider) throw new Error("Provider not found");
+
   return masterChef.buildMasterChefProvider(
-    new ethers.Contract(address, abi, provider),
+    new ethers.Contract(masterChefAddress, masterChefABI, providerOrSigner),
     { blockTag },
     {
       rewardToken() {
@@ -58,7 +64,8 @@ function masterChefProviderFactory(
             })
           );
       },
-      rewardPerSecond() {
+      async rewardPerSecond() {
+        const avgBlockTime = await ethereum.getAvgBlockTime(provider, blockTag);
         return this.contract
           .cakePerBlock({ blockTag: this.options.blockTag })
           .then((v: ethersType.BigNumber) =>
@@ -73,15 +80,17 @@ function masterChefProviderFactory(
 }
 
 function masterChef2ProviderFactory(
-  address: string,
-  abi: any,
-  provider: ethersType.providers.Provider | ethersType.Signer,
+  providerOrSigner: ethereum.ProviderOrSigner,
   blockTag: ethereum.BlockNumber,
-  avgBlockTime: number,
   poolIndex?: number
 ) {
+  const provider = ethers.providers.Provider.isProvider(providerOrSigner)
+    ? providerOrSigner
+    : providerOrSigner.provider;
+  if (!provider) throw new Error("Provider not found");
+
   return masterChef.buildMasterChefProvider(
-    new ethers.Contract(address, abi, provider),
+    new ethers.Contract(masterChef2Address, masterChef2ABI, providerOrSigner),
     { blockTag },
     {
       async totalAllocPoint() {
@@ -125,7 +134,8 @@ function masterChef2ProviderFactory(
             })
           );
       },
-      rewardPerSecond() {
+      async rewardPerSecond() {
+        const avgBlockTime = await ethereum.getAvgBlockTime(provider, blockTag);
         return this.contract
           .cakePerBlock({ blockTag: this.options.blockTag })
           .then((v: ethersType.BigNumber) =>
@@ -138,10 +148,6 @@ function masterChef2ProviderFactory(
     }
   );
 }
-
-const masterChefAddress = "0x73feaa1ee314f8c655e354234017be2193c9e24e";
-const masterChef2Address = "0xa5f8C5Dbd5F286960b9d90548680aE5ebFf07652";
-const routeTokens = ["0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"];
 
 module.exports = {
   masterChefPair: stakingAdapter(
@@ -163,16 +169,11 @@ module.exports = {
         .getNetwork()
         .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
-      const blockNumber = block.number;
       const priceFeed = bridgeWrapperBuild(
         await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network
-      );
-      const avgBlockTime = await ethereum.getAvgBlockTime(
-        provider,
-        blockNumber
       );
       const multicall = new ethersMulticall.Provider(provider);
       await multicall.init();
@@ -184,13 +185,7 @@ module.exports = {
         throw new Error("Pool is not found");
       }
 
-      const masterChefProvider = masterChefProviderFactory(
-        masterChefAddress,
-        masterChefABI,
-        provider,
-        blockTag,
-        avgBlockTime
-      );
+      const masterChefProvider = masterChefProviderFactory(provider, blockTag);
       const poolInfo = await masterChefProvider.poolInfo(pool.index);
 
       const rewardToken = await masterChefProvider.rewardToken();
@@ -360,16 +355,11 @@ module.exports = {
         .getNetwork()
         .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
-      const blockNumber = block.number;
       const priceFeed = bridgeWrapperBuild(
         await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network
-      );
-      const avgBlockTime = await ethereum.getAvgBlockTime(
-        provider,
-        blockNumber
       );
 
       const pool = masterChefSavedPools.find(
@@ -379,13 +369,7 @@ module.exports = {
         throw new Error("Pool is not found");
       }
 
-      const masterChefProvider = masterChefProviderFactory(
-        masterChefAddress,
-        masterChefABI,
-        provider,
-        blockTag,
-        avgBlockTime
-      );
+      const masterChefProvider = masterChefProviderFactory(provider, blockTag);
       const poolInfo = await masterChefProvider.poolInfo(pool.index);
 
       const rewardToken = await masterChefProvider.rewardToken();
@@ -514,16 +498,11 @@ module.exports = {
         .getNetwork()
         .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
-      const blockNumber = block.number;
       const priceFeed = bridgeWrapperBuild(
         await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network
-      );
-      const avgBlockTime = await ethereum.getAvgBlockTime(
-        provider,
-        blockNumber
       );
       const multicall = new ethersMulticall.Provider(provider);
       await multicall.init();
@@ -536,11 +515,8 @@ module.exports = {
       }
 
       const masterChefProvider = masterChef2ProviderFactory(
-        masterChef2Address,
-        masterChef2ABI,
         provider,
         blockTag,
-        avgBlockTime,
         pool.index
       );
       const poolInfo = await masterChefProvider.poolInfo(pool.index);
@@ -712,16 +688,11 @@ module.exports = {
         .getNetwork()
         .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
-      const blockNumber = block.number;
       const priceFeed = bridgeWrapperBuild(
         await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network
-      );
-      const avgBlockTime = await ethereum.getAvgBlockTime(
-        provider,
-        blockNumber
       );
 
       const pool = masterChefSavedPools.find(
@@ -732,11 +703,8 @@ module.exports = {
       }
 
       const masterChefProvider = masterChef2ProviderFactory(
-        masterChef2Address,
-        masterChef2ABI,
         provider,
         blockTag,
-        avgBlockTime,
         pool.index
       );
       const poolInfo = await masterChefProvider.poolInfo(pool.index);
@@ -1536,20 +1504,8 @@ module.exports = {
       signer: ethersType.Signer,
       contractAddress: string
     ) => {
-      if (!signer.provider) throw new Error("Provider not found");
-      const avgBlockTime = await ethereum.getAvgBlockTime(
-        signer.provider,
-        "latest"
-      );
-
       return masterChef.stakingPairAutomateAdapter({
-        masterChefProvider: masterChefProviderFactory(
-          contractAddress,
-          masterChefABI,
-          signer,
-          "latest",
-          avgBlockTime
-        ),
+        masterChefProvider: masterChefProviderFactory(signer, "latest"),
         automateABI: masterChefLpRestakeABI,
         stakingABI: masterChefABI,
         routeTokens,
@@ -1559,19 +1515,10 @@ module.exports = {
       signer: ethersType.Signer,
       contractAddress: string
     ) => {
-      if (!signer.provider) throw new Error("Provider not found");
-      const avgBlockTime = await ethereum.getAvgBlockTime(
-        signer.provider,
-        "latest"
-      );
-
       return masterChef.stakingPairAutomateAdapter({
         masterChefProvider: masterChef2ProviderFactory(
-          contractAddress,
-          masterChef2ABI,
           signer,
           "latest",
-          avgBlockTime
         ),
         automateABI: masterChef2LpRestakeABI,
         stakingABI: masterChef2ABI,
@@ -1582,20 +1529,8 @@ module.exports = {
       signer: ethersType.Signer,
       contractAddress: string
     ) => {
-      if (!signer.provider) throw new Error("Provider not found");
-      const avgBlockTime = await ethereum.getAvgBlockTime(
-        signer.provider,
-        "latest"
-      );
-
       return masterChef.stakingSingleAutomateAdapter({
-        masterChefProvider: masterChefProviderFactory(
-          contractAddress,
-          masterChefABI,
-          signer,
-          "latest",
-          avgBlockTime
-        ),
+        masterChefProvider: masterChefProviderFactory(signer, "latest"),
         automateABI: masterChefSingleRestakeABI,
         stakingABI: masterChefABI,
         routeTokens,
@@ -1605,19 +1540,10 @@ module.exports = {
       signer: ethersType.Signer,
       contractAddress: string
     ) => {
-      if (!signer.provider) throw new Error("Provider not found");
-      const avgBlockTime = await ethereum.getAvgBlockTime(
-        signer.provider,
-        "latest"
-      );
-
       return masterChef.stakingSingleAutomateAdapter({
         masterChefProvider: masterChef2ProviderFactory(
-          contractAddress,
-          masterChef2ABI,
           signer,
           "latest",
-          avgBlockTime
         ),
         automateABI: masterChef2SingleRestakeABI,
         stakingABI: masterChef2ABI,
