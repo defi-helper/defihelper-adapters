@@ -18,14 +18,16 @@ import masterChefABI from "./data/masterChefABI.json";
 import tomTokenABI from "./data/tomTokenABI.json";
 import masterChefFinnLpRestakeABI from "./data/masterChefFinnLpRestakeABI.json";
 
+const masterChefAddress = "0x1f4b7660b6AdC3943b5038e3426B33c1c0e343E6";
+const routeTokens = ["0x98878B06940aE243284CA214f92Bb71a2b032B8A"];
+const tomAddress = "0x37619cc85325afea778830e184cb60a3abc9210b";
+
 function masterChefProviderFactory(
-  address: string,
-  abi: any,
-  provider: ethersType.providers.Provider | ethersType.Signer,
+  providerOrSigner: ethereum.ProviderOrSigner,
   blockTag: ethereum.BlockNumber
 ) {
   return masterChef.buildMasterChefProvider(
-    new ethers.Contract(address, abi, provider),
+    new ethers.Contract(masterChefAddress, masterChefABI, providerOrSigner),
     { blockTag },
     {
       rewardToken() {
@@ -64,10 +66,6 @@ function masterChefProviderFactory(
   );
 }
 
-const masterChefAddress = "0x1f4b7660b6AdC3943b5038e3426B33c1c0e343E6";
-const routeTokens = ["0x98878B06940aE243284CA214f92Bb71a2b032B8A"];
-const tomAddress = "0x37619cc85325afea778830e184cb60a3abc9210b";
-
 module.exports = {
   masterChefPair: stakingAdapter(
     async (
@@ -104,12 +102,7 @@ module.exports = {
         throw new Error("Pool is not found");
       }
 
-      const masterChefProvider = masterChefProviderFactory(
-        masterChefAddress,
-        masterChefABI,
-        provider,
-        blockTag
-      );
+      const masterChefProvider = masterChefProviderFactory(provider, blockTag);
       const poolInfo = await masterChefProvider.poolInfo(pool.index);
 
       const rewardToken = await masterChefProvider.rewardToken();
@@ -292,12 +285,7 @@ module.exports = {
         throw new Error("Pool is not found");
       }
 
-      const masterChefProvider = masterChefProviderFactory(
-        masterChefAddress,
-        masterChefABI,
-        provider,
-        blockTag
-      );
+      const masterChefProvider = masterChefProviderFactory(provider, blockTag);
       const poolInfo = await masterChefProvider.poolInfo(pool.index);
 
       const rewardToken = await masterChefProvider.rewardToken();
@@ -665,12 +653,7 @@ module.exports = {
       if (!signer.provider) throw new Error("Provider not found");
 
       return masterChef.stakingPairAutomateAdapter({
-        masterChefProvider: masterChefProviderFactory(
-          masterChefAddress,
-          masterChefABI,
-          signer,
-          "latest"
-        ),
+        masterChefProvider: masterChefProviderFactory(signer, "latest"),
         automateABI: masterChefFinnLpRestakeABI,
         stakingABI: masterChefABI,
         routeTokens,

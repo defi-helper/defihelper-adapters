@@ -16,14 +16,15 @@ import croesusABI from "./data/croesusABI.json";
 import croesusLpRestakeABI from "./data/croesusLpRestakeABI.json";
 import croesusSingleRestakeABI from "./data/croesusSingleRestakeABI.json";
 
+const croesusAddress = "0xFb26525B14048B7BB1F3794F6129176195Db7766";
+const routeTokens = ["0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7"];
+
 function masterChefProviderFactory(
-  address: string,
-  abi: any,
-  provider: ethersType.providers.Provider | ethersType.Signer,
+  providerOrSigner: ethereum.ProviderOrSigner,
   blockTag: ethereum.BlockNumber
 ) {
   return masterChef.buildMasterChefProvider(
-    new ethers.Contract(address, abi, provider),
+    new ethers.Contract(croesusAddress, croesusABI, providerOrSigner),
     { blockTag },
     {
       rewardToken() {
@@ -74,9 +75,6 @@ function masterChefProviderFactory(
   );
 }
 
-const croesusAddress = "0xFb26525B14048B7BB1F3794F6129176195Db7766";
-const routeTokens = ["0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7"];
-
 module.exports = {
   croesusPair: stakingAdapter(
     async (
@@ -114,8 +112,6 @@ module.exports = {
       }
 
       const masterChefProvider = masterChefProviderFactory(
-        croesusAddress,
-        croesusABI,
         provider,
         blockTag
       );
@@ -302,8 +298,6 @@ module.exports = {
       }
 
       const masterChefProvider = masterChefProviderFactory(
-        croesusAddress,
-        croesusABI,
         provider,
         blockTag
       );
@@ -532,8 +526,6 @@ module.exports = {
 
       return masterChef.stakingPairAutomateAdapter({
         masterChefProvider: masterChefProviderFactory(
-          croesusAddress,
-          croesusABI,
           signer,
           "latest"
         ),
@@ -550,8 +542,6 @@ module.exports = {
 
       return masterChef.stakingPairAutomateAdapter({
         masterChefProvider: masterChefProviderFactory(
-          croesusAddress,
-          croesusABI,
           signer,
           "latest"
         ),

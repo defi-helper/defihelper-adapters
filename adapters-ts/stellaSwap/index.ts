@@ -19,14 +19,20 @@ const STELLA_SWAP_DISTRIBUTOR_ADDRESS =
   "0xEDFB330F5FA216C9D2039B99C8cE9dA85Ea91c1E";
 
 function masterChefProviderFactory(
-  address: string,
-  abi: any,
-  provider: ethersType.providers.Provider | ethersType.Signer,
-  blockTag: ethereum.BlockNumber,
-  avgBlockTime: number
+  providerOrSigner: ethereum.ProviderOrSigner,
+  blockTag: ethereum.BlockNumber
 ) {
+  const provider = ethers.providers.Provider.isProvider(providerOrSigner)
+    ? providerOrSigner
+    : providerOrSigner.provider;
+  if (!provider) throw new Error("Provider not found");
+
   return masterChef.buildMasterChefProvider(
-    new ethers.Contract(address, abi, provider),
+    new ethers.Contract(
+      STELLA_SWAP_DISTRIBUTOR_ADDRESS,
+      stellaSwapDistributorAbi,
+      providerOrSigner
+    ),
     { blockTag },
     {
       rewardToken() {
@@ -51,7 +57,8 @@ function masterChefProviderFactory(
             })
           );
       },
-      rewardPerSecond() {
+      async rewardPerSecond() {
+        const avgBlockTime = await ethereum.getAvgBlockTime(provider, blockTag);
         return this.contract
           .stellaPerBlock({ blockTag: this.options.blockTag })
           .then((v: ethersType.BigNumber) =>
@@ -104,17 +111,9 @@ module.exports = {
         throw new Error("Pool is not found");
       }
 
-      const avgBlockTime = await ethereum.getAvgBlockTime(
-        provider,
-        block.number
-      );
-
       const masterChefProvider = masterChefProviderFactory(
-        STELLA_SWAP_DISTRIBUTOR_ADDRESS,
-        stellaSwapDistributorAbi,
         provider,
         blockTag,
-        avgBlockTime
       );
 
       const poolInfo = await masterChefProvider.poolInfo(pool.index);

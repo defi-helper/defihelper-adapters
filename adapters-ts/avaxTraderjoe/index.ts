@@ -21,14 +21,18 @@ import masterChefV2LpRestakeABI from "./data/masterChefV2LpRestakeABI.json";
 import masterChefV2SingleRestakeABI from "./data/masterChefV2SingleRestakeABI.json";
 import masterChefV3LpRestakeABI from "./data/masterChefV3LpRestakeABI.json";
 
+const masterChefV2Address = "0xd6a4F121CA35509aF06A0Be99093d08462f53052";
+const masterChefV3Address = "0x188bED1968b795d5c9022F6a0bb5931Ac4c18F00";
+const routeTokens = ["0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7"];
+
 function masterChefProviderFactory(
   address: string,
   abi: any,
-  provider: ethersType.providers.Provider | ethersType.Signer,
+  providerOrSigner: ethereum.ProviderOrSigner,
   blockTag: ethereum.BlockNumber
 ) {
   return masterChef.buildMasterChefProvider(
-    new ethers.Contract(address, abi, provider),
+    new ethers.Contract(address, abi, providerOrSigner),
     { blockTag },
     {
       rewardToken() {
@@ -69,9 +73,17 @@ function masterChefProviderFactory(
   );
 }
 
-const masterChefV2Address = "0xd6a4F121CA35509aF06A0Be99093d08462f53052";
-const masterChefV3Address = "0x188bED1968b795d5c9022F6a0bb5931Ac4c18F00";
-const routeTokens = ["0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7"];
+const masterChefV2ProviderFactory = masterChefProviderFactory.bind(
+  null,
+  masterChefV2Address,
+  masterChefV2ABI
+);
+
+const masterChefV3ProviderFactory = masterChefProviderFactory.bind(
+  null,
+  masterChefV3Address,
+  masterChefV3ABI
+);
 
 module.exports = {
   masterChefV2Pair: stakingAdapter(
@@ -109,9 +121,7 @@ module.exports = {
         throw new Error("Pool is not found");
       }
 
-      const masterChefProvider = masterChefProviderFactory(
-        masterChefV2Address,
-        masterChefV2ABI,
+      const masterChefProvider = masterChefV2ProviderFactory(
         provider,
         blockTag
       );
@@ -318,9 +328,7 @@ module.exports = {
         throw new Error("Pool is not found");
       }
 
-      const masterChefProvider = masterChefProviderFactory(
-        masterChefV2Address,
-        masterChefV2ABI,
+      const masterChefProvider = masterChefV2ProviderFactory(
         provider,
         blockTag
       );
@@ -510,9 +518,7 @@ module.exports = {
         throw new Error("Pool is not found");
       }
 
-      const masterChefProvider = masterChefProviderFactory(
-        masterChefV3Address,
-        masterChefV3ABI,
+      const masterChefProvider = masterChefV3ProviderFactory(
         provider,
         blockTag
       );
@@ -1016,9 +1022,7 @@ module.exports = {
       if (!signer.provider) throw new Error("Provider not found");
 
       return masterChef.stakingPairAutomateAdapter({
-        masterChefProvider: masterChefProviderFactory(
-          masterChefV2Address,
-          masterChefV2ABI,
+        masterChefProvider: masterChefV2ProviderFactory(
           signer,
           "latest"
         ),
@@ -1034,9 +1038,7 @@ module.exports = {
       if (!signer.provider) throw new Error("Provider not found");
 
       return masterChef.stakingSingleAutomateAdapter({
-        masterChefProvider: masterChefProviderFactory(
-          masterChefV2Address,
-          masterChefV2ABI,
+        masterChefProvider: masterChefV2ProviderFactory(
           signer,
           "latest"
         ),
@@ -1052,9 +1054,7 @@ module.exports = {
       if (!signer.provider) throw new Error("Provider not found");
 
       return masterChef.stakingPairAutomateAdapter({
-        masterChefProvider: masterChefProviderFactory(
-          masterChefV3Address,
-          masterChefV3ABI,
+        masterChefProvider: masterChefV3ProviderFactory(
           signer,
           "latest"
         ),
