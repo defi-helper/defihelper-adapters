@@ -68,17 +68,14 @@ app.get(/^\/automates\/ethereum\/([a-z0-9_-]+)\/([a-z0-9_]+)\/([0-9]+)$/i, async
   const { 0: protocol, 1: contract, 2: network } = req.params;
   const isNew = await isFileExists(path.resolve(__dirname, `../automates/${protocol}/artifacts`));
   if (isNew) {
-    const contractBuildArtifactPath = path.resolve(
-      __dirname,
-      `../automates/${protocol}/artifacts/build/contracts/${contract}.automate.sol/${contract}.json`
-    );
-    const isBuildArtifactExists = await isFileExists(contractBuildArtifactPath);
+    const contractBuildArtifactPath = `automates/${protocol}/artifacts/build/contracts/${contract}.automate.sol/${contract}.json`;
+    const contractBuildArtifactAbsolutePath = path.resolve(__dirname, `../${contractBuildArtifactPath}`);
+    const isBuildArtifactExists = await isFileExists(contractBuildArtifactAbsolutePath);
     if (!isBuildArtifactExists) {
-      console.log(contractBuildArtifactPath, e.toString());
-      return res.status(404).send('Automate not found');
+      return res.status(404).send(`Automate "${contractBuildArtifactPath}" not found`);
     }
 
-    const buildArtifact = await fs.promises.readFile(contractBuildArtifactPath);
+    const buildArtifact = await fs.promises.readFile(contractBuildArtifactAbsolutePath);
     const { contractName, abi, bytecode, linkReferences } = JSON.parse(buildArtifact.toString('utf-8'));
     const [networkName] = Object.entries(hardhat.config.networks).find(
       ([, { chainId }]) => parseInt(network, 10) === chainId
