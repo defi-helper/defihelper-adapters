@@ -3,7 +3,7 @@ const { migration } = require('./utils');
 module.exports = migration(async ({ utils: { dfhNetwork, deploy } }) => {
   const { ERC1167, Storage } = dfhNetwork();
 
-  await deploy('avaxLydiaFinanceCroesusLpRestake', {
+  await deploy('CroesusLpRestake', {
     contract: 'contracts/CroesusLpRestake.automate.sol:CroesusLpRestake',
     args: [Storage.address],
     libraries: {
