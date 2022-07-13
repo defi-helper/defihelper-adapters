@@ -318,8 +318,9 @@ module.exports = {
         };
 
         const poolsV1: Array<ResolvedPool> = await Promise.all(
-          poolsV1Info.map(async (info, index) => {
-            const stakingTokenSymbol = poolsV1StakingTokensSymbol[index];
+          poolsV1Index.map(async (poolIndex, i) => {
+            const info = poolsV1Info[i];
+            const stakingTokenSymbol = poolsV1StakingTokensSymbol[i];
             const isPair = stakingTokenSymbol === "SLP";
 
             let token0Symbol, token1Symbol;
@@ -337,7 +338,7 @@ module.exports = {
             }
 
             return {
-              poolIndex: index,
+              poolIndex,
               stakingToken: info.lpToken,
               name: isPair
                 ? `${token0Symbol}-${token1Symbol}`
