@@ -283,7 +283,7 @@ module.exports = {
 
             return true;
           },
-          buy: async (
+          sell: async (
             tokenAddress: string,
             amount: string,
             slippage: number | string,
