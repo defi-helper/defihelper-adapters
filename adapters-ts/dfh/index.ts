@@ -3,7 +3,7 @@ import { bignumber as bn, ethers, dayjs, ethersMulticall } from "../lib";
 import * as ethereum from "../utils/ethereum/base";
 import * as erc20 from "../utils/ethereum/erc20";
 import * as uniswap from "../utils/ethereum/uniswap";
-import BuyLiquidityABI from "./data/BuyLiquidityABI.json";
+import LPTokensManagerABI from "./data/LPTokensManagerABI.json";
 
 const routeTokens: Record<number, string[] | undefined> = {
   1: ["0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"],
@@ -28,10 +28,10 @@ module.exports = {
         .then((v) => Number(v.toString()));
       const automate = new ethers.Contract(
         contractAddress,
-        BuyLiquidityABI
+        LPTokensManagerABI
       ).connect(signer);
       const automateMulticall =
-        ethereum.multicallContract(BuyLiquidityABI)(contractAddress);
+        ethereum.multicallContract(LPTokensManagerABI)(contractAddress);
       const multicall = new ethersMulticall.Provider(provider);
       await multicall.init();
 
@@ -196,10 +196,10 @@ module.exports = {
         .then((v) => Number(v.toString()));
       const automate = new ethers.Contract(
         contractAddress,
-        BuyLiquidityABI
+        LPTokensManagerABI
       ).connect(signer);
       const automateMulticall =
-        ethereum.multicallContract(BuyLiquidityABI)(contractAddress);
+        ethereum.multicallContract(LPTokensManagerABI)(contractAddress);
       const multicall = new ethersMulticall.Provider(provider);
       await multicall.init();
 

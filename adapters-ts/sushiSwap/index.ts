@@ -351,7 +351,7 @@ module.exports = {
               description: "",
               automate: {
                 adapters: ["masterChefV1"],
-                buyLiquidity: isPair
+                lpTokensManager: isPair
                   ? {
                       router: "0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F",
                       pair: info.lpToken,
