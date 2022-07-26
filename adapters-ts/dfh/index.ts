@@ -370,7 +370,7 @@ module.exports = {
             }
             debugo({
               _prefix: "buy",
-              swap1: JSON.stringify(swap0),
+              swap1: JSON.stringify(swap1),
             });
 
             const buyTx = await automate.buyLiquidity(
