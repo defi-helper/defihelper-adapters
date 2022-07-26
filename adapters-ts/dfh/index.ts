@@ -5,6 +5,7 @@ import * as ethereum from "../utils/ethereum/base";
 import * as erc20 from "../utils/ethereum/erc20";
 import * as uniswap from "../utils/ethereum/uniswap";
 import LPTokensManagerABI from "./data/LPTokensManagerABI.json";
+import StoreABI from "./data/StoreV2ABI.json";
 
 const routeTokens: Record<number, string[] | undefined> = {
   1: ["0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"],
@@ -15,6 +16,56 @@ const routeTokens: Record<number, string[] | undefined> = {
 };
 
 module.exports = {
+  store: async (signer: Signer, contractAddress: string) => {
+    debugo({
+      _prefix: "Adapter store",
+      contractAddress,
+    });
+    if (!signer.provider) throw new Error("Provider not found");
+    const provider = signer.provider;
+    const signerAddress = await signer.getAddress();
+    debug(`Signer address "${signerAddress}"`);
+    const store = new ethers.Contract(contractAddress, StoreABI).connect(
+      signer
+    );
+
+    return {
+      name: "DFHStore",
+      canBuy: async (product: number | string) => {
+        debugo({ _prefix: "canBuy", product });
+        const [price, balance] = await Promise.all([
+          store.price(product).then(ethereum.toBN),
+          provider.getBalance(signerAddress).then(ethereum.toBN),
+        ]);
+        debugo({
+          _prefix: "canBuy",
+          price,
+          balance,
+        });
+        if (price.lte(0)) return new Error("Undefined product");
+        if (price.multipliedBy(1.05).gt(balance)) {
+          return new Error("Insufficient funds on the balance");
+        }
+
+        return true;
+      },
+      buy: async (product: number | string) => {
+        debugo({ _prefix: "buy", product });
+        const price = await store.price(product).then(ethereum.toBN);
+
+        const buyTx = await store.buy(product, signerAddress, {
+          value: price.multipliedBy(1.05).toFixed(0),
+        });
+        debugo({
+          _prefix: "buy",
+          buyTx: JSON.stringify(buyTx),
+        });
+        return {
+          tx: buyTx,
+        };
+      },
+    };
+  },
   automates: {
     buyLiquidity: async (
       signer: Signer,
