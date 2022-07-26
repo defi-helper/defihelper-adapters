@@ -39,7 +39,11 @@ export async function autoRoute(
   const paths = [
     [from, to],
     ...withTokens
-      .filter((middle) => from !== middle && middle !== to)
+      .filter(
+        (middle) =>
+          from.toLowerCase() !== middle.toLowerCase() &&
+          middle.toLowerCase() !== to.toLowerCase()
+      )
       .map((middle) => [from, middle, to]),
   ];
   const amountsOut = await Promise.all(
