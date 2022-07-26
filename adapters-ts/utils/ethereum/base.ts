@@ -46,6 +46,6 @@ export const getAvgBlockTime = async (
   );
 };
 
-export function toBN(v: BigNumber | number) {
+export function toBN(v: BigNumber | number | string) {
   return new bn(v.toString());
 }

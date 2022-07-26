@@ -6,6 +6,7 @@ import * as erc20 from "../utils/ethereum/erc20";
 import * as uniswap from "../utils/ethereum/uniswap";
 import LPTokensManagerABI from "./data/LPTokensManagerABI.json";
 import StoreABI from "./data/StoreV2ABI.json";
+import BalanceABI from "./data/BalanceABI.json";
 
 const routeTokens: Record<number, string[] | undefined> = {
   1: ["0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"],
@@ -62,6 +63,103 @@ module.exports = {
         });
         return {
           tx: buyTx,
+        };
+      },
+    };
+  },
+  balance: async (signer: Signer, contractAddress: string) => {
+    debugo({
+      _prefix: "Adapter balance",
+      contractAddress,
+    });
+    if (!signer.provider) throw new Error("Provider not found");
+    const provider = signer.provider;
+    const signerAddress = await signer.getAddress();
+    debug(`Signer address "${signerAddress}"`);
+    const balance = new ethers.Contract(contractAddress, BalanceABI).connect(
+      signer
+    );
+
+    return {
+      name: "DFHBalance",
+      balance: async () => {
+        const signerBalance = balance
+          .balanceOf(signerAddress)
+          .then(ethereum.toBN);
+        debugo({ _prefix: "balance", signerBalance });
+
+        return signerBalance.div("1e18").toString(10);
+      },
+      netBalance: async () => {
+        const signerNetBalance = balance
+          .netBalanceOf(signerAddress)
+          .then(ethereum.toBN);
+        debugo({ _prefix: "netBalance", signerNetBalance });
+
+        return signerNetBalance.div("1e18").toString(10);
+      },
+      canDeposit: async (amount: string) => {
+        debugo({ _prefix: "canDeposit", amount });
+        const signerBalance = await provider
+          .getBalance(signerAddress)
+          .then(ethereum.toBN);
+        debugo({
+          _prefix: "canDeposit",
+          signerBalance,
+        });
+        if (
+          signerBalance.lt(
+            ethereum.toBN(amount).multipliedBy("1e18").toFixed(0)
+          )
+        ) {
+          return new Error("Insufficient funds on wallet");
+        }
+
+        return true;
+      },
+      deposit: async (amount: string) => {
+        debugo({ _prefix: "deposit", amount });
+        const depositTx = await balance.deposit(signerAddress, {
+          value: ethereum.toBN(amount).multipliedBy("1e18").toFixed(0),
+        });
+        debugo({
+          _prefix: "deposit",
+          depositTx: JSON.stringify(depositTx),
+        });
+        return {
+          tx: depositTx,
+        };
+      },
+      canRefund: async (amount: string) => {
+        debugo({ _prefix: "canRefund", amount });
+        const signerNetBalance = await balance
+          .netBalanceOf(signerAddress)
+          .then(ethereum.toBN);
+        debugo({
+          _prefix: "canRefund",
+          signerNetBalance,
+        });
+        if (
+          signerNetBalance.lt(
+            ethereum.toBN(amount).multipliedBy("1e18").toFixed(0)
+          )
+        ) {
+          return new Error("Insufficient funds on balance");
+        }
+
+        return true;
+      },
+      refund: async (amount: string) => {
+        debugo({ _prefix: "refund", amount });
+        const refundTx = await balance.refund(
+          ethereum.toBN(amount).multipliedBy("1e18").toFixed(0)
+        );
+        debugo({
+          _prefix: "refund",
+          depositTx: JSON.stringify(refundTx),
+        });
+        return {
+          tx: refundTx,
         };
       },
     };
