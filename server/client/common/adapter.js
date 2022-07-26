@@ -22,6 +22,7 @@ window.uniswap3 = {
 window.wavesSigner = WavesSigner;
 window.wavesSeedProvider = WavesProviderSeed;
 window.wavesTransaction = WavesTx;
+window.mode = 'dev';
 
 export async function list() {
   return fetch('/').then((res) => res.json());

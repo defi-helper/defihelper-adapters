@@ -25,6 +25,7 @@ export const env = process.env as {
   CACHE_HOST: string;
   CACHE_AUTH: string;
 };
+export const mode = (commonjsGlobal.mode ?? "dev") as "prod" | "dev";
 export const bignumber = commonjsGlobal.bignumber as BigNumber.Constructor;
 export const dayjs = commonjsGlobal.dayjs as typeof Dayjs;
 export const axios = commonjsGlobal.axios as typeof Axios;

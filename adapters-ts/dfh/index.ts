@@ -1,9 +1,10 @@
 import type { Signer } from "ethers";
 import { bignumber as bn, ethers, dayjs, ethersMulticall } from "../lib";
+import { debug, debugo } from "../utils/base";
 import * as ethereum from "../utils/ethereum/base";
 import * as erc20 from "../utils/ethereum/erc20";
 import * as uniswap from "../utils/ethereum/uniswap";
-import BuyLiquidityABI from "./data/BuyLiquidityABI.json";
+import LPTokensManagerABI from "./data/LPTokensManager.json";
 
 const routeTokens: Record<number, string[] | undefined> = {
   1: ["0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"],
@@ -20,18 +21,25 @@ module.exports = {
       contractAddress: string,
       { router, pair }: { router: string; pair: string }
     ) => {
+      debugo({
+        _prefix: "Adapter buyLiquidity",
+        contractAddress,
+        router,
+        pair,
+      });
       if (!signer.provider) throw new Error("Provider not found");
       const provider = signer.provider;
       const signerAddress = await signer.getAddress();
+      debug(`Signer address "${signerAddress}"`);
       const network = await signer
         .getChainId()
         .then((v) => Number(v.toString()));
       const automate = new ethers.Contract(
         contractAddress,
-        BuyLiquidityABI
+        LPTokensManagerABI
       ).connect(signer);
       const automateMulticall =
-        ethereum.multicallContract(BuyLiquidityABI)(contractAddress);
+        ethereum.multicallContract(LPTokensManagerABI)(contractAddress);
       const multicall = new ethersMulticall.Provider(provider);
       await multicall.init();
 
@@ -39,11 +47,13 @@ module.exports = {
         name: "DFHBuyLiquidity",
         methods: {
           balanceOf: async (tokenAddress: string) => {
+            debugo({ _prefix: "balanceOf", tokenAddress });
             const token = erc20.multicallContract(tokenAddress);
             const [balance, tokenDecimals] = await multicall.all([
               token.balanceOf(signerAddress),
               token.decimals(),
             ]);
+            debugo({ _prefix: "balanceOf", balance, tokenDecimals });
 
             return ethereum
               .toBN(balance)
@@ -51,6 +61,7 @@ module.exports = {
               .toString(10);
           },
           isApproved: async (tokenAddress: string, amount: string) => {
+            debugo({ _prefix: "isApproved", tokenAddress, amount });
             if (new bn(amount).lte(0)) return new Error("Invalid amount");
 
             const token = erc20.multicallContract(tokenAddress);
@@ -58,38 +69,55 @@ module.exports = {
               token.allowance(signerAddress, contractAddress),
               token.decimals(),
             ]);
+            debugo({ _prefix: "isApproved", allowance, tokenDecimals });
 
             return new bn(amount)
               .multipliedBy(`1e${tokenDecimals.toString()}`)
               .lte(ethereum.toBN(allowance));
           },
           approve: async (tokenAddress: string, amount: string) => {
+            debugo({ _prefix: "approve", tokenAddress, amount });
             const tokenMulticall = erc20.multicallContract(tokenAddress);
             const token = erc20.contract(signer, tokenAddress);
             const [allowance, tokenDecimals] = await multicall.all([
               tokenMulticall.allowance(signerAddress, contractAddress),
               tokenMulticall.decimals(),
             ]);
+            debugo({ _prefix: "approve", allowance, tokenDecimals });
 
             const amountInt = new bn(amount).multipliedBy(
               `1e${tokenDecimals.toString()}`
             );
             if (amountInt.gt(allowance.toString())) {
               if (ethereum.toBN(allowance).gt(0)) {
-                await token.approve(contractAddress, 0);
+                debug("approve: reset allowance value");
+                const resetApproveTx = await token.approve(contractAddress, 0);
+                await resetApproveTx.wait();
+                debugo({
+                  _prefix: "approve",
+                  resetApproveTx: JSON.stringify(resetApproveTx),
+                });
               }
 
+              debug("approve: approve max allowance value");
+              const approveTx = await token.approve(
+                contractAddress,
+                new bn(2).pow(256).minus(1).toFixed(0)
+              );
+              debugo({
+                _prefix: "approve",
+                approveTx: JSON.stringify(approveTx),
+              });
               return {
-                tx: await token.approve(
-                  contractAddress,
-                  new bn(2).pow(256).minus(1).toFixed(0)
-                ),
+                tx: approveTx,
               };
             }
 
+            debug("approve: skip approve");
             return {};
           },
           canBuy: async (tokenAddress: string, amount: string) => {
+            debugo({ _prefix: "canBuy", tokenAddress, amount });
             const token = erc20.multicallContract(tokenAddress);
             const [signerBalance, allowance, tokenDecimals, fee] =
               await multicall.all([
@@ -101,6 +129,14 @@ module.exports = {
             const feeBalance = await provider
               .getBalance(signerAddress)
               .then(ethereum.toBN);
+            debugo({
+              _prefix: "canBuy",
+              signerBalance,
+              allowance,
+              tokenDecimals,
+              fee,
+              feeBalance,
+            });
             const amountInt = new bn(amount).multipliedBy(
               `1e${tokenDecimals.toString()}`
             );
@@ -121,6 +157,13 @@ module.exports = {
             slippage: number | string,
             deadlineSeconds: number = 300
           ) => {
+            debugo({
+              _prefix: "buy",
+              tokenAddress,
+              amount,
+              slippage,
+              deadlineSeconds,
+            });
             const pairMulticall = uniswap.V2.pair.multicallContract(pair);
             const [tokenDecimals, token0, token1, fee] = await multicall.all([
               erc20.multicallContract(tokenAddress).decimals(),
@@ -128,6 +171,13 @@ module.exports = {
               pairMulticall.token1(),
               automateMulticall.fee(),
             ]);
+            debugo({
+              _prefix: "buy",
+              tokenDecimals,
+              token0,
+              token1,
+              fee,
+            });
 
             const amountInt = new bn(amount).multipliedBy(
               `1e${tokenDecimals.toString()}`
@@ -149,6 +199,10 @@ module.exports = {
                   .toFixed(0),
               };
             }
+            debugo({
+              _prefix: "buy",
+              swap0: JSON.stringify(swap0),
+            });
             let swap1 = { path: [tokenAddress, token1], outMin: "0" };
             if (tokenAddress.toLowerCase() !== token1.toLowerCase()) {
               const { path, amountOut } = await uniswap.V2.router.autoRoute(
@@ -165,19 +219,28 @@ module.exports = {
                   .toFixed(0),
               };
             }
+            debugo({
+              _prefix: "buy",
+              swap1: JSON.stringify(swap0),
+            });
 
+            const buyTx = await automate.buyLiquidity(
+              amountInt.toFixed(0),
+              router,
+              swap0,
+              swap1,
+              pair,
+              dayjs().add(deadlineSeconds, "seconds").unix(),
+              {
+                value: ethereum.toBN(fee).multipliedBy(1.05).toFixed(0),
+              }
+            );
+            debugo({
+              _prefix: "buy",
+              buyTx: JSON.stringify(buyTx),
+            });
             return {
-              tx: await automate.buyLiquidity(
-                amountInt.toFixed(0),
-                router,
-                swap0,
-                swap1,
-                pair,
-                dayjs().add(deadlineSeconds, "seconds").unix(),
-                {
-                  value: ethereum.toBN(fee).multipliedBy(1.05).toFixed(0),
-                }
-              ),
+              tx: buyTx,
             };
           },
         },
@@ -188,18 +251,25 @@ module.exports = {
       contractAddress: string,
       { router, pair }: { router: string; pair: string }
     ) => {
+      debugo({
+        _prefix: "Adapter sellLiquidity",
+        contractAddress,
+        router,
+        pair,
+      });
       if (!signer.provider) throw new Error("Provider not found");
       const provider = signer.provider;
       const signerAddress = await signer.getAddress();
+      debug(`Signer address "${signerAddress}"`);
       const network = await signer
         .getChainId()
         .then((v) => Number(v.toString()));
       const automate = new ethers.Contract(
         contractAddress,
-        BuyLiquidityABI
+        LPTokensManagerABI
       ).connect(signer);
       const automateMulticall =
-        ethereum.multicallContract(BuyLiquidityABI)(contractAddress);
+        ethereum.multicallContract(LPTokensManagerABI)(contractAddress);
       const multicall = new ethersMulticall.Provider(provider);
       await multicall.init();
 
@@ -212,6 +282,7 @@ module.exports = {
               token.balanceOf(signerAddress),
               token.decimals(),
             ]);
+            debugo({ _prefix: "balanceOf", balance, tokenDecimals });
 
             return ethereum
               .toBN(balance)
@@ -219,6 +290,7 @@ module.exports = {
               .toString(10);
           },
           isApproved: async (amount: string) => {
+            debugo({ _prefix: "isApproved", amount });
             if (new bn(amount).lte(0)) return new Error("Invalid amount");
 
             const token = erc20.multicallContract(pair);
@@ -226,38 +298,55 @@ module.exports = {
               token.allowance(signerAddress, contractAddress),
               token.decimals(),
             ]);
+            debugo({ _prefix: "isApproved", allowance, tokenDecimals });
 
             return new bn(amount)
               .multipliedBy(`1e${tokenDecimals.toString()}`)
               .lte(ethereum.toBN(allowance));
           },
           approve: async (amount: string) => {
+            debugo({ _prefix: "approve", amount });
             const tokenMulticall = erc20.multicallContract(pair);
             const token = erc20.contract(signer, pair);
             const [allowance, tokenDecimals] = await multicall.all([
               tokenMulticall.allowance(signerAddress, contractAddress),
               tokenMulticall.decimals(),
             ]);
+            debugo({ _prefix: "approve", allowance, tokenDecimals });
 
             const amountInt = new bn(amount).multipliedBy(
               `1e${tokenDecimals.toString()}`
             );
             if (amountInt.gt(allowance.toString())) {
               if (ethereum.toBN(allowance).gt(0)) {
-                await token.approve(contractAddress, 0);
+                debug(`approve: reset allowance value`);
+                const resetApproveTx = await token.approve(contractAddress, 0);
+                await resetApproveTx.wait();
+                debugo({
+                  _prefix: "approve",
+                  resetApproveTx: JSON.stringify(resetApproveTx),
+                });
               }
 
+              debug(`approve: approve max allowance value`);
+              const approveTx = await token.approve(
+                contractAddress,
+                new bn(2).pow(256).minus(1).toFixed(0)
+              );
+              debugo({
+                _prefix: "approve",
+                approveTx: JSON.stringify(approveTx),
+              });
               return {
-                tx: await token.approve(
-                  contractAddress,
-                  new bn(2).pow(256).minus(1).toFixed(0)
-                ),
+                tx: approveTx,
               };
             }
 
+            debug("approve: skip approve");
             return {};
           },
           canSell: async (amount: string) => {
+            debugo({ _prefix: "canSell", amount });
             const token = erc20.multicallContract(pair);
             const [signerBalance, allowance, tokenDecimals, fee] =
               await multicall.all([
@@ -269,6 +358,14 @@ module.exports = {
             const feeBalance = await provider
               .getBalance(signerAddress)
               .then(ethereum.toBN);
+            debugo({
+              _prefix: "canSell",
+              signerBalance,
+              allowance,
+              tokenDecimals,
+              fee,
+              feeBalance,
+            });
             const amountInt = new bn(amount).multipliedBy(
               `1e${tokenDecimals.toString()}`
             );
@@ -289,6 +386,13 @@ module.exports = {
             slippage: number | string,
             deadlineSeconds: number = 300
           ) => {
+            debugo({
+              _prefix: "sell",
+              tokenAddress,
+              amount,
+              slippage,
+              deadlineSeconds,
+            });
             const [pairDecimals, fee] = await multicall.all([
               uniswap.V2.pair.multicallContract(pair).decimals(),
               automateMulticall.fee(),
@@ -302,11 +406,23 @@ module.exports = {
               }
             );
             const { token0, token1 } = pairInfo;
+            debugo({
+              _prefix: "sell",
+              pairDecimals,
+              fee,
+              token0,
+              token1,
+            });
 
             const amountInt = new bn(amount).multipliedBy(
               `1e${pairDecimals.toString()}`
             );
             const balance = pairInfo.expandBalance(amountInt);
+            debugo({
+              _prefix: "sell",
+              token0Balance: balance.token0,
+              token1Balance: balance.token1,
+            });
             const outMinPercent = new bn(1).minus(new bn(slippage).div(100));
             let swap0 = { path: [token0, tokenAddress], outMin: "0" };
             if (tokenAddress.toLowerCase() !== token0.toLowerCase()) {
@@ -324,6 +440,10 @@ module.exports = {
                   .toFixed(0),
               };
             }
+            debugo({
+              _prefix: "buy",
+              swap0: JSON.stringify(swap0),
+            });
             let swap1 = { path: [token1, tokenAddress], outMin: "0" };
             if (tokenAddress.toLowerCase() !== token1.toLowerCase()) {
               const { path, amountOut } = await uniswap.V2.router.autoRoute(
@@ -340,19 +460,28 @@ module.exports = {
                   .toFixed(0),
               };
             }
+            debugo({
+              _prefix: "buy",
+              swap1: JSON.stringify(swap1),
+            });
 
+            const sellTx = await automate.sellLiquidity(
+              amountInt.toFixed(0),
+              router,
+              swap0,
+              swap1,
+              pair,
+              dayjs().add(deadlineSeconds, "seconds").unix(),
+              {
+                value: ethereum.toBN(fee).multipliedBy(1.05).toFixed(0),
+              }
+            );
+            debugo({
+              _prefix: "sell",
+              sellTx: JSON.stringify(sellTx),
+            });
             return {
-              tx: await automate.buyLiquidity(
-                amountInt.toFixed(0),
-                router,
-                swap0,
-                swap1,
-                pair,
-                dayjs().add(deadlineSeconds, "seconds").unix(),
-                {
-                  value: ethereum.toBN(fee).multipliedBy(1.05).toFixed(0),
-                }
-              ),
+              tx: sellTx,
             };
           },
         },

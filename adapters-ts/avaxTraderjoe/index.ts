@@ -1,5 +1,6 @@
 import type ethersType from "ethers";
 import { ethers, bignumber as bn, ethersMulticall } from "../lib";
+import { debug, debugo } from "../utils/base";
 import * as ethereum from "../utils/ethereum/base";
 import * as erc20 from "../utils/ethereum/erc20";
 import { V2 as uniswap } from "../utils/ethereum/uniswap";
@@ -1022,10 +1023,7 @@ module.exports = {
       if (!signer.provider) throw new Error("Provider not found");
 
       return masterChef.stakingPairAutomateAdapter({
-        masterChefProvider: masterChefV2ProviderFactory(
-          signer,
-          "latest"
-        ),
+        masterChefProvider: masterChefV2ProviderFactory(signer, "latest"),
         automateABI: masterChefV2LpRestakeABI,
         stakingABI: masterChefV2ABI,
         routeTokens,
@@ -1038,10 +1036,7 @@ module.exports = {
       if (!signer.provider) throw new Error("Provider not found");
 
       return masterChef.stakingSingleAutomateAdapter({
-        masterChefProvider: masterChefV2ProviderFactory(
-          signer,
-          "latest"
-        ),
+        masterChefProvider: masterChefV2ProviderFactory(signer, "latest"),
         automateABI: masterChefV2SingleRestakeABI,
         stakingABI: masterChefV2ABI,
         routeTokens,
@@ -1054,10 +1049,7 @@ module.exports = {
       if (!signer.provider) throw new Error("Provider not found");
 
       return masterChef.stakingPairAutomateAdapter({
-        masterChefProvider: masterChefV3ProviderFactory(
-          signer,
-          "latest"
-        ),
+        masterChefProvider: masterChefV3ProviderFactory(signer, "latest"),
         automateABI: masterChefV3LpRestakeABI,
         stakingABI: masterChefV3ABI,
         routeTokens,
