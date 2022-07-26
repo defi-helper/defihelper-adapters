@@ -1486,7 +1486,7 @@ module.exports = {
                   ? "MasterChefLpRestake"
                   : "MasterChefSingleRestake",
                 adapters: isPair ? ["masterChefPair"] : ["masterChefSingle"],
-                buyLiquidity: isPair
+                lpTokensManager: isPair
                   ? {
                       router: "0xcF0feBd3f17CEf5b47b0cD257aCf6025c5BFf3b7",
                       pair: info.lpToken,
@@ -1626,7 +1626,7 @@ module.exports = {
               description: "",
               automate: {
                 adapters: ["masterChefPairPolygon"],
-                buyLiquidity: isPair
+                lpTokensManager: isPair
                   ? {
                       router: "0xC0788A3aD43d79aa53B09c2EaCc313A787d1d607",
                       pair: info.lpToken,

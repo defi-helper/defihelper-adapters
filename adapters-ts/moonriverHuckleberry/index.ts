@@ -609,7 +609,7 @@ module.exports = {
                 autorestakeAdapter: isPair
                   ? "MasterChefFinnLpRestake"
                   : undefined,
-                buyLiquidity: isPair
+                lpTokensManager: isPair
                   ? {
                       router: "0x2d4e873f9Ab279da9f1bb2c532d4F06f67755b77",
                       pair: info.lpToken,

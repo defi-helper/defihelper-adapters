@@ -901,7 +901,7 @@ module.exports = {
                 adapters: isPair
                   ? ["masterChefV2Pair"]
                   : ["masterChefV2Single"],
-                buyLiquidity: isPair
+                lpTokensManager: isPair
                   ? {
                       router: "0x60aE616a2155Ee3d9A68541Ba4544862310933d4",
                       pair: info.lpToken,
@@ -951,7 +951,7 @@ module.exports = {
                 adapters: isPair
                   ? ["masterChefV3Pair"]
                   : ["masterChefV3Single"],
-                buyLiquidity: isPair
+                lpTokensManager: isPair
                   ? {
                       router: "0x60aE616a2155Ee3d9A68541Ba4544862310933d4",
                       pair: info.lpToken,

@@ -4,7 +4,7 @@ import { debug, debugo } from "../utils/base";
 import * as ethereum from "../utils/ethereum/base";
 import * as erc20 from "../utils/ethereum/erc20";
 import * as uniswap from "../utils/ethereum/uniswap";
-import LPTokensManagerABI from "./data/LPTokensManager.json";
+import LPTokensManagerABI from "./data/LPTokensManagerABI.json";
 
 const routeTokens: Record<number, string[] | undefined> = {
   1: ["0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"],
