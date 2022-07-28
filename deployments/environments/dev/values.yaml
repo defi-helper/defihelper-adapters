@@ -18,7 +18,7 @@ images:
     name: app
     resources:
       requests:
-        memory: 64Mi
+        memory: 128Mi
         cpu: 100m
       limits:
         memory: 128Mi
