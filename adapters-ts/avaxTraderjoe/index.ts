@@ -24,10 +24,14 @@ import masterChefV2LpRestakeABI from "./data/masterChefV2LpRestakeABI.json";
 import masterChefV2SingleRestakeABI from "./data/masterChefV2SingleRestakeABI.json";
 import masterChefV3LpRestakeABI from "./data/masterChefV3LpRestakeABI.json";
 import boostedMasterChefJoeLpRestakeABI from "./data/boostedMasterChefJoeLpRestakeABI.json";
+import farmLensV2AddressAbi from "./data/farmLensV2.json";
 
 const masterChefV2Address = "0xd6a4F121CA35509aF06A0Be99093d08462f53052";
 const masterChefV3Address = "0x188bED1968b795d5c9022F6a0bb5931Ac4c18F00";
 const boostedMasterChefJoeAddress = "0x4483f0b6e2F5486D06958C20f8C39A7aBe87bf8F";
+
+const farmLensV2Address = "0xF16d25Eba0D8E51cEAF480141bAf577aE55bfdd2";
+
 
 const routeTokens = ["0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7"];
 
@@ -746,21 +750,17 @@ module.exports = {
         .then((v) => v.div(`1e${stakingTokenDecimals}`));
       const tvl = new bn(totalLocked).multipliedBy(stakingTokenPriceUSD);
 
-      const [rewardPerSecond, totalAllocPoint] = await Promise.all([
-        masterChefProvider.rewardPerSecond(),
-        masterChefProvider.totalAllocPoint(),
-      ]);
-      const rewardPerSec = poolInfo.allocPoint
-        .multipliedBy(rewardPerSecond)
-        .div(totalAllocPoint)
-        .div(`1e${rewardTokenDecimals}`);
-      const aprSecond = tvl.gt(0)
-        ? rewardPerSec.multipliedBy(rewardTokenPriceUSD).div(tvl)
-        : new bn(0);
-      const aprDay = aprSecond.multipliedBy(86400);
-      const aprWeek = aprDay.multipliedBy(7);
-      const aprMonth = aprDay.multipliedBy(30);
-      const aprYear = aprDay.multipliedBy(365);
+      const farmLensV2Contract = new ethers.Contract(farmLensV2Address, farmLensV2AddressAbi, provider);
+      const response = await farmLensV2Contract.getBMCJFarmInfos(
+        boostedMasterChefJoeAddress,
+        '0x0000000000000000000000000000000000000000',
+        [pool.index]
+      )
+
+      const aprYear = ethereum.toBN(response[0].baseApr).div('1e18');
+      const aprDay = aprYear.dividedBy(365);
+      const aprWeek = aprDay.dividedBy(52);
+      const aprMonth = aprDay.dividedBy(12);
 
       return {
         stakeToken: {
