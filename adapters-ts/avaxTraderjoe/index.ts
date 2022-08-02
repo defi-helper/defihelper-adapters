@@ -724,8 +724,6 @@ module.exports = {
       );
       const poolInfo = await masterChefProvider.poolInfo(pool.index);
 
-      console.log(poolInfo);
-
       const rewardToken = await masterChefProvider.rewardToken();
       const rewardTokenDecimals = 18;
       const rewardTokenPriceUSD = await priceFeed(rewardToken);
