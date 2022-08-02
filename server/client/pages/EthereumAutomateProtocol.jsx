@@ -182,13 +182,8 @@ export function EthereumAutomateProtocol(props) {
   const onAutomateReload = async ({ protocol }, artifact) => {
     setAutomateArtifact(artifact);
 
-    try {
-      const protocolAdapters = await adaptersGateway.load(`${protocol}2`);
-      setAdapters(protocolAdapters.automates);
-    } catch (e) {
-      const protocolAdapters = await adaptersGateway.load(protocol);
-      setAdapters(protocolAdapters.automates);
-    }
+    const protocolAdapters = await adaptersGateway.load(protocol);
+    setAdapters(protocolAdapters.automates);
   };
 
   const onDeployStepsCall = async () => {
