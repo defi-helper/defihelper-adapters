@@ -17,7 +17,7 @@ export async function getPrice(
   options = base.defaultOptions()
 ) {
   try {
-    const amountsOut = await router.getAmountsOut(amountIn, path, {
+    const amountsOut: string[] = await router.getAmountsOut(amountIn, path, {
       blockTag: options.blockNumber,
     });
 

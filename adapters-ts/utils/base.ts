@@ -28,7 +28,17 @@ export function debugo(obj: Record<string, any>) {
     .filter(
       ([name, value]) => name !== "_prefix" && typeof value !== "function"
     )
-    .map(([name, value]) => `${name}: "${value.toString()}"`)
+    .map(([name, value]) => {
+      let stringifyValue = value.toString();
+      if (
+        Array.isArray(value) ||
+        (typeof value === "object" && value !== null)
+      ) {
+        stringifyValue = JSON.stringify(stringifyValue);
+      }
+
+      return `${name}: "${stringifyValue}"`;
+    })
     .join("; ");
   debug(`${prefix}${msg}`);
 }

@@ -3,4 +3,4 @@ export * from './AdapterProtocol';
 export * from './EthereumAutomateProtocol';
 export * from './ProtocolContractsResolver';
 export * from './WavesAutomateProtocol';
-export * from './DFHAutomate';
+export * as DFH from './DFH';
