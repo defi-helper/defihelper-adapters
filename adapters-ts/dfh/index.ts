@@ -553,10 +553,7 @@ module.exports = {
               token1,
             });
 
-            const amountInt = new bn(amount).multipliedBy(
-              `1e${pairDecimals.toString()}`
-            );
-            const balance = pairInfo.expandBalance(amountInt);
+            const balance = pairInfo.expandBalance(amount);
             debugo({
               _prefix: "sell",
               token0Balance: balance.token0,
@@ -567,7 +564,9 @@ module.exports = {
             if (tokenAddress.toLowerCase() !== token0.toLowerCase()) {
               const { path, amountOut } = await uniswap.V2.router.autoRoute(
                 uniswap.V2.router.contract(provider, router),
-                balance.token0,
+                new bn(balance.token0)
+                  .multipliedBy(`1e${pairInfo.token0Decimals}`)
+                  .toFixed(0),
                 token0,
                 tokenAddress,
                 routeTokens[network] ?? []
@@ -587,7 +586,9 @@ module.exports = {
             if (tokenAddress.toLowerCase() !== token1.toLowerCase()) {
               const { path, amountOut } = await uniswap.V2.router.autoRoute(
                 uniswap.V2.router.contract(provider, router),
-                balance.token1,
+                new bn(balance.token1)
+                  .multipliedBy(`1e${pairInfo.token1Decimals}`)
+                  .toFixed(0),
                 token1,
                 tokenAddress,
                 routeTokens[network] ?? []
@@ -605,7 +606,9 @@ module.exports = {
             });
 
             const sellTx = await automate.sellLiquidity(
-              amountInt.toFixed(0),
+              new bn(amount)
+                .multipliedBy(`1e${pairDecimals.toString()}`)
+                .toFixed(0),
               router,
               swap0,
               swap1,
