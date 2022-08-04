@@ -657,6 +657,18 @@ module.exports = {
 
               return fee.div("1e18").toString(10);
             },
+            order: async (id: number | string) => {
+              const order = await router.order(id);
+              debugo({ _prefix: "order", id, order });
+
+              return {
+                id: order.id.toString(),
+                owner: order.owner,
+                status: order.status.toString(),
+                handler: order.handler,
+                callData: order.callData,
+              };
+            },
             balanceOf: useBalanceOf({ multicall, account: signerAddress }),
             depositBalanceOf: async (tokenAddress: string) => {
               debugo({ _prefix: "depositBalanceOf", tokenAddress });
@@ -777,11 +789,20 @@ module.exports = {
               };
             },
             canCancelOrder: async (id: number | string) => {
+              debugo({ _prefix: "canCancelOrder", id });
               const order = await router.order(id);
-              if (order.owner === ZERO_ADDRESS) {
+              debugo({
+                _prefix: "canCancelOrder",
+                id: order.id.toString(),
+                owner: order.owner,
+                status: order.status.toString(),
+                handler: order.handler,
+                callData: order.callData,
+              });
+              if (order.owner.toLowerCase() === ZERO_ADDRESS) {
                 return new Error("Order not found");
               }
-              if (order.owner === signerAddress) {
+              if (order.owner.toLowerCase() !== signerAddress.toLowerCase()) {
                 return new Error("Forbidden");
               }
               if (order.status.toString() !== "0") {
@@ -799,6 +820,17 @@ module.exports = {
               });
               return {
                 tx: cancelOrderTx,
+              };
+            },
+            handleOrder: async (id: number | string) => {
+              debugo({ _prefix: "handleOrder", id });
+              const handleOrderTx = await router.handleOrder(id, 0);
+              debugo({
+                _prefix: "handleOrder",
+                handleOrderTx: JSON.stringify(handleOrderTx),
+              });
+              return {
+                tx: handleOrderTx,
               };
             },
           },
@@ -835,7 +867,7 @@ module.exports = {
               deposit: {
                 token?: string;
                 native?: string;
-              }
+              } = {}
             ) => {
               debugo({
                 _prefix: "createOrder",
@@ -858,21 +890,21 @@ module.exports = {
               const amountInInt = new bn(amount)
                 .multipliedBy(`1e${inTokenDecimals}`)
                 .toFixed(0);
-              const outMinPercent = new bn(1).minus(new bn(slippage).div(100));
               const amountOut = await uniswap.V2.router.getPrice(
                 uniswap.V2.router.contract(provider, exchangeAddress),
                 amountInInt,
                 path,
                 { blockNumber: "latest", signer: null }
               );
-              const amountOutMin = new bn(amountOut)
+              const outMinPercent = new bn(1).minus(new bn(slippage).div(100));
+              const amountOutMin = new bn(amountOut.toString())
                 .multipliedBy(outMinPercent)
                 .toFixed(0);
               debugo({
                 _prefix: "createOrder",
                 amountInInt,
-                outMinPercent,
                 amountOut,
+                outMinPercent,
                 amountOutMin,
               });
 

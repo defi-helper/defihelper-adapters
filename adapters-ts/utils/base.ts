@@ -1,4 +1,4 @@
-import { mode } from "../lib";
+import { mode, ethers, bignumber } from "../lib";
 
 export class Builder<C, M extends {}> {
   protected parts: { [k in keyof M]: M[k] };
@@ -29,12 +29,17 @@ export function debugo(obj: Record<string, any>) {
       ([name, value]) => name !== "_prefix" && typeof value !== "function"
     )
     .map(([name, value]) => {
-      let stringifyValue = value.toString();
+      let stringifyValue = "";
       if (
         Array.isArray(value) ||
-        (typeof value === "object" && value !== null)
+        (typeof value === "object" &&
+          value !== null &&
+          !(value instanceof ethers.BigNumber) &&
+          !(value instanceof bignumber))
       ) {
-        stringifyValue = JSON.stringify(stringifyValue);
+        stringifyValue = JSON.stringify(value);
+      } else {
+        stringifyValue = value.toString();
       }
 
       return `${name}: "${stringifyValue}"`;
