@@ -745,7 +745,7 @@ module.exports = {
               debugo({ _prefix: "canRefund", tokenAddress, amount });
               const token = erc20.multicallContract(tokenAddress);
               const [depositBalance, tokenDecimals] = await multicall.all([
-                router.balanceOf(signerAddress, tokenAddress),
+                routerMulticall.balanceOf(signerAddress, tokenAddress),
                 token.decimals(),
               ]);
               debugo({
@@ -759,7 +759,7 @@ module.exports = {
                   .lt(
                     ethereum
                       .toBN(amount)
-                      .multipliedBy(`1e${tokenDecimals}`)
+                      .multipliedBy(`1e${tokenDecimals.toString()}`)
                       .toFixed(0)
                   )
               ) {
@@ -859,11 +859,38 @@ module.exports = {
         return {
           name: "DFHSmartTradeSwapHandler",
           methods: {
+            amountOut: async (
+              exchangeAddress: string,
+              path: string[],
+              amountIn: string
+            ) => {
+              const inToken = erc20.multicallContract(path[0]);
+              const outToken = erc20.multicallContract(path[path.length - 1]);
+              const [inTokenDecimals, outTokenDecimals] = await multicall.all([
+                inToken.decimals(),
+                outToken.decimals(),
+              ]);
+
+              return uniswap.V2.router
+                .getPrice(
+                  uniswap.V2.router.contract(provider, exchangeAddress),
+                  new bn(amountIn)
+                    .multipliedBy(`1e${inTokenDecimals}`)
+                    .toFixed(0),
+                  path,
+                  { blockNumber: "latest", signer: null }
+                )
+                .then((amountOut) =>
+                  new bn(amountOut).div(`1e${outTokenDecimals}`).toString(10)
+                );
+            },
             createOrder: async (
               exchangeAddress: string,
               path: string[],
-              amount: string,
+              amountIn: string,
+              amountOut: string,
               slippage: string | number,
+              direction: "gt" | "lt",
               deposit: {
                 token?: string;
                 native?: string;
@@ -873,37 +900,45 @@ module.exports = {
                 _prefix: "createOrder",
                 exchangeAddress,
                 path,
-                amount,
+                amountIn,
+                amountOut,
                 slippage,
+                direction,
               });
               const inToken = erc20.multicallContract(path[0]);
               const outToken = erc20.multicallContract(path[path.length - 1]);
-              const [inTokenDecimals, outTokenDecimals] = await multicall.all([
-                inToken.decimals(),
-                outToken.decimals(),
-              ]);
+              const [inTokenDecimals, outTokenDecimals, pairAddress] =
+                await multicall.all([
+                  inToken.decimals(),
+                  outToken.decimals(),
+                  uniswap.V2.factory
+                    .multicallContract(
+                      await uniswap.V2.router
+                        .contract(provider, exchangeAddress)
+                        .factory()
+                    )
+                    .getPair(inToken.address, outToken.address),
+                ]);
               debugo({
                 _prefix: "createOrder",
                 inTokenDecimals,
                 outTokenDecimals,
               });
-              const amountInInt = new bn(amount)
+              const amountInInt = new bn(amountIn)
                 .multipliedBy(`1e${inTokenDecimals}`)
                 .toFixed(0);
-              const amountOut = await uniswap.V2.router.getPrice(
-                uniswap.V2.router.contract(provider, exchangeAddress),
-                amountInInt,
-                path,
-                { blockNumber: "latest", signer: null }
-              );
-              const outMinPercent = new bn(1).minus(new bn(slippage).div(100));
-              const amountOutMin = new bn(amountOut.toString())
+              const amountOutInt = new bn(amountOut)
+                .multipliedBy(`1e${outTokenDecimals}`)
+                .toFixed(0);
+              const slippageFloat = new bn(slippage).div(100).toNumber();
+              const outMinPercent = new bn(1).minus(slippageFloat);
+              const amountOutMin = new bn(amountOutInt)
                 .multipliedBy(outMinPercent)
                 .toFixed(0);
               debugo({
                 _prefix: "createOrder",
                 amountInInt,
-                amountOut,
+                amountOutInt,
                 outMinPercent,
                 amountOutMin,
               });
@@ -945,12 +980,26 @@ module.exports = {
                 depositToken.amount,
                 { value: nativeTokenValue }
               );
+              const orderParam = {
+                exchange: exchangeAddress,
+                pair: pairAddress,
+                path,
+                tokenInDecimals: Number(inTokenDecimals),
+                amountIn: amountInInt,
+                tokenOutDecimals: Number(outTokenDecimals),
+                amountOut: amountOutInt,
+                amountOutMin,
+                slippage: slippageFloat,
+                direction,
+              };
               debugo({
                 _prefix: "createOrder",
                 depositTx: JSON.stringify(createOrderTx),
+                orderParam: JSON.stringify(orderParam),
               });
               return {
                 tx: createOrderTx,
+                callData: orderParam,
               };
             },
           },
