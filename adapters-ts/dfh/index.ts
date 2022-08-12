@@ -1,4 +1,4 @@
-import type { Signer } from "ethers";
+import type { Signer, ContractTransaction } from "ethers";
 import type { Provider as MulticallProvider } from "@defihelper/ethers-multicall";
 import { bignumber as bn, ethers, dayjs, ethersMulticall } from "../lib";
 import { debug, debugo } from "../utils/base";
@@ -973,13 +973,14 @@ module.exports = {
                 nativeTokenValue,
               });
 
-              const createOrderTx = await router.createOrder(
-                handler.address,
-                callData,
-                depositToken.address,
-                depositToken.amount,
-                { value: nativeTokenValue }
-              );
+              const createOrderTx: ContractTransaction =
+                await router.createOrder(
+                  handler.address,
+                  callData,
+                  depositToken.address,
+                  depositToken.amount,
+                  { value: nativeTokenValue }
+                );
               const orderParam = {
                 exchange: exchangeAddress,
                 pair: pairAddress,
@@ -999,7 +1000,17 @@ module.exports = {
               });
               return {
                 tx: createOrderTx,
+                handler: handler.address,
+                callDataRaw: callData,
                 callData: orderParam,
+                getOrderNumber: async () => {
+                  const receipt = await createOrderTx.wait();
+                  if (!receipt.events) return null;
+                  const event = receipt.events.find(
+                    (e) => e.event === "OrderCreated"
+                  );
+                  return event?.args?.id.toString() ?? null;
+                },
               };
             },
           },

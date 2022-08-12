@@ -113,7 +113,7 @@ function SwapHandler({ signer, adapters, searchParams }) {
       );
     }
 
-    const { tx, callData } = await handlerAdapter.methods.createOrder(
+    const data = await handlerAdapter.methods.createOrder(
       exchangeAddress,
       path,
       amountIn,
@@ -125,8 +125,13 @@ function SwapHandler({ signer, adapters, searchParams }) {
         native: depositBalanceAmount !== "" ? depositBalanceAmount : undefined,
       }
     );
-    setCreateOrderTx(tx);
-    setCreateOrderCallData(callData);
+    setCreateOrderTx(data.tx);
+    setCreateOrderCallData({
+      handler: data.handler,
+      callDataRaw: data.callDataRaw,
+      callData: data.callData,
+      number: await data.getOrderNumber(),
+    });
   };
 
   return (
