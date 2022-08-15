@@ -41,7 +41,7 @@ const useIsApproved =
     recipient: string;
   }) =>
   async (tokenAddress: string, amount: string) => {
-    debugo({ _prefix: "isApproved", tokenAddress, amount });
+    debugo({ _prefix: "isApproved", spender, recipient, tokenAddress, amount });
     if (new bn(amount).lte(0)) return new Error("Invalid amount");
 
     const token = erc20.multicallContract(tokenAddress);
@@ -69,7 +69,7 @@ const useApprove =
     recipient: string;
   }) =>
   async (tokenAddress: string, amount: string) => {
-    debugo({ _prefix: "approve", tokenAddress, amount });
+    debugo({ _prefix: "approve", spender, recipient, tokenAddress, amount });
     const tokenMulticall = erc20.multicallContract(tokenAddress);
     const token = erc20.contract(signer, tokenAddress);
     const [allowance, tokenDecimals] = await multicall.all([

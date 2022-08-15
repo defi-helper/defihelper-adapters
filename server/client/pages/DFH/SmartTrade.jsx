@@ -110,7 +110,7 @@ function SwapHandler({ signer, adapters, searchParams }) {
       if (!isApproved) {
         await handlerAdapter.methods
           .approve(path[0], depositTokenAmount)
-          .then((tx) => tx.wait());
+          .then(({ tx }) => tx?.wait());
       }
     }
 
