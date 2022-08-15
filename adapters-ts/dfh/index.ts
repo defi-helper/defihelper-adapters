@@ -884,6 +884,17 @@ module.exports = {
                   new bn(amountOut).div(`1e${outTokenDecimals}`).toString(10)
                 );
             },
+            isApproved: useIsApproved({
+              multicall,
+              spender: signerAddress,
+              recipient: router.address,
+            }),
+            approve: useApprove({
+              multicall,
+              signer,
+              spender: signerAddress,
+              recipient: router.address,
+            }),
             createOrder: async (
               exchangeAddress: string,
               path: string[],

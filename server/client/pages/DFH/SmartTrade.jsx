@@ -57,17 +57,6 @@ function SwapHandler({ signer, adapters, searchParams }) {
     );
   };
 
-  const onAmountInChanged = async (value) => {
-    setAmountIn(value);
-    if (
-      handlerAdapter &&
-      ethers.utils.isAddress(exchangeAddress) &&
-      path.length > 1 &&
-      !Number.isNaN(Number(value))
-    ) {
-    }
-  };
-
   useDebounce(
     () => {
       if (
@@ -111,6 +100,18 @@ function SwapHandler({ signer, adapters, searchParams }) {
       return setError(
         `Invalid deposit balance amount: "${depositBalanceAmount}"`
       );
+    }
+
+    if (depositTokenAmount !== "") {
+      const isApproved = await handlerAdapter.methods.isApproved(
+        path[0],
+        depositTokenAmount
+      );
+      if (!isApproved) {
+        await handlerAdapter.methods
+          .approve(path[0], depositTokenAmount)
+          .then((tx) => tx.wait());
+      }
     }
 
     const data = await handlerAdapter.methods.createOrder(
