@@ -327,7 +327,7 @@ export function SmartTradePage() {
     searchParams.get("router") ?? ""
   );
   const [currentHandlerName, setCurrentHandlerName] = useState(
-    (location.hash ?? "#mock-handler").slice(1)
+    (location.hash !== "" ? location.hash : "#mock-handler").slice(1)
   );
   const [depositTokenAddress, setDepositTokenAddress] = useState("");
   const [depositAmount, setDepositAmount] = useState("");
