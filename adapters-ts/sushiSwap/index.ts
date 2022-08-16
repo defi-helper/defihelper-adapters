@@ -1,5 +1,4 @@
 import type ethersType from "ethers";
-
 import {
   contractsResolver,
   stakingAdapter,
@@ -7,9 +6,9 @@ import {
 import * as masterChef from "../utils/ethereum/adapter/masterChef";
 import * as ethereum from "../utils/ethereum/base";
 import * as cache from "../utils/cache";
+import * as dfh from "../utils/dfh";
 import { bignumber as bn, ethers, ethersMulticall } from "../lib";
 import { bridgeWrapperBuild } from "../utils/coingecko";
-import bridgeTokens from "./data/bridgeTokens.json";
 import masterChefABIV1 from "./data/masterChefABIV1.json";
 import { ResolvedContract, Staking } from "../utils/adapter/base";
 import * as erc20 from "../utils/ethereum/erc20";
@@ -18,14 +17,20 @@ import { V2 as uniswap } from "../utils/ethereum/uniswap";
 const MASTER_CHEF_ADDRESS_V1 = "0xc2EdaD668740f1aA35E4D8f227fB8E17dcA888Cd";
 
 function masterChefProviderFactory(
-  address: string,
-  abi: any,
-  provider: ethersType.providers.Provider | ethersType.Signer,
-  blockTag: ethereum.BlockNumber,
-  avgBlockTime: number
+  providerOrSigner: ethereum.ProviderOrSigner,
+  blockTag: ethereum.BlockNumber
 ) {
+  const provider = ethers.providers.Provider.isProvider(providerOrSigner)
+    ? providerOrSigner
+    : providerOrSigner.provider;
+  if (!provider) throw new Error("Provider not found");
+
   return masterChef.buildMasterChefProvider(
-    new ethers.Contract(address, abi, provider),
+    new ethers.Contract(
+      MASTER_CHEF_ADDRESS_V1,
+      masterChefABIV1,
+      providerOrSigner
+    ),
     { blockTag },
     {
       rewardToken() {
@@ -50,7 +55,8 @@ function masterChefProviderFactory(
             })
           );
       },
-      rewardPerSecond() {
+      async rewardPerSecond() {
+        const avgBlockTime = await ethereum.getAvgBlockTime(provider, blockTag);
         return this.contract
           .sushiPerBlock({ blockTag: this.options.blockTag })
           .then((v: ethersType.BigNumber) =>
@@ -88,15 +94,14 @@ module.exports = {
         .getNetwork()
         .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
-      const multicall = new ethersMulticall.Provider(provider, network);
-      await multicall.init();
-
       const priceFeed = bridgeWrapperBuild(
-        bridgeTokens,
+        await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network
       );
+      const multicall = new ethersMulticall.Provider(provider, network);
+      await multicall.init();
 
       const masterChefSavedPools = await cache.read(
         "sushiSwap",
@@ -110,18 +115,7 @@ module.exports = {
         throw new Error("Pool is not found");
       }
 
-      const avgBlockTime = await ethereum.getAvgBlockTime(
-        provider,
-        block.number
-      );
-
-      const masterChefProvider = masterChefProviderFactory(
-        MASTER_CHEF_ADDRESS_V1,
-        masterChefABIV1,
-        provider,
-        blockTag,
-        avgBlockTime
-      );
+      const masterChefProvider = masterChefProviderFactory(provider, blockTag);
 
       const poolInfo = await masterChefProvider.poolInfo(pool.index);
 
@@ -324,8 +318,9 @@ module.exports = {
         };
 
         const poolsV1: Array<ResolvedPool> = await Promise.all(
-          poolsV1Info.map(async (info, index) => {
-            const stakingTokenSymbol = poolsV1StakingTokensSymbol[index];
+          poolsV1Index.map(async (poolIndex, i) => {
+            const info = poolsV1Info[i];
+            const stakingTokenSymbol = poolsV1StakingTokensSymbol[i];
             const isPair = stakingTokenSymbol === "SLP";
 
             let token0Symbol, token1Symbol;
@@ -342,10 +337,8 @@ module.exports = {
               token1Symbol = pairSymbols[1];
             }
 
-            const autorestakeAdapter = "masterChefV1";
-
             return {
-              poolIndex: index,
+              poolIndex,
               stakingToken: info.lpToken,
               name: isPair
                 ? `${token0Symbol}-${token1Symbol}`
@@ -357,9 +350,8 @@ module.exports = {
               adapter: "masterChefV1",
               description: "",
               automate: {
-                autorestakeAdapter,
                 adapters: ["masterChefV1"],
-                buyLiquidity: isPair
+                lpTokensManager: isPair
                   ? {
                       router: "0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F",
                       pair: info.lpToken,

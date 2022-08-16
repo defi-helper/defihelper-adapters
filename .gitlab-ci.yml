@@ -11,9 +11,11 @@ default:
     - adcorn-dev
 
 variables:
-  APP_NAME: "app"
+  APP_NAME: "adapters"
   APP_NAMESPACE: "${CI_PROJECT_ROOT_NAMESPACE}-${CI_PROJECT_NAME}"
   ENVIRONMENT: dev
+  KUBECONFIG_B64: $DEV_KUBECONFIG_B64
+  CONFIG: $DEV_CONFIG
 
 stages:
   - build
@@ -22,12 +24,20 @@ stages:
 build:app:
   stage: build
   variables:
+    KUBERNETES_CPU_REQUEST: 1
+    KUBERNETES_CPU_LIMIT: 4
+    KUBERNETES_MEMORY_REQUEST: 3072Mi
+    KUBERNETES_MEMORY_LIMIT: 3072Mi
     APP_NAME: "app"
   extends: .build_image
   rules:
     - if: $CI_COMMIT_REF_NAME == "master"
       variables:
-        BUILD_ARGS: "--build-arg NODE_ENV=development"
+        BUILD_ARGS: "--build-arg NODE_ENV=development --build-arg DFH_HOST=https://backend-dev.defihelper.info --build-arg CACHE_HOST=https://adapters-dev.defihelper.info/cache --build-arg CACHE_AUTH=${DEV_CACHE_AUTH}"
+    - if: $CI_COMMIT_REF_NAME == "release"
+      variables:
+        BUILD_ARGS: "--build-arg NODE_ENV=production --build-arg DFH_HOST=https://backend.defihelper.io --build-arg CACHE_HOST=https://adapters.defihelper.io/cache --build-arg CACHE_AUTH=${PROD_CACHE_AUTH}"
+        ENVIRONMENT: prod
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH'
 
 build:nginx:
@@ -39,15 +49,23 @@ build:nginx:
     - if: $CI_COMMIT_REF_NAME == "master"
       variables:
         BUILD_ARGS: "--build-arg NODE_ENV=development"
+    - if: $CI_COMMIT_REF_NAME == "release"
+      variables:
+        BUILD_ARGS: "--build-arg NODE_ENV=production"
+        ENVIRONMENT: prod
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH'
 
 deploy:
   extends: .helm_upgrade
   stage: deploy
   rules:
-    - if: $CI_COMMIT_REF_NAME == "master"
+    - if: '$CI_COMMIT_REF_NAME == "master"'
+      when: always
+    - if: '$CI_COMMIT_REF_NAME == "release"'
+      when: on_success
       variables:
-        CONFIG: $DEV_CONFIG
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      when: never
-    - if: '$CI_COMMIT_REF_NAME == "master" || $CI_COMMIT_REF_NAME == "release"'
+        KUBECONFIG_B64: $PROD_KUBECONFIG_B64
+        ENVIRONMENT: prod
+        CONFIG: $PROD_CONFIG
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+      when: manual

@@ -7,8 +7,22 @@ replicaCount: 1
 images:
   nginx:
     name: nginx
+    resources:
+      requests:
+        memory: 64Mi
+        cpu: 10m
+      limits:
+        memory: 64Mi
+        cpu: 100m
   app:
     name: app
+    resources:
+      requests:
+        memory: 64Mi
+        cpu: 10m
+      limits:
+        memory: 128Mi
+        cpu: 100m
 
 service:
   type: ClusterIP
@@ -29,7 +43,6 @@ ingress:
       hosts:
         - adapters-dev.defihelper.info
 
-resources: {}
 autoscaling:
   enabled: false
   minReplicas: 1

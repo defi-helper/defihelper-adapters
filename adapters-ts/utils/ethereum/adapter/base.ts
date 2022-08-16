@@ -163,6 +163,8 @@ export namespace Automate {
     deposit: {
       name: "automateRestake-deposit";
       methods: {
+        tokenAddress: () => string;
+        symbol: () => string;
         balanceOf: () => Promise<string>;
         canTransfer: (amount: string) => Promise<true | Error>;
         transfer: (amount: string) => Promise<{ tx: ContractTransaction }>;
@@ -174,6 +176,8 @@ export namespace Automate {
     refund: {
       name: "automateRestake-refund";
       methods: {
+        tokenAddress: () => string;
+        symbol: () => string;
         staked: () => Promise<string>;
         can: () => Promise<true | Error>;
         refund: () => Promise<{ tx: ContractTransaction }>;

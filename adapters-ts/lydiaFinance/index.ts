@@ -6,6 +6,7 @@ import { V2 as uniswap } from "../utils/ethereum/uniswap";
 import { bridgeWrapperBuild } from "../utils/coingecko";
 import * as masterChef from "../utils/ethereum/adapter/masterChef";
 import * as cache from "../utils/cache";
+import * as dfh from "../utils/dfh";
 import { Staking, ResolvedContract } from "../utils/adapter/base";
 import {
   stakingAdapter,
@@ -14,16 +15,16 @@ import {
 import croesusABI from "./data/croesusABI.json";
 import croesusLpRestakeABI from "./data/croesusLpRestakeABI.json";
 import croesusSingleRestakeABI from "./data/croesusSingleRestakeABI.json";
-import bridgeTokens from "./data/bridgeTokens.json";
+
+const croesusAddress = "0xFb26525B14048B7BB1F3794F6129176195Db7766";
+const routeTokens = ["0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7"];
 
 function masterChefProviderFactory(
-  address: string,
-  abi: any,
-  provider: ethersType.providers.Provider | ethersType.Signer,
+  providerOrSigner: ethereum.ProviderOrSigner,
   blockTag: ethereum.BlockNumber
 ) {
   return masterChef.buildMasterChefProvider(
-    new ethers.Contract(address, abi, provider),
+    new ethers.Contract(croesusAddress, croesusABI, providerOrSigner),
     { blockTag },
     {
       rewardToken() {
@@ -74,9 +75,6 @@ function masterChefProviderFactory(
   );
 }
 
-const croesusAddress = "0xFb26525B14048B7BB1F3794F6129176195Db7766";
-const routeTokens = ["0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7"];
-
 module.exports = {
   croesusPair: stakingAdapter(
     async (
@@ -98,7 +96,7 @@ module.exports = {
         .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
       const priceFeed = bridgeWrapperBuild(
-        bridgeTokens,
+        await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network
@@ -114,8 +112,6 @@ module.exports = {
       }
 
       const masterChefProvider = masterChefProviderFactory(
-        croesusAddress,
-        croesusABI,
         provider,
         blockTag
       );
@@ -124,7 +120,6 @@ module.exports = {
       const rewardToken = await masterChefProvider.rewardToken();
       const rewardTokenDecimals = 18;
       const rewardTokenPriceUSD = await priceFeed(rewardToken);
-
       const stakingToken = await masterChefProvider.stakingToken(poolInfo);
       const stakingTokenDecimals = 18;
       const stakingTokenPair = await uniswap.pair.PairInfo.create(
@@ -289,7 +284,7 @@ module.exports = {
         .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
       const priceFeed = bridgeWrapperBuild(
-        bridgeTokens,
+        await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network
@@ -303,8 +298,6 @@ module.exports = {
       }
 
       const masterChefProvider = masterChefProviderFactory(
-        croesusAddress,
-        croesusABI,
         provider,
         blockTag
       );
@@ -313,7 +306,6 @@ module.exports = {
       const rewardToken = await masterChefProvider.rewardToken();
       const rewardTokenDecimals = 18;
       const rewardTokenPriceUSD = await priceFeed(rewardToken);
-
       const stakingToken = contractAddress.toLowerCase();
       const stakingTokenDecimals = await erc20
         .contract(provider, stakingToken)
@@ -481,7 +473,7 @@ module.exports = {
                 autorestakeAdapter: isPair
                   ? "CroesusLpRestake"
                   : "CroesusSingleRestake",
-                buyLiquidity: isPair
+                lpTokensManager: isPair
                   ? {
                       router: "0xA52aBE4676dbfd04Df42eF7755F01A3c41f28D27",
                       pair: info.lpToken,
@@ -534,8 +526,6 @@ module.exports = {
 
       return masterChef.stakingPairAutomateAdapter({
         masterChefProvider: masterChefProviderFactory(
-          croesusAddress,
-          croesusABI,
           signer,
           "latest"
         ),
@@ -552,8 +542,6 @@ module.exports = {
 
       return masterChef.stakingPairAutomateAdapter({
         masterChefProvider: masterChefProviderFactory(
-          croesusAddress,
-          croesusABI,
           signer,
           "latest"
         ),

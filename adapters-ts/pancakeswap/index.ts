@@ -1,5 +1,5 @@
 import type ethersType from "ethers";
-import { bignumber as bn, dayjs, ethers, ethersMulticall, axios } from "../lib";
+import { bignumber as bn, dayjs, ethers, ethersMulticall } from "../lib";
 import { Staking, Action, ResolvedContract } from "../utils/adapter/base";
 import {
   stakingAdapter,
@@ -13,25 +13,34 @@ import { bridgeWrapperBuild } from "../utils/coingecko";
 import * as cache from "../utils/cache";
 import * as ethereum from "../utils/ethereum/base";
 import * as erc20 from "../utils/ethereum/erc20";
+import * as dfh from "../utils/dfh";
 import { V2 as uniswap } from "../utils/ethereum/uniswap";
 import * as masterChef from "../utils/ethereum/adapter/masterChef";
 import masterChefABI from "./data/masterChefABI.json";
+import masterChef2ABI from "./data/masterChefV2ABI.json";
 import smartChefInitializableABI from "./data/smartChefInitializableABI.json";
 import smartChefInitializableRestakeABI from "./data/smartChefInitializableRestakeABI.json";
 import masterChefSingleRestakeABI from "./data/masterChefSingleRestakeABI.json";
 import masterChefLpRestakeABI from "./data/masterChefLpRestakeABI.json";
-import bridgeTokens from "./data/bridgeTokens.json";
+import masterChef2SingleRestakeABI from "./data/masterChef2SingleRestakeABI.json";
+import masterChef2LpRestakeABI from "./data/masterChef2LpRestakeABI.json";
 import BigNumber from "bignumber.js";
 
+const masterChefAddress = "0x73feaa1ee314f8c655e354234017be2193c9e24e";
+const masterChef2Address = "0xa5f8C5Dbd5F286960b9d90548680aE5ebFf07652";
+const routeTokens = ["0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"];
+
 function masterChefProviderFactory(
-  address: string,
-  abi: any,
-  provider: ethersType.providers.Provider | ethersType.Signer,
-  blockTag: ethereum.BlockNumber,
-  avgBlockTime: number
+  providerOrSigner: ethereum.ProviderOrSigner,
+  blockTag: ethereum.BlockNumber
 ) {
+  const provider = ethers.providers.Provider.isProvider(providerOrSigner)
+    ? providerOrSigner
+    : providerOrSigner.provider;
+  if (!provider) throw new Error("Provider not found");
+
   return masterChef.buildMasterChefProvider(
-    new ethers.Contract(address, abi, provider),
+    new ethers.Contract(masterChefAddress, masterChefABI, providerOrSigner),
     { blockTag },
     {
       rewardToken() {
@@ -56,7 +65,8 @@ function masterChefProviderFactory(
             })
           );
       },
-      rewardPerSecond() {
+      async rewardPerSecond() {
+        const avgBlockTime = await ethereum.getAvgBlockTime(provider, blockTag);
         return this.contract
           .cakePerBlock({ blockTag: this.options.blockTag })
           .then((v: ethersType.BigNumber) =>
@@ -70,8 +80,75 @@ function masterChefProviderFactory(
   );
 }
 
-const masterChefAddress = "0x73feaa1ee314f8c655e354234017be2193c9e24e";
-const routeTokens = ["0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"];
+function masterChef2ProviderFactory(
+  providerOrSigner: ethereum.ProviderOrSigner,
+  blockTag: ethereum.BlockNumber,
+  poolIndex?: number
+) {
+  const provider = ethers.providers.Provider.isProvider(providerOrSigner)
+    ? providerOrSigner
+    : providerOrSigner.provider;
+  if (!provider) throw new Error("Provider not found");
+
+  return masterChef.buildMasterChefProvider(
+    new ethers.Contract(masterChef2Address, masterChef2ABI, providerOrSigner),
+    { blockTag },
+    {
+      async totalAllocPoint() {
+        const isRegular = poolIndex
+          ? await this.contract
+              .poolInfo(poolIndex, {
+                blockTag: this.options.blockTag,
+              })
+              .then(({ isRegular }: { isRegular: boolean }) => isRegular)
+          : true;
+
+        return isRegular
+          ? this.contract
+              .totalRegularAllocPoint({ blockTag: this.options.blockTag })
+              .then(ethereum.toBN)
+          : this.contract
+              .totalSpecialAllocPoint({ blockTag: this.options.blockTag })
+              .then(ethereum.toBN);
+      },
+      rewardToken() {
+        return "0x0e09fabb73bd3ade0a17ecc321fd13a19e81ce82";
+      },
+      async poolInfo(poolIndex) {
+        const lpToken = await this.contract.lpToken(poolIndex, {
+          blockTag: this.options.blockTag,
+        });
+
+        return this.contract
+          .poolInfo(poolIndex, { blockTag: this.options.blockTag })
+          .then(
+            ({
+              allocPoint,
+              accCakePerShare,
+            }: {
+              allocPoint: ethersType.BigNumber;
+              accCakePerShare: ethersType.BigNumber;
+            }) => ({
+              lpToken,
+              allocPoint: ethereum.toBN(allocPoint),
+              accRewardPerShare: ethereum.toBN(accCakePerShare),
+            })
+          );
+      },
+      async rewardPerSecond() {
+        const avgBlockTime = await ethereum.getAvgBlockTime(provider, blockTag);
+        return this.contract
+          .cakePerBlock({ blockTag: this.options.blockTag })
+          .then((v: ethersType.BigNumber) =>
+            ethereum.toBN(v).multipliedBy(1000).div(avgBlockTime)
+          );
+      },
+      pendingReward(poolIndex, wallet) {
+        return this.contract.pendingCake(poolIndex, wallet).then(ethereum.toBN);
+      },
+    }
+  );
+}
 
 module.exports = {
   masterChefPair: stakingAdapter(
@@ -93,16 +170,11 @@ module.exports = {
         .getNetwork()
         .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
-      const blockNumber = block.number;
       const priceFeed = bridgeWrapperBuild(
-        bridgeTokens,
+        await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network
-      );
-      const avgBlockTime = await ethereum.getAvgBlockTime(
-        provider,
-        blockNumber
       );
       const multicall = new ethersMulticall.Provider(provider);
       await multicall.init();
@@ -114,13 +186,7 @@ module.exports = {
         throw new Error("Pool is not found");
       }
 
-      const masterChefProvider = masterChefProviderFactory(
-        masterChefAddress,
-        masterChefABI,
-        provider,
-        blockTag,
-        avgBlockTime
-      );
+      const masterChefProvider = masterChefProviderFactory(provider, blockTag);
       const poolInfo = await masterChefProvider.poolInfo(pool.index);
 
       const rewardToken = await masterChefProvider.rewardToken();
@@ -305,16 +371,11 @@ module.exports = {
         .getNetwork()
         .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
-      const blockNumber = block.number;
       const priceFeed = bridgeWrapperBuild(
-        bridgeTokens,
+        await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network
-      );
-      const avgBlockTime = await ethereum.getAvgBlockTime(
-        provider,
-        blockNumber
       );
 
       const pool = masterChefSavedPools.find(
@@ -324,12 +385,343 @@ module.exports = {
         throw new Error("Pool is not found");
       }
 
-      const masterChefProvider = masterChefProviderFactory(
-        masterChefAddress,
-        masterChefABI,
+      const masterChefProvider = masterChefProviderFactory(provider, blockTag);
+      const poolInfo = await masterChefProvider.poolInfo(pool.index);
+
+      const rewardToken = await masterChefProvider.rewardToken();
+      const rewardTokenDecimals = 18;
+      const rewardTokenPriceUSD = await priceFeed(rewardToken);
+
+      const stakingToken = contractAddress.toLowerCase();
+      const stakingTokenDecimals = await erc20
+        .contract(provider, stakingToken)
+        .decimals()
+        .then((v: ethersType.BigNumber) => Number(v.toString()));
+      const stakingTokenPriceUSD = await priceFeed(stakingToken);
+
+      const totalLocked = await masterChefProvider
+        .totalLocked(poolInfo)
+        .then((v) => v.div(`1e${stakingTokenDecimals}`));
+      const tvl = new bn(totalLocked).multipliedBy(stakingTokenPriceUSD);
+
+      const [rewardPerSecond, totalAllocPoint] = await Promise.all([
+        masterChefProvider.rewardPerSecond(),
+        masterChefProvider.totalAllocPoint(),
+      ]);
+      const rewardPerSec = poolInfo.allocPoint
+        .multipliedBy(rewardPerSecond)
+        .div(totalAllocPoint)
+        .div(`1e${rewardTokenDecimals}`);
+      const aprSecond = tvl.gt(0)
+        ? rewardPerSec.multipliedBy(rewardTokenPriceUSD).div(tvl)
+        : new bn(0);
+      const aprDay = aprSecond.multipliedBy(86400);
+      const aprWeek = aprDay.multipliedBy(7);
+      const aprMonth = aprDay.multipliedBy(30);
+      const aprYear = aprDay.multipliedBy(365);
+
+      return {
+        stakeToken: {
+          address: stakingToken,
+          decimals: stakingTokenDecimals,
+          priceUSD: stakingTokenPriceUSD.toString(10),
+        },
+        rewardToken: {
+          address: rewardToken,
+          decimals: rewardTokenDecimals,
+          priceUSD: rewardTokenPriceUSD.toString(10),
+        },
+        metrics: {
+          tvl: tvl.toString(10),
+          aprDay: aprDay.toString(10),
+          aprWeek: aprWeek.toString(10),
+          aprMonth: aprMonth.toString(10),
+          aprYear: aprYear.toString(10),
+        },
+        wallet: async (walletAddress) => {
+          const balance = await masterChefProvider
+            .userInfo(pool.index, walletAddress)
+            .then(({ amount }) => amount.div(`1e${stakingTokenDecimals}`));
+          const earned = await masterChefProvider
+            .pendingReward(pool.index, walletAddress)
+            .then((v) => v.div(`1e${rewardTokenDecimals}`));
+          const balanceUSD = balance.multipliedBy(stakingTokenPriceUSD);
+          const earnedUSD = earned.multipliedBy(rewardTokenPriceUSD);
+
+          return {
+            staked: {
+              [stakingToken]: {
+                balance: balance.toString(10),
+                usd: balanceUSD.toString(10),
+              },
+            },
+            earned: {
+              [rewardToken]: {
+                balance: earned.toString(10),
+                usd: earnedUSD.toString(10),
+              },
+            },
+            metrics: {
+              staking: balance.toString(10),
+              stakingUSD: balanceUSD.toString(10),
+              earned: earned.toString(10),
+              earnedUSD: earnedUSD.toString(10),
+            },
+            tokens: Staking.tokens(
+              {
+                token: stakingToken,
+                data: {
+                  balance: balance.toString(10),
+                  usd: balanceUSD.toString(10),
+                },
+              },
+              {
+                token: rewardToken,
+                data: {
+                  balance: earned.toString(10),
+                  usd: earnedUSD.toString(10),
+                },
+              }
+            ),
+          };
+        },
+        actions: masterChef.stakingActionComponents({
+          masterChefProvider,
+          poolIndex: pool.index,
+          poolInfo,
+          signer: options.signer,
+          etherscanAddressURL: "https://bscscan.com/address",
+        }),
+      };
+    }
+  ),
+  masterChef2Pair: stakingAdapter(
+    async (
+      provider,
+      contractAddress,
+      initOptions = ethereum.defaultOptions()
+    ) => {
+      const options = {
+        ...ethereum.defaultOptions(),
+        ...initOptions,
+      };
+      const masterChefSavedPools = await cache.read(
+        "pancakeswap",
+        "masterChef2Pools"
+      );
+      const blockTag = options.blockNumber;
+      const network = await provider
+        .getNetwork()
+        .then(({ chainId }) => chainId);
+      const block = await provider.getBlock(blockTag);
+      const priceFeed = bridgeWrapperBuild(
+        await dfh.getPriceFeeds(network),
+        blockTag,
+        block,
+        network
+      );
+      const multicall = new ethersMulticall.Provider(provider);
+      await multicall.init();
+
+      const pool = masterChefSavedPools.find(
+        (p) => p.stakingToken.toLowerCase() === contractAddress.toLowerCase()
+      );
+      if (!pool) {
+        throw new Error("Pool is not found");
+      }
+
+      const masterChefProvider = masterChef2ProviderFactory(
         provider,
         blockTag,
-        avgBlockTime
+        pool.index
+      );
+      const poolInfo = await masterChefProvider.poolInfo(pool.index);
+
+      const rewardToken = await masterChefProvider.rewardToken();
+      const rewardTokenDecimals = 18;
+      const rewardTokenPriceUSD = await priceFeed(rewardToken);
+
+      const stakingToken = await masterChefProvider.stakingToken(poolInfo);
+      const stakingTokenDecimals = 18;
+      const stakingTokenPair = await uniswap.pair.PairInfo.create(
+        multicall,
+        stakingToken,
+        options
+      );
+      const token0PriceUSD = await priceFeed(stakingTokenPair.token0);
+      const token1PriceUSD = await priceFeed(stakingTokenPair.token1);
+      const stakingTokenPriceUSD = stakingTokenPair.calcPrice(
+        token0PriceUSD,
+        token1PriceUSD
+      );
+
+      const totalLocked = await masterChefProvider
+        .totalLocked(poolInfo)
+        .then((v) => v.div(`1e${stakingTokenDecimals}`));
+      const tvl = new bn(totalLocked).multipliedBy(stakingTokenPriceUSD);
+
+      const [rewardPerSecond, totalAllocPoint] = await Promise.all([
+        masterChefProvider.rewardPerSecond(),
+        masterChefProvider.totalAllocPoint(),
+      ]);
+      const rewardPerSec = poolInfo.allocPoint
+        .multipliedBy(rewardPerSecond)
+        .div(totalAllocPoint)
+        .div(`1e${rewardTokenDecimals}`);
+      const aprSecond = tvl.gt(0)
+        ? rewardPerSec.multipliedBy(rewardTokenPriceUSD).div(tvl)
+        : new bn(0);
+      const aprDay = aprSecond.multipliedBy(86400);
+      const aprWeek = aprDay.multipliedBy(7);
+      const aprMonth = aprDay.multipliedBy(30);
+      const aprYear = aprDay.multipliedBy(365);
+
+      return {
+        stakeToken: {
+          address: stakingToken,
+          decimals: stakingTokenDecimals,
+          priceUSD: stakingTokenPriceUSD.toString(10),
+          parts: [
+            {
+              address: stakingTokenPair.token0,
+              decimals: stakingTokenPair.token0Decimals,
+              priceUSD: token0PriceUSD.toString(10),
+            },
+            {
+              address: stakingTokenPair.token1,
+              decimals: stakingTokenPair.token1Decimals,
+              priceUSD: token1PriceUSD.toString(10),
+            },
+          ],
+        },
+        rewardToken: {
+          address: rewardToken,
+          decimals: rewardTokenDecimals,
+          priceUSD: rewardTokenPriceUSD.toString(10),
+        },
+        metrics: {
+          tvl: tvl.toString(10),
+          aprDay: aprDay.toString(10),
+          aprWeek: aprWeek.toString(10),
+          aprMonth: aprMonth.toString(10),
+          aprYear: aprYear.toString(10),
+        },
+        wallet: async (walletAddress) => {
+          const balance = await masterChefProvider
+            .userInfo(pool.index, walletAddress)
+            .then(({ amount }) => amount.div(`1e${stakingTokenDecimals}`));
+          const earned = await masterChefProvider
+            .pendingReward(pool.index, walletAddress)
+            .then((v) => v.div(`1e${rewardTokenDecimals}`));
+          const expandedBalance = stakingTokenPair.expandBalance(balance);
+          const reviewedBalance = [
+            {
+              token: stakingTokenPair.token0,
+              balance: expandedBalance.token0.toString(10),
+              usd: expandedBalance.token0
+                .multipliedBy(token0PriceUSD)
+                .toString(10),
+            },
+            {
+              token: stakingTokenPair.token1,
+              balance: expandedBalance.token1.toString(10),
+              usd: expandedBalance.token1
+                .multipliedBy(token1PriceUSD)
+                .toString(10),
+            },
+          ];
+          const earnedUSD = earned.multipliedBy(rewardTokenPriceUSD);
+
+          return {
+            staked: reviewedBalance.reduce(
+              (res, b) => ({
+                ...res,
+                [b.token]: {
+                  balance: b.balance,
+                  usd: b.usd,
+                },
+              }),
+              {}
+            ),
+            earned: {
+              [rewardToken]: {
+                balance: earned.toString(10),
+                usd: earnedUSD.toString(10),
+              },
+            },
+            metrics: {
+              staking: balance.toString(10),
+              stakingUSD: balance
+                .multipliedBy(stakingTokenPriceUSD)
+                .toString(10),
+              earned: earned.toString(10),
+              earnedUSD: earnedUSD.toString(10),
+            },
+            tokens: Staking.tokens(
+              ...reviewedBalance.map((b) => ({
+                token: b.token,
+                data: {
+                  balance: b.balance,
+                  usd: b.usd,
+                },
+              })),
+              {
+                token: rewardToken,
+                data: {
+                  balance: earned.toString(10),
+                  usd: earnedUSD.toString(10),
+                },
+              }
+            ),
+          };
+        },
+        actions: masterChef.stakingActionComponents({
+          masterChefProvider,
+          poolIndex: pool.index,
+          poolInfo,
+          signer: options.signer,
+          etherscanAddressURL: "https://bscscan.com/address",
+        }),
+      };
+    }
+  ),
+  masterChef2Single: stakingAdapter(
+    async (
+      provider,
+      contractAddress,
+      initOptions = ethereum.defaultOptions()
+    ) => {
+      const options = {
+        ...ethereum.defaultOptions(),
+        ...initOptions,
+      };
+      const masterChefSavedPools = await cache.read(
+        "pancakeswap",
+        "masterChef2Pools"
+      );
+      const blockTag = options.blockNumber;
+      const network = await provider
+        .getNetwork()
+        .then(({ chainId }) => chainId);
+      const block = await provider.getBlock(blockTag);
+      const priceFeed = bridgeWrapperBuild(
+        await dfh.getPriceFeeds(network),
+        blockTag,
+        block,
+        network
+      );
+
+      const pool = masterChefSavedPools.find(
+        (p) => p.stakingToken.toLowerCase() === contractAddress.toLowerCase()
+      );
+      if (!pool) {
+        throw new Error("Pool is not found");
+      }
+
+      const masterChefProvider = masterChef2ProviderFactory(
+        provider,
+        blockTag,
+        pool.index
       );
       const poolInfo = await masterChefProvider.poolInfo(pool.index);
 
@@ -457,7 +849,7 @@ module.exports = {
       const block = await provider.getBlock(blockTag);
       const blockNumber = block.number;
       const priceFeed = bridgeWrapperBuild(
-        bridgeTokens,
+        await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network
@@ -788,9 +1180,12 @@ module.exports = {
   automates: {
     contractsResolver: {
       default: contractsResolver(async (provider, options = {}) => {
-        const invalidPools = [64, 105, 444];
         const multicall = new ethersMulticall.Provider(provider);
         await multicall.init();
+        type ResolvedPool = ResolvedContract & {
+          poolIndex: number;
+          stakingToken: string;
+        };
 
         const masterChiefContract = new ethersMulticall.Contract(
           masterChefAddress,
@@ -801,7 +1196,7 @@ module.exports = {
         ]);
         const poolsIndex = Array.from(
           new Array(totalPools.toNumber()).keys()
-        ).filter((poolIndex) => !invalidPools.includes(poolIndex));
+        ).filter((poolIndex) => ![64, 105, 444].includes(poolIndex));
         const poolsInfo = await multicall.all(
           poolsIndex.map((poolIndex) => masterChiefContract.poolInfo(poolIndex))
         );
@@ -810,10 +1205,6 @@ module.exports = {
             erc20.multicallContract(lpToken).symbol()
           )
         );
-        type ResolvedPool = ResolvedContract & {
-          poolIndex: number;
-          stakingToken: string;
-        };
 
         const masterChefPools: ResolvedPool[] = await Promise.all(
           poolsIndex.map(async (index, i) => {
@@ -852,7 +1243,7 @@ module.exports = {
                   ? "MasterChefLpRestake"
                   : "MasterChefSingleRestake",
                 adapters: isPair ? ["masterChefPair"] : ["masterChefSingle"],
-                buyLiquidity: isPair
+                lpTokensManager: isPair
                   ? {
                       router: "0x10ED43C718714eb63d5aA57B78B54704E256024E",
                       pair: info.lpToken,
@@ -872,6 +1263,88 @@ module.exports = {
               index: poolIndex,
               stakingToken,
               type: adapter === "masterChefPair" ? "lp" : "single",
+            }))
+          );
+        }
+
+        const masterChief2Contract = new ethersMulticall.Contract(
+          masterChef2Address,
+          masterChef2ABI
+        );
+        const [totalPools2] = await multicall.all([
+          masterChief2Contract.poolLength(),
+        ]);
+        const pools2Index = Array.from(
+          new Array(totalPools2.toNumber()).keys()
+        );
+        const pools2Token = await multicall.all(
+          pools2Index.map((poolIndex) =>
+            masterChief2Contract.lpToken(poolIndex)
+          )
+        );
+        const pools2StakingTokensSymbol = await multicall.all(
+          pools2Token.map((lpToken) =>
+            erc20.multicallContract(lpToken).symbol()
+          )
+        );
+
+        const masterChef2Pools: ResolvedPool[] = await Promise.all(
+          pools2Index.map(async (index, i) => {
+            const lpToken = pools2Token[i];
+            const stakingTokenSymbol = pools2StakingTokensSymbol[i];
+            const isPair = stakingTokenSymbol === "Cake-LP";
+
+            let token0Symbol, token1Symbol;
+            if (isPair) {
+              const [token0, token1] = await multicall.all([
+                uniswap.pair.multicallContract(lpToken).token0(),
+                uniswap.pair.multicallContract(lpToken).token1(),
+              ]);
+              const pairSymbols = await multicall.all([
+                erc20.multicallContract(token0).symbol(),
+                erc20.multicallContract(token1).symbol(),
+              ]);
+              token0Symbol = pairSymbols[0];
+              token1Symbol = pairSymbols[1];
+            }
+
+            return {
+              poolIndex: index,
+              stakingToken: lpToken,
+              name: isPair
+                ? `${token0Symbol}-${token1Symbol}`
+                : stakingTokenSymbol,
+              address: lpToken,
+              blockchain: "ethereum",
+              network: "56",
+              layout: "staking",
+              adapter: isPair ? "masterChef2Pair" : "masterChef2Single",
+              description: "",
+              automate: {
+                autorestakeAdapter: isPair
+                  ? "MasterChef2LpRestake"
+                  : "MasterChef2SingleRestake",
+                adapters: isPair ? ["masterChef2Pair"] : ["masterChef2Single"],
+                lpTokensManager: isPair
+                  ? {
+                      router: "0x10ED43C718714eb63d5aA57B78B54704E256024E",
+                      pair: lpToken,
+                    }
+                  : undefined,
+              },
+              link: "https://pancakeswap.finance/farms",
+            };
+          })
+        );
+        if (options.cacheAuth) {
+          cache.write(
+            options.cacheAuth,
+            "pancakeswap",
+            "masterChef2Pools",
+            masterChef2Pools.map(({ poolIndex, stakingToken, adapter }) => ({
+              index: poolIndex,
+              stakingToken,
+              type: adapter === "masterChef2Pair" ? "lp" : "single",
             }))
           );
         }
@@ -940,7 +1413,11 @@ module.exports = {
           );
         }
 
-        return [...masterChefPools, ...chefInitializablePools];
+        return [
+          ...masterChefPools,
+          ...masterChef2Pools,
+          ...chefInitializablePools,
+        ];
       }),
     },
     deploy: {
@@ -958,6 +1435,22 @@ module.exports = {
         poolsLoader: () =>
           cache
             .read("pancakeswap", "masterChefPools")
+            .then((pools) => pools.filter(({ type }) => type === "single")),
+      }),
+      MasterChef2LpRestake: masterChef.stakingAutomateDeployTabs({
+        liquidityRouter: "0x10ED43C718714eb63d5aA57B78B54704E256024E",
+        stakingAddress: masterChef2Address,
+        poolsLoader: () =>
+          cache
+            .read("pancakeswap", "masterChef2Pools")
+            .then((pools) => pools.filter(({ type }) => type === "lp")),
+      }),
+      MasterChef2SingleRestake: masterChef.stakingAutomateDeployTabs({
+        liquidityRouter: "0x10ED43C718714eb63d5aA57B78B54704E256024E",
+        stakingAddress: masterChef2Address,
+        poolsLoader: () =>
+          cache
+            .read("pancakeswap", "masterChef2Pools")
             .then((pools) => pools.filter(({ type }) => type === "single")),
       }),
       SmartChefInitializableRestake: deployAdapter(
@@ -1027,22 +1520,24 @@ module.exports = {
       signer: ethersType.Signer,
       contractAddress: string
     ) => {
-      if (!signer.provider) throw new Error("Provider not found");
-      const avgBlockTime = await ethereum.getAvgBlockTime(
-        signer.provider,
-        "latest"
-      );
-
       return masterChef.stakingPairAutomateAdapter({
-        masterChefProvider: masterChefProviderFactory(
-          masterChefAddress,
-          masterChefABI,
-          signer,
-          "latest",
-          avgBlockTime
-        ),
+        masterChefProvider: masterChefProviderFactory(signer, "latest"),
         automateABI: masterChefLpRestakeABI,
         stakingABI: masterChefABI,
+        routeTokens,
+      })(signer, contractAddress);
+    },
+    MasterChef2LpRestake: async (
+      signer: ethersType.Signer,
+      contractAddress: string
+    ) => {
+      return masterChef.stakingPairAutomateAdapter({
+        masterChefProvider: masterChef2ProviderFactory(
+          signer,
+          "latest",
+        ),
+        automateABI: masterChef2LpRestakeABI,
+        stakingABI: masterChef2ABI,
         routeTokens,
       })(signer, contractAddress);
     },
@@ -1050,22 +1545,24 @@ module.exports = {
       signer: ethersType.Signer,
       contractAddress: string
     ) => {
-      if (!signer.provider) throw new Error("Provider not found");
-      const avgBlockTime = await ethereum.getAvgBlockTime(
-        signer.provider,
-        "latest"
-      );
-
       return masterChef.stakingSingleAutomateAdapter({
-        masterChefProvider: masterChefProviderFactory(
-          masterChefAddress,
-          masterChefABI,
-          signer,
-          "latest",
-          avgBlockTime
-        ),
+        masterChefProvider: masterChefProviderFactory(signer, "latest"),
         automateABI: masterChefSingleRestakeABI,
         stakingABI: masterChefABI,
+        routeTokens,
+      })(signer, contractAddress);
+    },
+    MasterChef2SingleRestake: async (
+      signer: ethersType.Signer,
+      contractAddress: string
+    ) => {
+      return masterChef.stakingSingleAutomateAdapter({
+        masterChefProvider: masterChef2ProviderFactory(
+          signer,
+          "latest",
+        ),
+        automateABI: masterChef2SingleRestakeABI,
+        stakingABI: masterChef2ABI,
         routeTokens,
       })(signer, contractAddress);
     },
@@ -1090,10 +1587,13 @@ module.exports = {
         const stakingTokenDecimals = await stakingToken
           .decimals()
           .then((v: ethersType.BigNumber) => Number(v.toString()));
+        const stakingTokenSymbol = await stakingToken.symbol();
 
         const deposit: Automate.AdapterActions["deposit"] = {
           name: "automateRestake-deposit",
           methods: {
+            tokenAddress: () => stakingTokenAddress,
+            symbol: () => stakingTokenSymbol,
             balanceOf: () =>
               stakingToken
                 .balanceOf(signerAddress)
@@ -1154,6 +1654,8 @@ module.exports = {
         const refund: Automate.AdapterActions["refund"] = {
           name: "automateRestake-refund",
           methods: {
+            tokenAddress: () => stakingTokenAddress,
+            symbol: () => stakingTokenSymbol,
             staked: () =>
               staking
                 .userInfo(automate.address)
@@ -1273,10 +1775,7 @@ module.exports = {
               routeTokens
             );
             swap[0] = path;
-            swap[1] = ethereum
-              .toBN(amountOut)
-              .multipliedBy(slippage)
-              .toFixed(0);
+            swap[1] = new bn(amountOut).multipliedBy(slippage).toFixed(0);
           }
 
           const deadline = dayjs().add(deadlineSeconds, "seconds").unix();

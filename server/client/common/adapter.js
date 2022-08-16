@@ -2,6 +2,8 @@ import dayjs from 'dayjs';
 import { BigNumber } from 'bignumber.js';
 import axios from 'axios';
 import { ethers } from 'ethers';
+import * as Uniswap3Core from "@uniswap/sdk-core";
+import * as Uniswap3SDK from "@uniswap/v3-sdk";
 import ethersMulticall from '@defihelper/ethers-multicall';
 import { Signer as WavesSigner } from '@waves/signer';
 import { ProviderSeed as WavesProviderSeed } from '@waves/provider-seed';
@@ -13,9 +15,14 @@ window.bignumber = BigNumber;
 window.axios = axios;
 window.ethers = ethers;
 window.ethersMulticall = ethersMulticall;
+window.uniswap3 = {
+  core: Uniswap3Core,
+  sdk: Uniswap3SDK,
+}
 window.wavesSigner = WavesSigner;
 window.wavesSeedProvider = WavesProviderSeed;
 window.wavesTransaction = WavesTx;
+window.mode = 'dev';
 
 export async function list() {
   return fetch('/').then((res) => res.json());

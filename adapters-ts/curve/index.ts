@@ -17,6 +17,7 @@ import {
 import { bridgeWrapperBuild, PriceFeed } from "../utils/coingecko";
 import * as ethereum from "../utils/ethereum/base";
 import * as erc20 from "../utils/ethereum/erc20";
+import * as dfh from "../utils/dfh";
 import { V2 as uniswap } from "../utils/ethereum/uniswap";
 import registryABI from "./data/registryABI.json";
 import gaugeABI from "./data/gaugeABI.json";
@@ -244,7 +245,7 @@ function stakingAdapterFactory(poolABI: any) {
       const block = await provider.getBlock(blockTag);
       const multicall = new ethersMulticall.Provider(provider, network);
       const priceFeed = bridgeWrapperBuild(
-        bridgeTokens,
+        await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network
@@ -288,7 +289,7 @@ function stakingAdapterFactory(poolABI: any) {
         pool,
         stakedTotalSupply.toString()
       );
-      const stakedTokens = totalSupplyTokens.flat(Infinity);
+      const stakedTokens = totalSupplyTokens.flat(10) as UnderlyingBalance[];
       const tvl = stakedTokens.reduce(
         (sum: BigNumber, { balanceUSD }) => sum.plus(balanceUSD),
         new bn(0)
@@ -352,7 +353,7 @@ function stakingAdapterFactory(poolABI: any) {
               pool,
               staked.toString()
             )
-          ).flat(Infinity);
+          ).flat(10) as UnderlyingBalance[];
           const earnedNormalize = new bn(earned.toString())
             .div(1e18)
             .toString(10);
@@ -391,27 +392,31 @@ function stakingAdapterFactory(poolABI: any) {
               earnedUSD,
             },
             tokens: Staking.tokens(
-              ...stakedTokens
-                .concat([
+              ...[
+                ...stakedTokens,
+                {
+                  address: crvToken,
+                  balance: earnedNormalize,
+                  balanceUSD: earnedUSD,
+                },
+              ].reduce<
+                Array<{
+                  token: string;
+                  data: { balance: string; usd: string };
+                }>
+              >(
+                (result, { address, balance, balanceUSD }) => [
+                  ...result,
                   {
-                    address: crvToken,
-                    balance: earnedNormalize,
-                    balanceUSD: earnedUSD,
-                  },
-                ])
-                .reduce(
-                  (result, { address, balance, balanceUSD }) => [
-                    ...result,
-                    {
-                      token: address,
-                      data: {
-                        balance,
-                        usd: balanceUSD,
-                      },
+                    token: address,
+                    data: {
+                      balance,
+                      usd: balanceUSD,
                     },
-                  ],
-                  []
-                )
+                  },
+                ],
+                []
+              )
             ),
           };
         },
@@ -628,7 +633,7 @@ module.exports = {
     const block = await provider.getBlock(blockTag);
     const multicall = new ethersMulticall.Provider(provider, network);
     const priceFeed = bridgeWrapperBuild(
-      bridgeTokens,
+      await dfh.getPriceFeeds(network),
       blockTag,
       block,
       network
@@ -677,7 +682,7 @@ module.exports = {
             pool,
             earned.toString(10)
           )
-        ).flat(Infinity);
+        ).flat(10) as UnderlyingBalance[];
 
         return {
           staked: {
@@ -705,27 +710,28 @@ module.exports = {
               .toString(10),
           },
           tokens: Staking.tokens(
-            ...rewardTokens
-              .concat([
+            ...[
+              ...rewardTokens,
+              {
+                address: veCRVAddress,
+                balance: staked.toString(10),
+                balanceUSD: stakedUSD.toString(10),
+              },
+            ].reduce<
+              Array<{ token: string; data: { balance: string; usd: string } }>
+            >(
+              (result, { address, balance, balanceUSD }) => [
+                ...result,
                 {
-                  address: veCRVAddress,
-                  balance: staked.toString(10),
-                  balanceUSD: stakedUSD.toString(10),
-                },
-              ])
-              .reduce(
-                (result, { address, balance, balanceUSD }) => [
-                  ...result,
-                  {
-                    token: address,
-                    data: {
-                      balance,
-                      usd: balanceUSD,
-                    },
+                  token: address,
+                  data: {
+                    balance,
+                    usd: balanceUSD,
                   },
-                ],
-                []
-              )
+                },
+              ],
+              []
+            )
           ),
         };
       },
@@ -938,10 +944,13 @@ module.exports = {
       const stakingTokenDecimals = await stakingToken
         .decimals()
         .then((v: ethersType.BigNumber) => Number(v.toString()));
+      const stakingTokenSymbol = await stakingToken.symbol();
 
       const deposit: Automate.AdapterActions["deposit"] = {
         name: "automateRestake-deposit",
         methods: {
+          tokenAddress: () => stakingTokenAddress,
+          symbol: () => stakingTokenSymbol,
           balanceOf: () =>
             stakingToken
               .balanceOf(signerAddress)
@@ -1002,6 +1011,8 @@ module.exports = {
       const refund: Automate.AdapterActions["refund"] = {
         name: "automateRestake-refund",
         methods: {
+          tokenAddress: () => stakingTokenAddress,
+          symbol: () => stakingTokenSymbol,
           staked: () =>
             staking
               .balanceOf(automate.address)
@@ -1168,10 +1179,13 @@ module.exports = {
       const stakingTokenDecimals = await stakingToken
         .decimals()
         .then((v: ethersType.BigNumber) => Number(v.toString()));
+      const stakingTokenSymbol = await stakingToken.symbol();
 
       const deposit: Automate.AdapterActions["deposit"] = {
         name: "automateRestake-deposit",
         methods: {
+          tokenAddress: () => stakingTokenAddress,
+          symbol: () => stakingTokenSymbol,
           balanceOf: () =>
             stakingToken
               .balanceOf(signerAddress)
@@ -1232,6 +1246,8 @@ module.exports = {
       const refund: Automate.AdapterActions["refund"] = {
         name: "automateRestake-refund",
         methods: {
+          tokenAddress: () => stakingTokenAddress,
+          symbol: () => stakingTokenSymbol,
           staked: () =>
             staking
               .balanceOf(automate.address)

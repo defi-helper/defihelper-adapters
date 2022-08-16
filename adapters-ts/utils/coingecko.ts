@@ -3,6 +3,15 @@ import { AxiosError } from "axios";
 import * as base from "./ethereum/base";
 import { bignumber as bn, dayjs, axios } from "../lib";
 
+export class PriceNotResolvedError extends Error {
+  constructor(
+    public readonly address: string,
+    public readonly network: number
+  ) {
+    super(`Price "coingecko:${network}:${address}" not resolved`);
+  }
+}
+
 export interface PriceFeed {
   (address: string): Promise<BigNumber>;
 }
@@ -23,6 +32,7 @@ export class CoingeckoProvider {
 
   static platformMap = {
     1: "ethereum",
+    10: "optimistic-ethereum",
     56: "binance-smart-chain",
     128: "huobi-token",
     137: "polygon-pos",
@@ -171,6 +181,11 @@ export function bridgeWrapperBuild(
 
     return new CoingeckoProvider({ block, blockTag })
       .initPlatform(network)
-      .contractPrice(address);
+      .contractPrice(address)
+      .catch((e) => {
+        throw e instanceof Error
+          ? new PriceNotResolvedError(address, network)
+          : e;
+      });
   };
 }

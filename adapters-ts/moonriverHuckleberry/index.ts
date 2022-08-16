@@ -10,22 +10,24 @@ import { bridgeWrapperBuild } from "../utils/coingecko";
 import * as cache from "../utils/cache";
 import * as ethereum from "../utils/ethereum/base";
 import * as erc20 from "../utils/ethereum/erc20";
+import * as dfh from "../utils/dfh";
 import { V2 as uniswap } from "../utils/ethereum/uniswap";
 import * as masterChef from "../utils/ethereum/adapter/masterChef";
 import * as govSwap from "../utils/ethereum/adapter/govSwap";
 import masterChefABI from "./data/masterChefABI.json";
 import tomTokenABI from "./data/tomTokenABI.json";
 import masterChefFinnLpRestakeABI from "./data/masterChefFinnLpRestakeABI.json";
-import bridgeTokens from "./data/bridgeTokens.json";
+
+const masterChefAddress = "0x1f4b7660b6AdC3943b5038e3426B33c1c0e343E6";
+const routeTokens = ["0x98878B06940aE243284CA214f92Bb71a2b032B8A"];
+const tomAddress = "0x37619cc85325afea778830e184cb60a3abc9210b";
 
 function masterChefProviderFactory(
-  address: string,
-  abi: any,
-  provider: ethersType.providers.Provider | ethersType.Signer,
+  providerOrSigner: ethereum.ProviderOrSigner,
   blockTag: ethereum.BlockNumber
 ) {
   return masterChef.buildMasterChefProvider(
-    new ethers.Contract(address, abi, provider),
+    new ethers.Contract(masterChefAddress, masterChefABI, providerOrSigner),
     { blockTag },
     {
       rewardToken() {
@@ -64,9 +66,6 @@ function masterChefProviderFactory(
   );
 }
 
-const masterChefAddress = "0x1f4b7660b6AdC3943b5038e3426B33c1c0e343E6";
-const routeTokens = ["0x98878B06940aE243284CA214f92Bb71a2b032B8A"];
-
 module.exports = {
   masterChefPair: stakingAdapter(
     async (
@@ -88,7 +87,7 @@ module.exports = {
         .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
       const priceFeed = bridgeWrapperBuild(
-        bridgeTokens,
+        await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network
@@ -103,18 +102,12 @@ module.exports = {
         throw new Error("Pool is not found");
       }
 
-      const masterChefProvider = masterChefProviderFactory(
-        masterChefAddress,
-        masterChefABI,
-        provider,
-        blockTag
-      );
+      const masterChefProvider = masterChefProviderFactory(provider, blockTag);
       const poolInfo = await masterChefProvider.poolInfo(pool.index);
 
       const rewardToken = await masterChefProvider.rewardToken();
       const rewardTokenDecimals = 18;
       const rewardTokenPriceUSD = await priceFeed(rewardToken);
-
       const stakingToken = await masterChefProvider.stakingToken(poolInfo);
       const stakingTokenDecimals = 18;
       const stakingTokenPair = await uniswap.pair.PairInfo.create(
@@ -279,7 +272,7 @@ module.exports = {
         .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
       const priceFeed = bridgeWrapperBuild(
-        bridgeTokens,
+        await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network
@@ -292,18 +285,12 @@ module.exports = {
         throw new Error("Pool is not found");
       }
 
-      const masterChefProvider = masterChefProviderFactory(
-        masterChefAddress,
-        masterChefABI,
-        provider,
-        blockTag
-      );
+      const masterChefProvider = masterChefProviderFactory(provider, blockTag);
       const poolInfo = await masterChefProvider.poolInfo(pool.index);
 
       const rewardToken = await masterChefProvider.rewardToken();
       const rewardTokenDecimals = 18;
       const rewardTokenPriceUSD = await priceFeed(rewardToken);
-
       const stakingToken = contractAddress.toLowerCase();
       const stakingTokenDecimals = await erc20
         .contract(provider, stakingToken)
@@ -311,10 +298,7 @@ module.exports = {
         .then((v: ethersType.BigNumber) => Number(v.toString()));
       let stakingTokenPriceUSD = new bn(0);
       // Tom token price feed
-      if (
-        stakingToken.toLowerCase() ===
-        "0x37619cc85325afea778830e184cb60a3abc9210b"
-      ) {
+      if (stakingToken.toLowerCase() === tomAddress) {
         const [tomTotalSupply, finnBalance, finnPriceUSD] = await Promise.all([
           erc20
             .contract(provider, stakingToken)
@@ -441,7 +425,7 @@ module.exports = {
         .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
       const priceFeed = bridgeWrapperBuild(
-        bridgeTokens,
+        await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network
@@ -625,7 +609,7 @@ module.exports = {
                 autorestakeAdapter: isPair
                   ? "MasterChefFinnLpRestake"
                   : undefined,
-                buyLiquidity: isPair
+                lpTokensManager: isPair
                   ? {
                       router: "0x2d4e873f9Ab279da9f1bb2c532d4F06f67755b77",
                       pair: info.lpToken,
@@ -669,12 +653,7 @@ module.exports = {
       if (!signer.provider) throw new Error("Provider not found");
 
       return masterChef.stakingPairAutomateAdapter({
-        masterChefProvider: masterChefProviderFactory(
-          masterChefAddress,
-          masterChefABI,
-          signer,
-          "latest"
-        ),
+        masterChefProvider: masterChefProviderFactory(signer, "latest"),
         automateABI: masterChefFinnLpRestakeABI,
         stakingABI: masterChefABI,
         routeTokens,

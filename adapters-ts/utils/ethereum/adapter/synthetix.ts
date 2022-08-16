@@ -119,10 +119,13 @@ export function stakingPairAutomateAdapter({
     const stakingTokenDecimals = await stakingToken
       .decimals()
       .then((v: ethersType.BigNumber) => Number(v.toString()));
+    const stakingTokenSymbol = await stakingToken.symbol();
 
     const deposit: Automate.AdapterActions["deposit"] = {
       name: "automateRestake-deposit",
       methods: {
+        tokenAddress: () => stakingTokenAddress,
+        symbol: () => stakingTokenSymbol,
         balanceOf: () =>
           stakingToken
             .balanceOf(signerAddress)
@@ -181,6 +184,8 @@ export function stakingPairAutomateAdapter({
     const refund: Automate.AdapterActions["refund"] = {
       name: "automateRestake-refund",
       methods: {
+        tokenAddress: () => stakingTokenAddress,
+        symbol: () => stakingTokenSymbol,
         staked: () =>
           staking
             .balanceOf(automate.address)

@@ -8,6 +8,7 @@ import { useProvider } from "../common/ether";
 import { AdapterModalSteps, AdapterModalComponent } from "../components";
 import { ReactJsonWrap } from "../components/ReactJsonWrap";
 import { Button } from "../components/Button";
+import { blockchainEnum } from "../common/constants";
 
 function txMinimal({ hash, type, from, data, r, s, v }) {
   return {
@@ -181,13 +182,8 @@ export function EthereumAutomateProtocol(props) {
   const onAutomateReload = async ({ protocol }, artifact) => {
     setAutomateArtifact(artifact);
 
-    try {
-      const protocolAdapters = await adaptersGateway.load(`${protocol}2`);
-      setAdapters(protocolAdapters.automates);
-    } catch (e) {
-      const protocolAdapters = await adaptersGateway.load(protocol);
-      setAdapters(protocolAdapters.automates);
-    }
+    const protocolAdapters = await adaptersGateway.load(protocol);
+    setAdapters(protocolAdapters.automates);
   };
 
   const onDeployStepsCall = async () => {
@@ -447,6 +443,7 @@ export function EthereumAutomateProtocol(props) {
         <div>
           <h3>Action component</h3>
           <AdapterModalComponent
+            blockchain={blockchainEnum.ethereum}
             component={actionComponent}
             onAction={setActionResult}
           />

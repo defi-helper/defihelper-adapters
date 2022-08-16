@@ -13,6 +13,7 @@ import { bridgeWrapperBuild } from "../utils/coingecko";
 import * as cache from "../utils/cache";
 import * as ethereum from "../utils/ethereum/base";
 import * as erc20 from "../utils/ethereum/erc20";
+import * as dfh from "../utils/dfh";
 import { V2 as uniswap } from "../utils/ethereum/uniswap";
 import * as masterChef from "../utils/ethereum/adapter/masterChef";
 import masterChefABI from "./data/masterChefABI.json";
@@ -21,18 +22,30 @@ import apeRewardV4ABI from "./data/apeRewardV4ABI.json";
 import masterChefLpRestakeABI from "./data/masterChefLpRestakeABI.json";
 import masterChefSingleRestakeABI from "./data/masterChefSingleRestakeABI.json";
 import apeRewardV4RestakeABI from "./data/apeRewardV4RestakeABI.json";
-import bridgeTokens from "./data/bridgeTokens.json";
-import { Contract, Provider } from "@defihelper/ethers-multicall";
+import { Provider } from "@defihelper/ethers-multicall";
+
+const masterChefAddress = "0x5c8D727b265DBAfaba67E050f2f739cAeEB4A6F9";
+const routeTokens = ["0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"];
+
+const gnanaTokenAddress = "0xddb3bd8645775f59496c821e4f55a7ea6a6dc299";
+const bananaTokenAddress = "0x603c7f932ed1fc6575303d8fb018fdcbb0f39a95";
+
+const masterChefPolygonAddress = "0x54aff400858dcac39797a81894d9920f16972d1d";
+
+const polygonGnanaTokenAddress = "0xddb3bd8645775f59496c821e4f55a7ea6a6dc299";
+const polygonBananaTokenAddress = "0x5d47baba0d66083c52009271faf3f50dcc01023c";
 
 function masterChefProviderFactory(
-  address: string,
-  abi: any,
-  provider: ethersType.providers.Provider | ethersType.Signer,
-  blockTag: ethereum.BlockNumber,
-  avgBlockTime: number
+  providerOrSigner: ethereum.ProviderOrSigner,
+  blockTag: ethereum.BlockNumber
 ) {
+  const provider = ethers.providers.Provider.isProvider(providerOrSigner)
+    ? providerOrSigner
+    : providerOrSigner.provider;
+  if (!provider) throw new Error("Provider not found");
+
   return masterChef.buildMasterChefProvider(
-    new ethers.Contract(address, abi, provider),
+    new ethers.Contract(masterChefAddress, masterChefABI, providerOrSigner),
     { blockTag },
     {
       rewardToken() {
@@ -57,7 +70,8 @@ function masterChefProviderFactory(
             })
           );
       },
-      rewardPerSecond() {
+      async rewardPerSecond() {
+        const avgBlockTime = await ethereum.getAvgBlockTime(provider, blockTag);
         return this.contract
           .cakePerBlock({ blockTag: this.options.blockTag })
           .then((v: ethersType.BigNumber) =>
@@ -140,17 +154,6 @@ function masterChefPolygonProviderFactory(
   );
 }
 
-const masterChefAddress = "0x5c8D727b265DBAfaba67E050f2f739cAeEB4A6F9";
-const routeTokens = ["0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"];
-
-const gnanaTokenAddress = "0xddb3bd8645775f59496c821e4f55a7ea6a6dc299";
-const bananaTokenAddress = "0x603c7f932ed1fc6575303d8fb018fdcbb0f39a95";
-
-const masterChefPolygonAddress = "0x54aff400858dcac39797a81894d9920f16972d1d";
-
-const polygonGnanaTokenAddress = "0xddb3bd8645775f59496c821e4f55a7ea6a6dc299";
-const polygonBananaTokenAddress = "0x5d47baba0d66083c52009271faf3f50dcc01023c";
-
 module.exports = {
   masterChefPair: stakingAdapter(
     async (
@@ -172,16 +175,11 @@ module.exports = {
         .getNetwork()
         .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
-      const blockNumber = block.number;
       const priceFeed = bridgeWrapperBuild(
-        bridgeTokens,
+        await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network
-      );
-      const avgBlockTime = await ethereum.getAvgBlockTime(
-        provider,
-        blockNumber
       );
       const multicall = new ethersMulticall.Provider(provider);
       await multicall.init();
@@ -194,18 +192,14 @@ module.exports = {
       }
 
       const masterChefProvider = masterChefProviderFactory(
-        masterChefAddress,
-        masterChefABI,
         provider,
         blockTag,
-        avgBlockTime
       );
       const poolInfo = await masterChefProvider.poolInfo(pool.index);
 
       const rewardToken = await masterChefProvider.rewardToken();
       const rewardTokenDecimals = 18;
       const rewardTokenPriceUSD = await priceFeed(rewardToken);
-
       const stakingToken = await masterChefProvider.stakingToken(poolInfo);
       const stakingTokenDecimals = 18;
       const stakingTokenPair = await uniswap.pair.PairInfo.create(
@@ -370,7 +364,6 @@ module.exports = {
       };
     }
   ),
-
   masterChefPairPolygon: stakingAdapter(
     async (
       provider,
@@ -392,7 +385,7 @@ module.exports = {
         .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
       const priceFeed = bridgeWrapperBuild(
-        bridgeTokens,
+        await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network
@@ -420,16 +413,13 @@ module.exports = {
       const rewardToken = await masterChefProvider.rewardToken();
       const rewardTokenDecimals = 18;
       const rewardTokenPriceUSD = await priceFeed(rewardToken);
-
       const stakingToken = await masterChefProvider.stakingToken(poolInfo);
-
       const stakingTokenDecimals = 18;
       const stakingTokenPair = await uniswap.pair.PairInfo.create(
         multicall,
         stakingToken,
         options
       );
-
       let token0PriceUSD = new bn(0);
       let token1PriceUSD = new bn(0);
 
@@ -588,7 +578,6 @@ module.exports = {
       };
     }
   ),
-
   masterChefSingle: stakingAdapter(
     async (
       provider,
@@ -608,16 +597,11 @@ module.exports = {
         .getNetwork()
         .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
-      const blockNumber = block.number;
       const priceFeed = bridgeWrapperBuild(
-        bridgeTokens,
+        await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network
-      );
-      const avgBlockTime = await ethereum.getAvgBlockTime(
-        provider,
-        blockNumber
       );
 
       const pool = masterChefSavedPools.find(
@@ -628,24 +612,19 @@ module.exports = {
       }
 
       const masterChefProvider = masterChefProviderFactory(
-        masterChefAddress,
-        masterChefABI,
         provider,
         blockTag,
-        avgBlockTime
       );
       const poolInfo = await masterChefProvider.poolInfo(pool.index);
 
       const rewardToken = await masterChefProvider.rewardToken();
       const rewardTokenDecimals = 18;
       const rewardTokenPriceUSD = await priceFeed(rewardToken);
-
       const stakingToken = contractAddress.toLowerCase();
       const stakingTokenDecimals = await erc20
         .contract(provider, stakingToken)
         .decimals()
         .then((v: ethersType.BigNumber) => Number(v.toString()));
-
       let stakingTokenPriceUSD = new bn(0);
       if (stakingToken.toLowerCase() === gnanaTokenAddress.toLowerCase()) {
         stakingTokenPriceUSD = (
@@ -766,7 +745,7 @@ module.exports = {
       const block = await provider.getBlock(blockTag);
       const blockNumber = block.number;
       const priceFeed = bridgeWrapperBuild(
-        bridgeTokens,
+        await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network
@@ -808,7 +787,6 @@ module.exports = {
         .contract(provider, stakingToken)
         .decimals()
         .then((v: ethersType.BigNumber) => Number(v.toString()));
-
       let stakingTokenPriceUSD = new bn(0);
       if (stakingToken.toLowerCase() === gnanaTokenAddress.toLowerCase()) {
         stakingTokenPriceUSD = (
@@ -1094,7 +1072,6 @@ module.exports = {
       };
     }
   ),
-
   apeRewardV4StakingLp: stakingAdapter(
     async (
       provider,
@@ -1112,7 +1089,7 @@ module.exports = {
       const block = await provider.getBlock(blockTag);
       const blockNumber = block.number;
       const priceFeed = bridgeWrapperBuild(
-        bridgeTokens,
+        await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network
@@ -1130,22 +1107,18 @@ module.exports = {
       const rewardToken = await apeRewardContract
         .REWARD_TOKEN()
         .then((v: ethersType.BigNumber) => v.toString().toLowerCase());
-
       const rewardTokenDecimals = await erc20
         .contract(provider, rewardToken)
         .decimals()
         .then((v: ethersType.BigNumber) => Number(v.toString()));
-
-      const rewardTokenPriceUSD = await priceFeed(rewardToken);
       const rewardTokenPerBlock = await apeRewardContract
         .rewardPerBlock({ blockTag })
         .then((v: ethersType.BigNumber) =>
           ethereum.toBN(v).div(`1e${rewardTokenDecimals}`)
         );
-
+      const rewardTokenPriceUSD = await priceFeed(rewardToken);
       const multicall = new ethersMulticall.Provider(provider);
       await multicall.init();
-
       const stakingLpAddress = await apeRewardContract.STAKE_TOKEN();
       const stakingLpPairToken = await uniswap.pair.PairInfo.create(
         multicall,
@@ -1155,15 +1128,12 @@ module.exports = {
       const stakingLpTokenDecimals = await await erc20
         .contract(provider, stakingLpAddress)
         .decimals();
-
       const stakingToken0 = stakingLpPairToken.token0;
       const stakingToken1 = stakingLpPairToken.token1;
-
       const [stakingToken0Usd, stakingToken1Usd] = await Promise.all([
         priceFeed(stakingToken0),
         priceFeed(stakingToken1),
       ]);
-
       const stakedLpPairTokenPrice = stakingLpPairToken.calcPrice(
         stakingToken0Usd,
         stakingToken1Usd
@@ -1516,7 +1486,7 @@ module.exports = {
                   ? "MasterChefLpRestake"
                   : "MasterChefSingleRestake",
                 adapters: isPair ? ["masterChefPair"] : ["masterChefSingle"],
-                buyLiquidity: isPair
+                lpTokensManager: isPair
                   ? {
                       router: "0xcF0feBd3f17CEf5b47b0cD257aCf6025c5BFf3b7",
                       pair: info.lpToken,
@@ -1543,7 +1513,7 @@ module.exports = {
         }
 
         const poolsJsonRaw = (
-          await axios.get("http://api.apeswap.finance/stats")
+          await axios.get("https://api.apeswap.finance/stats")
         ).data.incentivizedPools.filter(
           (v: { address: string; active: boolean }) => {
             return (
@@ -1656,7 +1626,7 @@ module.exports = {
               description: "",
               automate: {
                 adapters: ["masterChefPairPolygon"],
-                buyLiquidity: isPair
+                lpTokensManager: isPair
                   ? {
                       router: "0xC0788A3aD43d79aa53B09c2EaCc313A787d1d607",
                       pair: info.lpToken,
@@ -1767,19 +1737,10 @@ module.exports = {
       signer: ethersType.Signer,
       contractAddress: string
     ) => {
-      if (!signer.provider) throw new Error("Provider not found");
-      const avgBlockTime = await ethereum.getAvgBlockTime(
-        signer.provider,
-        "latest"
-      );
-
       return masterChef.stakingPairAutomateAdapter({
         masterChefProvider: masterChefProviderFactory(
-          masterChefAddress,
-          masterChefABI,
           signer,
           "latest",
-          avgBlockTime
         ),
         automateABI: masterChefLpRestakeABI,
         stakingABI: masterChefABI,
@@ -1790,19 +1751,10 @@ module.exports = {
       signer: ethersType.Signer,
       contractAddress: string
     ) => {
-      if (!signer.provider) throw new Error("Provider not found");
-      const avgBlockTime = await ethereum.getAvgBlockTime(
-        signer.provider,
-        "latest"
-      );
-
       return masterChef.stakingSingleAutomateAdapter({
         masterChefProvider: masterChefProviderFactory(
-          masterChefAddress,
-          masterChefABI,
           signer,
           "latest",
-          avgBlockTime
         ),
         automateABI: masterChefSingleRestakeABI,
         stakingABI: masterChefABI,
@@ -1829,10 +1781,13 @@ module.exports = {
       const stakingTokenDecimals = await stakingToken
         .decimals()
         .then((v: ethersType.BigNumber) => v.toString());
+      const stakingTokenSymbol = await stakingToken.symbol();
 
       const deposit: Automate.AdapterActions["deposit"] = {
         name: "automateRestake-deposit",
         methods: {
+          tokenAddress: () => stakingTokenAddress,
+          symbol: () => stakingTokenSymbol,
           balanceOf: () =>
             stakingToken
               .balanceOf(signerAddress)
@@ -1893,6 +1848,8 @@ module.exports = {
       const refund: Automate.AdapterActions["refund"] = {
         name: "automateRestake-refund",
         methods: {
+          tokenAddress: () => stakingTokenAddress,
+          symbol: () => stakingTokenSymbol,
           staked: () =>
             staking
               .userInfo(automate.address)

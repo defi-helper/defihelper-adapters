@@ -1,4 +1,5 @@
 require('dotenv').config();
+const cla = require('command-line-args');
 const hardhat = require('hardhat');
 const path = require('path');
 const Express = require('express');
@@ -34,7 +35,6 @@ const database = knex({
 
 const app = Express();
 app.use(Express.static(path.resolve(__dirname, '../adapters-public-ts')));
-app.use(Express.static(path.resolve(__dirname, '../adapters-public')));
 app.get('/cache', async (req, res) => {
   const { protocol, key } = req.query;
 
@@ -68,17 +68,14 @@ app.get(/^\/automates\/ethereum\/([a-z0-9_-]+)\/([a-z0-9_]+)\/([0-9]+)$/i, async
   const { 0: protocol, 1: contract, 2: network } = req.params;
   const isNew = await isFileExists(path.resolve(__dirname, `../automates/${protocol}/artifacts`));
   if (isNew) {
-    const contractBuildArtifactPath = path.resolve(
-      __dirname,
-      `../automates/${protocol}/artifacts/build/contracts/${contract}.automate.sol/${contract}.json`
-    );
-    const isBuildArtifactExists = await isFileExists(contractBuildArtifactPath);
+    const contractBuildArtifactPath = `automates/${protocol}/artifacts/build/contracts/${contract}.automate.sol/${contract}.json`;
+    const contractBuildArtifactAbsolutePath = path.resolve(__dirname, `../${contractBuildArtifactPath}`);
+    const isBuildArtifactExists = await isFileExists(contractBuildArtifactAbsolutePath);
     if (!isBuildArtifactExists) {
-      console.log(contractBuildArtifactPath, e.toString());
-      return res.status(404).send('Automate not found');
+      return res.status(404).send(`Automate "${contractBuildArtifactPath}" not found`);
     }
 
-    const buildArtifact = await fs.promises.readFile(contractBuildArtifactPath);
+    const buildArtifact = await fs.promises.readFile(contractBuildArtifactAbsolutePath);
     const { contractName, abi, bytecode, linkReferences } = JSON.parse(buildArtifact.toString('utf-8'));
     const [networkName] = Object.entries(hardhat.config.networks).find(
       ([, { chainId }]) => parseInt(network, 10) === chainId
@@ -199,20 +196,72 @@ app.get('/automates/waves', async (req, res) => {
     })
   );
 });
-app.get('/', async (req, res) => {
-  const adapters = await glob(path.resolve(__dirname, '../adapters-public/*.js')).then((adapters) =>
-    adapters.map((adapter) => path.parse(adapter).name)
+app.get('/token-bridges', async (req, res) => {
+  const platformMap = {
+    1: 'ethereum',
+    56: 'binance-smart-chain',
+    128: 'huobi-token',
+    137: 'polygon-pos',
+    250: 'fantom',
+    1285: 'moonriver',
+    1284: 'moonbeam',
+    43114: 'avalanche',
+  };
+  const bridgesFiles = await glob(path.resolve(__dirname, '../adapters-ts/**/data/bridgeTokens.json'));
+
+  return res.json(
+    await bridgesFiles.reduce(async (result, file) => {
+      const bridges = JSON.parse(await fs.promises.readFile(file));
+      const network = bridges.meta.network;
+
+      return [
+        ...(await result),
+        ...Object.entries(bridges).reduce((result, [address, alias]) => {
+          if (typeof alias.id === 'string') {
+            return [...result, { network, address, priceFeed: { type: 'coingeckoId', id: alias.id } }];
+          }
+          if (typeof alias.platform === 'string' && typeof alias.address === 'string') {
+            return [
+              ...result,
+              {
+                network,
+                address,
+                priceFeed: { type: 'coingeckoAddress', platform: alias.platform, address: alias.address },
+              },
+            ];
+          }
+          if (
+            typeof alias.network === 'number' &&
+            typeof alias.address === 'string' &&
+            platformMap[alias.network] !== undefined
+          ) {
+            return [
+              ...result,
+              {
+                network,
+                address,
+                priceFeed: { type: 'coingeckoAddress', platform: platformMap[alias.network], address: alias.address },
+              },
+            ];
+          }
+          return result;
+        }, []),
+      ];
+    }, [])
   );
+});
+
+app.get('/', async (req, res) => {
   const adaptersTS = await glob(path.resolve(__dirname, '../adapters-public-ts/*.js')).then((adapters) =>
     adapters.map((adapter) => path.parse(adapter).name)
   );
 
-  return res.json([...adapters, ...adaptersTS]);
+  return res.json([...adaptersTS]);
 });
 app.use(Express.static(path.resolve(__dirname, '../public')));
 app.get(/^\/client/, (req, res) => {
   return res.sendFile(path.resolve(__dirname, '../public/index.html'));
 });
 
-const port = 8080;
+const { port } = cla([{ name: 'port', alias: 'p', type: Number, defaultValue: 8080 }]);
 app.listen(port, () => console.log(`Listen ${port}`));

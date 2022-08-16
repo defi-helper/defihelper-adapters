@@ -524,6 +524,7 @@ export function stakingPairAutomateAdapter({
     const stakingTokenDecimals = await stakingToken
       .decimals()
       .then((v: ethersType.BigNumber) => v.toString());
+    const stakingTokenSymbol = await stakingToken.symbol();
     const poolId = await automate
       .pool()
       .then((v: ethersType.BigNumber) => v.toString());
@@ -531,6 +532,8 @@ export function stakingPairAutomateAdapter({
     const deposit: Automate.AdapterActions["deposit"] = {
       name: "automateRestake-deposit",
       methods: {
+        tokenAddress: () => stakingTokenAddress,
+        symbol: () => stakingTokenSymbol,
         balanceOf: () =>
           stakingToken
             .balanceOf(signerAddress)
@@ -589,6 +592,8 @@ export function stakingPairAutomateAdapter({
     const refund: Automate.AdapterActions["refund"] = {
       name: "automateRestake-refund",
       methods: {
+        tokenAddress: () => stakingTokenAddress,
+        symbol: () => stakingTokenSymbol,
         staked: () =>
           masterChefProvider
             .userInfo(poolId, automate.address)
@@ -786,6 +791,7 @@ export function stakingSingleAutomateAdapter({
     const stakingTokenDecimals = await stakingToken
       .decimals()
       .then((v: ethersType.BigNumber) => v.toString());
+    const stakingTokenSymbol = await stakingToken.symbol();
     const poolId = await automate
       .pool()
       .then((v: ethersType.BigNumber) => v.toString());
@@ -793,6 +799,8 @@ export function stakingSingleAutomateAdapter({
     const deposit: Automate.AdapterActions["deposit"] = {
       name: "automateRestake-deposit",
       methods: {
+        tokenAddress: () => stakingTokenAddress,
+        symbol: () => stakingTokenSymbol,
         balanceOf: () =>
           stakingToken
             .balanceOf(signerAddress)
@@ -851,6 +859,8 @@ export function stakingSingleAutomateAdapter({
     const refund: Automate.AdapterActions["refund"] = {
       name: "automateRestake-refund",
       methods: {
+        tokenAddress: () => stakingTokenAddress,
+        symbol: () => stakingTokenSymbol,
         staked: () =>
           masterChefProvider
             .userInfo(poolId, automate.address)

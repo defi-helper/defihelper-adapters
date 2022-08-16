@@ -117,3 +117,15 @@ module.exports: ProtocolAdapter
 ```
 
 3. Test your implementation with frontend (on localhost:8080): `npm run dev`
+
+### Deploy automate
+
+```
+npx hardhat deploy --config ./automates/pancakeswap/hardhat.config.js --tags Protocol,Governance,GovernanceOwner --network bsc
+```
+
+### Verify automate
+
+```
+npx hardhat etherscan-verify --config ./automates/pancakeswap/hardhat.config.js --network ${NETWORK} --api-key ${KEY}
+```

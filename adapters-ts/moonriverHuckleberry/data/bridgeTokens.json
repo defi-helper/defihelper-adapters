@@ -1,4 +1,7 @@
 {
+  "meta": {
+    "network": 1285
+  },
   "0x576fde3f61b7c97e381c94e7a03dbc2e08af1111": {
     "network": 1,
     "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"

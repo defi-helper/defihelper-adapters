@@ -7,9 +7,9 @@ import {
 import * as masterChef from "../utils/ethereum/adapter/masterChef";
 import * as ethereum from "../utils/ethereum/base";
 import * as cache from "../utils/cache";
+import * as dfh from "../utils/dfh";
 import { bignumber as bn, ethers, ethersMulticall } from "../lib";
 import { bridgeWrapperBuild } from "../utils/coingecko";
-import bridgeTokens from "./data/bridgeTokens.json";
 import stellaSwapDistributorAbi from "./data/stellaSwapDistributor.json";
 import { ResolvedContract, Staking } from "../utils/adapter/base";
 import * as erc20 from "../utils/ethereum/erc20";
@@ -19,14 +19,20 @@ const STELLA_SWAP_DISTRIBUTOR_ADDRESS =
   "0xEDFB330F5FA216C9D2039B99C8cE9dA85Ea91c1E";
 
 function masterChefProviderFactory(
-  address: string,
-  abi: any,
-  provider: ethersType.providers.Provider | ethersType.Signer,
-  blockTag: ethereum.BlockNumber,
-  avgBlockTime: number
+  providerOrSigner: ethereum.ProviderOrSigner,
+  blockTag: ethereum.BlockNumber
 ) {
+  const provider = ethers.providers.Provider.isProvider(providerOrSigner)
+    ? providerOrSigner
+    : providerOrSigner.provider;
+  if (!provider) throw new Error("Provider not found");
+
   return masterChef.buildMasterChefProvider(
-    new ethers.Contract(address, abi, provider),
+    new ethers.Contract(
+      STELLA_SWAP_DISTRIBUTOR_ADDRESS,
+      stellaSwapDistributorAbi,
+      providerOrSigner
+    ),
     { blockTag },
     {
       rewardToken() {
@@ -51,7 +57,8 @@ function masterChefProviderFactory(
             })
           );
       },
-      rewardPerSecond() {
+      async rewardPerSecond() {
+        const avgBlockTime = await ethereum.getAvgBlockTime(provider, blockTag);
         return this.contract
           .stellaPerBlock({ blockTag: this.options.blockTag })
           .then((v: ethersType.BigNumber) =>
@@ -83,15 +90,14 @@ module.exports = {
         .getNetwork()
         .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
-      const multicall = new ethersMulticall.Provider(provider, network);
-      await multicall.init();
-
       const priceFeed = bridgeWrapperBuild(
-        bridgeTokens,
+        await dfh.getPriceFeeds(network),
         blockTag,
         block,
         network
       );
+      const multicall = new ethersMulticall.Provider(provider, network);
+      await multicall.init();
 
       const masterChefSavedPools = await cache.read(
         "stellaSwap",
@@ -105,17 +111,9 @@ module.exports = {
         throw new Error("Pool is not found");
       }
 
-      const avgBlockTime = await ethereum.getAvgBlockTime(
-        provider,
-        block.number
-      );
-
       const masterChefProvider = masterChefProviderFactory(
-        STELLA_SWAP_DISTRIBUTOR_ADDRESS,
-        stellaSwapDistributorAbi,
         provider,
         blockTag,
-        avgBlockTime
       );
 
       const poolInfo = await masterChefProvider.poolInfo(pool.index);
@@ -354,7 +352,7 @@ module.exports = {
               automate: {
                 autorestakeAdapter,
                 adapters: ["stellaSwapDistributor"],
-                buyLiquidity: isPair
+                lpTokensManager: isPair
                   ? {
                       router: "0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F",
                       pair: info.lpToken,

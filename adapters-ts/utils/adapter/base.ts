@@ -114,7 +114,7 @@ export interface ResolvedContract {
   automate: {
     adapters?: string[];
     autorestakeAdapter?: string;
-    buyLiquidity?: {
+    lpTokensManager?: {
       router: string;
       pair: string;
     };

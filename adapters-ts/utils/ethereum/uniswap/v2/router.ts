@@ -31,21 +31,25 @@ export async function getPrice(
 
 export async function autoRoute(
   router: Contract,
-  amountIn: BN | string | number,
+  amountIn: string | number,
   from: string,
   to: string,
   withTokens: string[]
-) {
+): Promise<{ path: string[]; amountOut: string }> {
   const paths = [
     [from, to],
     ...withTokens
-      .filter((middle) => from !== middle && middle !== to)
+      .filter(
+        (middle) =>
+          from.toLowerCase() !== middle.toLowerCase() &&
+          middle.toLowerCase() !== to.toLowerCase()
+      )
       .map((middle) => [from, middle, to]),
   ];
   const amountsOut = await Promise.all(
     paths.map((path) =>
       router
-        .getAmountsOut(amountIn, path)
+        .getAmountsOut(new bn(amountIn).toFixed(0), path)
         .catch(() => path.map(() => new bn("0")))
     )
   );
