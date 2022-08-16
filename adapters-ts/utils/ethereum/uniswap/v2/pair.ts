@@ -75,4 +75,19 @@ export class PairInfo {
     const reserve1 = new bn(this.reserve1).multipliedBy(token1Price);
     return reserve0.plus(reserve1).div(this.totalSupply);
   }
+
+  predictUnresolvedTokenPrice(
+    tokenIndex: 1 | 0,
+    knownSidePrice: BN
+  ): BN {
+    const realReservesToken0 = new bn(this.reserve0).div(`1e${this.token0Decimals}`);
+    const realReservesToken1 = new bn(this.reserve1).div(`1e${this.token1Decimals}`);
+    const totalReserves = realReservesToken0.plus(realReservesToken1)
+
+    const token0ReservesPiePercentage = new bn(100).minus(
+      (tokenIndex === 0 ? realReservesToken1 : realReservesToken0)
+        .div(totalReserves).multipliedBy(100)
+    )
+    return knownSidePrice.multipliedBy(token0ReservesPiePercentage.div(100))
+  }
 }

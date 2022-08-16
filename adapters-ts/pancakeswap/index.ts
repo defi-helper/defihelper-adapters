@@ -21,6 +21,7 @@ import smartChefInitializableRestakeABI from "./data/smartChefInitializableResta
 import masterChefSingleRestakeABI from "./data/masterChefSingleRestakeABI.json";
 import masterChefLpRestakeABI from "./data/masterChefLpRestakeABI.json";
 import bridgeTokens from "./data/bridgeTokens.json";
+import BigNumber from "bignumber.js";
 
 function masterChefProviderFactory(
   address: string,
@@ -133,8 +134,23 @@ module.exports = {
         stakingToken,
         options
       );
-      const token0PriceUSD = await priceFeed(stakingTokenPair.token0);
-      const token1PriceUSD = await priceFeed(stakingTokenPair.token1);
+      let token0PriceUSD: BigNumber
+      let token1PriceUSD: BigNumber
+
+      try {
+        token0PriceUSD = await priceFeed(stakingTokenPair.token0);
+      } catch {
+        token1PriceUSD = await priceFeed(stakingTokenPair.token1);
+        token0PriceUSD = stakingTokenPair.predictUnresolvedTokenPrice(0, token1PriceUSD)
+      }
+
+      try {
+        token1PriceUSD = await priceFeed(stakingTokenPair.token1);
+      } catch {
+        token0PriceUSD = await priceFeed(stakingTokenPair.token0);
+        token1PriceUSD = stakingTokenPair.predictUnresolvedTokenPrice(1, token0PriceUSD)
+      }
+
       const stakingTokenPriceUSD = stakingTokenPair.calcPrice(
         token0PriceUSD,
         token1PriceUSD
