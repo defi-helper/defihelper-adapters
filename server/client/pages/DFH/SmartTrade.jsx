@@ -8,6 +8,25 @@ import * as adaptersGateway from "../../common/adapter";
 import { useQueryParams } from "../../common/useQueryParams";
 import { ReactJsonWrap } from "../../components/ReactJsonWrap";
 
+function isNaN(value) {
+  return Number.isNaN(Number(value));
+}
+
+function percent(value) {
+  if (Number(value) < 0) return 0;
+  if (Number(value) > 100) return 100;
+  return value;
+}
+
+function calcSlippage(value, slippage) {
+  if (isNaN(value) || isNaN(slippage)) {
+    return new BN(0);
+  }
+  return new BN(Number(value)).multipliedBy(
+    new BN(1).minus(new BN(Number(slippage)).div(100))
+  );
+}
+
 function TabButton({ id, label, activeId, onClick }) {
   return (
     <button
@@ -37,9 +56,16 @@ function SwapHandler({ signer, adapters, searchParams }) {
   const [exchangeAddress, setExchangeAddress] = useState("");
   const [path, setPath] = useState([]);
   const [amountIn, setAmountIn] = useState("100");
-  const [amountOut, setAmountOut] = useState("100");
-  const [slippage, setSlippage] = useState("1");
-  const [direction, setDirection] = useState("lt");
+  const [takeProfit, setTakeProfit] = useState(false);
+  const [takeProfitAmountOut, setTakeProfitAmountOut] = useState("0");
+  const [takeProfitSlippage, setTakeProfitSlippage] = useState("1");
+  const [takeProfitAmountOutMin, setTakeProfitAmountOutMin] = useState("0");
+  const [takeProfitPrice, setTakeProfitPrice] = useState("0");
+  const [stopLoss, setStopLoss] = useState(false);
+  const [stopLossAmountOut, setStopLossAmountOut] = useState("0");
+  const [stopLossSlippage, setStopLossSlippage] = useState("1");
+  const [stopLossAmountOutMin, setStopLossAmountOutMin] = useState("0");
+  const [stopLossPrice, setStopLossPrice] = useState("0");
   const [depositTokenAmount, setDepositTokenAmount] = useState("");
   const [depositBalanceAmount, setDepositBalanceAmount] = useState("");
   const [createOrderTx, setCreateOrderTx] = useState(null);
@@ -87,8 +113,19 @@ function SwapHandler({ signer, adapters, searchParams }) {
     if (Number.isNaN(Number(amountIn))) {
       return setError(`Invalid amount: "${amountIn}"`);
     }
-    if (Number.isNaN(Number(slippage))) {
-      return setError(`Invalid slippage: "${slippage}"`);
+    if (stopLoss && Number.isNaN(Number(stopLossAmountOut))) {
+      return setError(`Invalid stop loss amount out: "${stopLossAmountOut}"`);
+    }
+    if (takeProfit && Number.isNaN(Number(takeProfitAmountOut))) {
+      return setError(
+        `Invalid take profit amount out: "${takeProfitAmountOut}"`
+      );
+    }
+    if (stopLoss && Number.isNaN(Number(stopLossSlippage))) {
+      return setError(`Invalid stop loss slippage: "${stopLossSlippage}"`);
+    }
+    if (takeProfit && Number.isNaN(Number(takeProfitSlippage))) {
+      return setError(`Invalid take profit slippage: "${takeProfitSlippage}"`);
     }
     if (depositTokenAmount !== "" && Number.isNaN(Number(depositTokenAmount))) {
       return setError(`Invalid deposit token amount: "${depositAmount}"`);
@@ -118,9 +155,12 @@ function SwapHandler({ signer, adapters, searchParams }) {
       exchangeAddress,
       path,
       amountIn,
-      amountOut,
-      slippage,
-      direction,
+      stopLoss
+        ? { amountOut: stopLossAmountOut, slippage: stopLossSlippage }
+        : null,
+      takeProfit
+        ? { amountOut: takeProfitAmountOut, slippage: takeProfitSlippage }
+        : null,
       {
         token: depositTokenAmount !== "" ? depositTokenAmount : undefined,
         native: depositBalanceAmount !== "" ? depositBalanceAmount : undefined,
@@ -134,6 +174,36 @@ function SwapHandler({ signer, adapters, searchParams }) {
       number: await data.getOrderNumber(),
     });
   };
+
+  useEffect(
+    () =>
+      setTakeProfitAmountOutMin(
+        calcSlippage(takeProfitAmountOut, takeProfitSlippage).toString(10)
+      ),
+    [takeProfitAmountOut, takeProfitSlippage]
+  );
+
+  useEffect(
+    () =>
+      setStopLossAmountOutMin(
+        calcSlippage(stopLossAmountOut, stopLossSlippage).toString(10)
+      ),
+    [stopLossAmountOut, stopLossSlippage]
+  );
+
+  useEffect(
+    () =>
+      setTakeProfitPrice(
+        new BN(takeProfitAmountOut).div(amountIn).toString(10)
+      ),
+    [amountIn, takeProfitAmountOut]
+  );
+
+  useEffect(
+    () =>
+      setStopLossPrice(new BN(stopLossAmountOut).div(amountIn).toString(10)),
+    [amountIn, stopLossAmountOut]
+  );
 
   return (
     <div>
@@ -190,33 +260,6 @@ function SwapHandler({ signer, adapters, searchParams }) {
             </div>
             <div>
               <div>
-                <label>Direction:</label>
-              </div>
-              <div>
-                <div>
-                  <label>Take profit:</label>
-                  <input
-                    type="radio"
-                    name="direction"
-                    value="gt"
-                    checked={direction === "gt"}
-                    onChange={() => setDirection("gt")}
-                  />
-                </div>
-                <div>
-                  <label>Stop loss:</label>
-                  <input
-                    type="radio"
-                    name="direction"
-                    value="lt"
-                    checked={direction === "lt"}
-                    onChange={() => setDirection("lt")}
-                  />
-                </div>
-              </div>
-            </div>
-            <div>
-              <div>
                 <label>Amount in:</label>
               </div>
               <div>
@@ -229,27 +272,89 @@ function SwapHandler({ signer, adapters, searchParams }) {
             </div>
             <div>
               <div>
-                <label>Amount out:</label>
-              </div>
-              <div>
+                <label htmlFor="takeProfit">Take profit:</label>
                 <input
-                  type="text"
-                  value={amountOut}
-                  onChange={(e) => setAmountOut(e.target.value)}
+                  id="takeProfit"
+                  type="checkbox"
+                  checked={takeProfit}
+                  onChange={(e) => setTakeProfit(e.target.checked)}
                 />
               </div>
+              {takeProfit && (
+                <>
+                  <div>
+                    <div>
+                      <label>Amount out:</label>
+                    </div>
+                    <div>
+                      <input
+                        type="text"
+                        value={takeProfitAmountOut}
+                        onChange={(e) => setTakeProfitAmountOut(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <div>
+                      <label>Slippage (%):</label>
+                    </div>
+                    <div>
+                      <input
+                        type="text"
+                        value={takeProfitSlippage}
+                        onChange={(e) =>
+                          setTakeProfitSlippage(percent(e.target.value))
+                        }
+                      />
+                    </div>
+                    <div>Amount out min: {takeProfitAmountOutMin}</div>
+                    <div>Price: {takeProfitPrice}</div>
+                  </div>
+                </>
+              )}
             </div>
             <div>
               <div>
-                <label>Slippage (%):</label>
-              </div>
-              <div>
+                <label htmlFor="stopLoss">Stop loss:</label>
                 <input
-                  type="text"
-                  value={slippage}
-                  onChange={(e) => setSlippage(e.target.value)}
+                  id="stopLoss"
+                  type="checkbox"
+                  checked={stopLoss}
+                  onChange={(e) => setStopLoss(e.target.checked)}
                 />
               </div>
+              {stopLoss && (
+                <>
+                  <div>
+                    <div>
+                      <label>Amount out:</label>
+                    </div>
+                    <div>
+                      <input
+                        type="text"
+                        value={stopLossAmountOut}
+                        onChange={(e) => setStopLossAmountOut(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <div>
+                      <label>Slippage (%):</label>
+                    </div>
+                    <div>
+                      <input
+                        type="text"
+                        value={stopLossSlippage}
+                        onChange={(e) =>
+                          setStopLossSlippage(percent(e.target.value))
+                        }
+                      />
+                    </div>
+                    <div>Amount out min: {stopLossAmountOutMin}</div>
+                    <div>Price: {stopLossPrice}</div>
+                  </div>
+                </>
+              )}
             </div>
             <div>
               <div>
@@ -278,7 +383,12 @@ function SwapHandler({ signer, adapters, searchParams }) {
               </div>
             </div>
             <div>
-              <button onClick={onCreateOrder}>Send</button>
+              <button
+                onClick={onCreateOrder}
+                disabled={!stopLoss && !takeProfit}
+              >
+                Send
+              </button>
             </div>
             {createOrderTx !== null && (
               <ReactJsonWrap>
@@ -340,8 +450,6 @@ export function SmartTradePage() {
   const [order, setOrder] = useState(null);
   const [cancelOrderId, setCancelOrderId] = useState("");
   const [cancelOrderTx, setCancelOrderTx] = useState(null);
-  const [handleOrderId, setHandleOrderId] = useState("");
-  const [handleOrderTx, setHandleOrderTx] = useState(null);
 
   const onAdaptersReload = async () => {
     setAdapters(null);
@@ -446,20 +554,6 @@ export function SmartTradePage() {
 
     const { tx } = await routerAdapter.methods.cancelOrder(orderId);
     setCancelOrderTx(tx);
-  };
-
-  const onHandleOrder = async () => {
-    setError("");
-    setHandleOrderTx(null);
-    if (!routerAdapter) return;
-
-    const orderId = Number(handleOrderId);
-    if (Number.isNaN(orderId)) {
-      return setError(`Invalid order id: "${orderId}"`);
-    }
-
-    const { tx } = await routerAdapter.methods.handleOrder(orderId);
-    setHandleOrderTx(tx);
   };
 
   useEffect(onAdaptersReload, []);
@@ -599,32 +693,6 @@ export function SmartTradePage() {
               <ReactJsonWrap>
                 <ReactJson
                   src={JSON.parse(JSON.stringify(cancelOrderTx))}
-                  collapsed={1}
-                />
-              </ReactJsonWrap>
-            )}
-          </div>
-          <div>
-            <div>
-              <label>Handle order:</label>
-            </div>
-            <div className="row">
-              <div className="column column-80">
-                <input
-                  type="text"
-                  placeholder="id"
-                  value={handleOrderId}
-                  onChange={(e) => setHandleOrderId(e.target.value)}
-                />
-              </div>
-              <div className="column column-20">
-                <button onClick={onHandleOrder}>Send</button>
-              </div>
-            </div>
-            {handleOrderTx !== null && (
-              <ReactJsonWrap>
-                <ReactJson
-                  src={JSON.parse(JSON.stringify(handleOrderTx))}
                   collapsed={1}
                 />
               </ReactJsonWrap>

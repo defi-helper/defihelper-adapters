@@ -5,11 +5,11 @@ import { debug, debugo } from "../utils/base";
 import * as ethereum from "../utils/ethereum/base";
 import * as erc20 from "../utils/ethereum/erc20";
 import * as uniswap from "../utils/ethereum/uniswap";
-import LPTokensManagerABI from "./data/LPTokensManagerABI.json";
-import SmartTradeRouterABI from "./data/SmartTradeRouterABI.json";
-import SmartTradeSwapHandlerABI from "./data/SmartTradeSwapHandlerABI.json";
-import StoreABI from "./data/StoreV2ABI.json";
-import BalanceABI from "./data/BalanceABI.json";
+import { abi as BalanceABI } from "@defihelper/networks/abi/Balance.json";
+import { abi as StoreABI } from "@defihelper/networks/abi/StoreV2.json";
+import { abi as LPTokensManagerABI } from "@defihelper/networks/abi/LPTokensManager.json";
+import { abi as SmartTradeRouterABI } from "@defihelper/networks/abi/SmartTradeRouter.json";
+import { abi as SmartTradeSwapHandlerABI } from "@defihelper/networks/abi/SmartTradeSwapHandler.json";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -822,17 +822,6 @@ module.exports = {
                 tx: cancelOrderTx,
               };
             },
-            handleOrder: async (id: number | string) => {
-              debugo({ _prefix: "handleOrder", id });
-              const handleOrderTx = await router.handleOrder(id, 0);
-              debugo({
-                _prefix: "handleOrder",
-                handleOrderTx: JSON.stringify(handleOrderTx),
-              });
-              return {
-                tx: handleOrderTx,
-              };
-            },
           },
         };
       },
@@ -899,9 +888,14 @@ module.exports = {
               exchangeAddress: string,
               path: string[],
               amountIn: string,
-              amountOut: string,
-              slippage: string | number,
-              direction: "gt" | "lt",
+              stopLoss: {
+                amountOut: string;
+                slippage: string | number;
+              } | null,
+              takeProfit: {
+                amountOut: string;
+                slippage: string | number;
+              } | null,
               deposit: {
                 token?: string;
                 native?: string;
@@ -912,9 +906,8 @@ module.exports = {
                 exchangeAddress,
                 path,
                 amountIn,
-                amountOut,
-                slippage,
-                direction,
+                stopLoss,
+                takeProfit,
               });
               const inToken = erc20.multicallContract(path[0]);
               const outToken = erc20.multicallContract(path[path.length - 1]);
@@ -938,27 +931,46 @@ module.exports = {
               const amountInInt = new bn(amountIn)
                 .multipliedBy(`1e${inTokenDecimals}`)
                 .toFixed(0);
-              const amountOutInt = new bn(amountOut)
-                .multipliedBy(`1e${outTokenDecimals}`)
-                .toFixed(0);
-              const slippageFloat = new bn(slippage).div(100).toNumber();
-              const outMinPercent = new bn(1).minus(slippageFloat);
-              const amountOutMin = new bn(amountOutInt)
-                .multipliedBy(outMinPercent)
-                .toFixed(0);
+
+              const createRoute = (
+                amountOut: string,
+                slippage: string | number,
+                direction: "gt" | "lt"
+              ) => ({
+                get amountOut() {
+                  return new bn(amountOut)
+                    .multipliedBy(`1e${outTokenDecimals}`)
+                    .toFixed(0);
+                },
+                get slippage() {
+                  return new bn(slippage).div(100).toString(10);
+                },
+                get amountOutMin() {
+                  return new bn(this.amountOut)
+                    .multipliedBy(new bn(1).minus(this.slippage))
+                    .toFixed(0);
+                },
+                direction,
+              });
+              const routes = [
+                stopLoss
+                  ? createRoute(stopLoss.amountOut, stopLoss.slippage, "lt")
+                  : null,
+                takeProfit
+                  ? createRoute(takeProfit.amountOut, takeProfit.slippage, "gt")
+                  : null,
+              ];
               debugo({
                 _prefix: "createOrder",
                 amountInInt,
-                amountOutInt,
-                outMinPercent,
-                amountOutMin,
+                routes,
               });
 
               const callData = await handler.callDataEncode({
                 exchange: exchangeAddress,
                 amountIn: amountInInt,
                 path,
-                amountOutMin,
+                amountOutMin: routes.map((route) => route?.amountOutMin ?? "0"),
               });
               debugo({
                 _prefix: "createOrder",
@@ -997,12 +1009,10 @@ module.exports = {
                 pair: pairAddress,
                 path,
                 tokenInDecimals: Number(inTokenDecimals),
-                amountIn: amountInInt,
                 tokenOutDecimals: Number(outTokenDecimals),
-                amountOut: amountOutInt,
-                amountOutMin,
-                slippage: slippageFloat,
-                direction,
+                amountIn: amountInInt,
+                stopLoss: routes[0],
+                takeProfit: routes[1],
               };
               debugo({
                 _prefix: "createOrder",
