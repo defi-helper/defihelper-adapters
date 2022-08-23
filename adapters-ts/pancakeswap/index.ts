@@ -202,30 +202,8 @@ module.exports = {
         options
       );
 
-      let token0PriceUSD: BigNumber
-      let token1PriceUSD: BigNumber
-
-      const router = uniswap.router.contract(provider, '0x10ED43C718714eb63d5aA57B78B54704E256024E');
-      const [v1, v2] = await router.getAmountsOut(
-        ethers.utils.parseEther("1"),
-        [stakingTokenPair.token0, stakingTokenPair.token1]
-      );
-
-      console.info(v1.toString(10), v2.toString(10))
-
-      try {
-        token0PriceUSD = await priceFeed(stakingTokenPair.token0 + '');
-      } catch {
-        token1PriceUSD = await priceFeed(stakingTokenPair.token1);
-        token0PriceUSD = stakingTokenPair.predictUnresolvedTokenPrice(0, token1PriceUSD);
-      }
-
-      try {
-        token1PriceUSD = await priceFeed(stakingTokenPair.token1);
-      } catch {
-        token0PriceUSD = await priceFeed(stakingTokenPair.token0);
-        token1PriceUSD = stakingTokenPair.predictUnresolvedTokenPrice(1, token0PriceUSD)
-      }
+      const token0PriceUSD = await priceFeed(stakingTokenPair.token0);
+      const token1PriceUSD = await priceFeed(stakingTokenPair.token1);
 
       const stakingTokenPriceUSD = stakingTokenPair.calcPrice(
         token0PriceUSD,
