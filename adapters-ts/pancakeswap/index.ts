@@ -1,6 +1,7 @@
 import type ethersType from "ethers";
 import { bignumber as bn, dayjs, ethers, ethersMulticall } from "../lib";
 import { Staking, Action, ResolvedContract } from "../utils/adapter/base";
+import type BigNumber from "bignumber.js";
 import {
   stakingAdapter,
   contractsResolver,
@@ -24,7 +25,6 @@ import masterChefSingleRestakeABI from "./data/masterChefSingleRestakeABI.json";
 import masterChefLpRestakeABI from "./data/masterChefLpRestakeABI.json";
 import masterChef2SingleRestakeABI from "./data/masterChef2SingleRestakeABI.json";
 import masterChef2LpRestakeABI from "./data/masterChef2LpRestakeABI.json";
-import BigNumber from "bignumber.js";
 
 const masterChefAddress = "0x73feaa1ee314f8c655e354234017be2193c9e24e";
 const masterChef2Address = "0xa5f8C5Dbd5F286960b9d90548680aE5ebFf07652";
@@ -174,7 +174,8 @@ module.exports = {
         await dfh.getPriceFeeds(network),
         blockTag,
         block,
-        network
+        network,
+        provider
       );
       const multicall = new ethersMulticall.Provider(provider);
       await multicall.init();
@@ -200,14 +201,23 @@ module.exports = {
         stakingToken,
         options
       );
+
       let token0PriceUSD: BigNumber
       let token1PriceUSD: BigNumber
 
+      const router = uniswap.router.contract(provider, '0x10ED43C718714eb63d5aA57B78B54704E256024E');
+      const [v1, v2] = await router.getAmountsOut(
+        ethers.utils.parseEther("1"),
+        [stakingTokenPair.token0, stakingTokenPair.token1]
+      );
+
+      console.info(v1.toString(10), v2.toString(10))
+
       try {
-        token0PriceUSD = await priceFeed(stakingTokenPair.token0);
+        token0PriceUSD = await priceFeed(stakingTokenPair.token0 + '');
       } catch {
         token1PriceUSD = await priceFeed(stakingTokenPair.token1);
-        token0PriceUSD = stakingTokenPair.predictUnresolvedTokenPrice(0, token1PriceUSD)
+        token0PriceUSD = stakingTokenPair.predictUnresolvedTokenPrice(0, token1PriceUSD);
       }
 
       try {
@@ -375,7 +385,8 @@ module.exports = {
         await dfh.getPriceFeeds(network),
         blockTag,
         block,
-        network
+        network,
+        provider,
       );
 
       const pool = masterChefSavedPools.find(
@@ -518,7 +529,8 @@ module.exports = {
         await dfh.getPriceFeeds(network),
         blockTag,
         block,
-        network
+        network,
+        provider,
       );
       const multicall = new ethersMulticall.Provider(provider);
       await multicall.init();
@@ -708,7 +720,8 @@ module.exports = {
         await dfh.getPriceFeeds(network),
         blockTag,
         block,
-        network
+        network,
+        provider,
       );
 
       const pool = masterChefSavedPools.find(
@@ -852,7 +865,8 @@ module.exports = {
         await dfh.getPriceFeeds(network),
         blockTag,
         block,
-        network
+        network,
+        provider,
       );
       const avgBlockTime = await ethereum.getAvgBlockTime(
         provider,

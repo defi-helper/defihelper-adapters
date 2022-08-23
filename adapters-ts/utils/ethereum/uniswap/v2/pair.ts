@@ -82,12 +82,19 @@ export class PairInfo {
   ): BN {
     const realReservesToken0 = new bn(this.reserve0).div(`1e${this.token0Decimals}`);
     const realReservesToken1 = new bn(this.reserve1).div(`1e${this.token1Decimals}`);
-    const totalReserves = realReservesToken0.plus(realReservesToken1)
+    const totalReserves =realReservesToken0.plus(realReservesToken1)
 
-    const token0ReservesPiePercentage = new bn(100).minus(
+    console.info(1, knownSidePrice.toString(10))
+
+    const knownPiePercentage = 
       (tokenIndex === 0 ? realReservesToken1 : realReservesToken0)
         .div(totalReserves).multipliedBy(100)
-    )
-    return knownSidePrice.multipliedBy(token0ReservesPiePercentage.div(100))
+
+    console.info('pie percent', knownPiePercentage.toString(10))
+
+    const unknownPiePercent = new bn(100).minus(knownPiePercentage)
+    const piePrice = knownSidePrice.multipliedBy(100).div(knownPiePercentage)
+
+    return piePrice.div(100).multipliedBy(unknownPiePercent)
   }
 }

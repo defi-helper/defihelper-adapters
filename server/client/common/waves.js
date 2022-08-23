@@ -48,6 +48,7 @@ export function useProvider() {
   }, [provider]);
 
   useEffect(() => {
+    if(!window.WavesKeeper) return;
     window.WavesKeeper.on('update', onReloadProvider);
     onReloadProvider();
   }, []);
