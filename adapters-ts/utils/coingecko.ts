@@ -31,26 +31,20 @@ const errorHandler = (e: AxiosError) => {
   throw new Error(`coingecko ${method} ${url}: ${e}`);
 };
 
-export class UniswapV2RouterProvider {
-  constructor(
-    public readonly provider: ethersType.ethers.providers.Provider,
-  ) {}
+const uniswapRouterV2ResolveTokenPrice = async (provider: ethersType.ethers.providers.Provider, token: UniswapRouterV2Alias) => {
+  const { route, routerAddress, outputDecimals } = token
+  const router = uniswap.router.contract(provider, routerAddress);
 
-  async price(token: UniswapRouterV2Alias) {
-    const { route, routerAddress, outputDecimals } = token
-    const router = uniswap.router.contract(this.provider, routerAddress);
+  const inputDecimals = await erc20
+    .contract(provider, route[0])
+    .decimals();
 
-    const inputDecimals = await erc20
-      .contract(this.provider, route[0])
-      .decimals();
+  const pairsPathConversionArray = await router.getAmountsOut(
+    ethereum.toBN(`1e${inputDecimals}`).toFixed(0),
+    route
+  );
 
-    const pairsPathConversionArray = await router.getAmountsOut(
-      ethereum.toBN(`1e${inputDecimals}`).toFixed(0),
-      route
-    );
-
-    return pairsPathConversionArray[pairsPathConversionArray.length-1].div(`1e${outputDecimals}`);
-  }
+  return pairsPathConversionArray[pairsPathConversionArray.length-1].div(`1e${outputDecimals}`);
 }
 
 export class CoingeckoProvider {
@@ -206,8 +200,7 @@ export function bridgeWrapperBuild(
           throw new Error('You have to pass a provider before')
         }
 
-        return new UniswapV2RouterProvider(provider)
-          .price(alias)
+        return uniswapRouterV2ResolveTokenPrice(provider, alias)
       } else {
         return new CoingeckoProvider({
           block,
