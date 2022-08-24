@@ -195,6 +195,15 @@ module.exports = {
       return {
         name: "DFHBuyLiquidity",
         methods: {
+          fee: async () => {
+            const fee = await automate.fee().then(ethereum.toBN);
+            debugo({ _prefix: "fee", fee });
+
+            return {
+              native: fee.div("1e18").toString(10),
+              usd: "1",
+            };
+          },
           balanceOf: async (tokenAddress: string) => {
             debugo({ _prefix: "balanceOf", tokenAddress });
             const token = erc20.multicallContract(tokenAddress);
@@ -425,6 +434,15 @@ module.exports = {
       return {
         name: "DFHSellLiquidity",
         methods: {
+          fee: async () => {
+            const fee = await automate.fee().then(ethereum.toBN);
+            debugo({ _prefix: "fee", fee });
+
+            return {
+              native: fee.div("1e18").toString(10),
+              usd: "1",
+            };
+          },
           balanceOf: async () => {
             const token = erc20.multicallContract(pair);
             const [balance, tokenDecimals] = await multicall.all([
