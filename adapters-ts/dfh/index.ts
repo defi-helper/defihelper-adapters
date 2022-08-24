@@ -297,6 +297,15 @@ module.exports = {
       return {
         name: "DFHBuyLiquidity",
         methods: {
+          fee: async () => {
+            const fee = await automate.fee().then(ethereum.toBN);
+            debugo({ _prefix: "fee", fee });
+
+            return {
+              native: fee.div("1e18").toString(10),
+              usd: "1",
+            };
+          },
           balanceOf: useBalanceOf({ multicall, account: signerAddress }),
           isApproved: useIsApproved({
             multicall,
@@ -469,6 +478,15 @@ module.exports = {
       return {
         name: "DFHSellLiquidity",
         methods: {
+          fee: async () => {
+            const fee = await automate.fee().then(ethereum.toBN);
+            debugo({ _prefix: "fee", fee });
+
+            return {
+              native: fee.div("1e18").toString(10),
+              usd: "1",
+            };
+          },
           balanceOf: useBalanceOf({ multicall, account: signerAddress }).bind(
             null,
             pair
