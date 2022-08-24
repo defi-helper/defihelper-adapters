@@ -48,7 +48,6 @@ export class UniswapV2RouterProvider {
   ) {}
 
   async price(route: string[]) {
-    console.info('network, ' + this.provider.getNetwork())
     const currentNetwork = await this.provider.getNetwork()
     const routerAddress = UniswapV2RouterProvider.routingMap[currentNetwork.chainId as keyof typeof UniswapV2RouterProvider.routingMap]
     if(!routerAddress) {
