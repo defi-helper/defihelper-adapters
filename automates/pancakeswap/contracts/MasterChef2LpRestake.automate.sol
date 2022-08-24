@@ -2,27 +2,28 @@
 pragma solidity ^0.8.6;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./utils/DFH/Automate.sol";
 import "./utils/DFH/IStorage.sol";
 import "./utils/Uniswap/IUniswapV2Router02.sol";
 import "./utils/Uniswap/IUniswapV2Pair.sol";
-import {ERC20Tools} from "./utils/ERC20Tools.sol";
 import "./IMasterChef2.sol";
+import "./WithStopLoss.sol";
 
 /**
  * @notice Use with LP token only.
  */
-contract MasterChef2LpRestake is Automate {
-  using ERC20Tools for IERC20;
+contract MasterChef2LpRestake is Automate, WithStopLoss {
+  using SafeERC20 for IERC20;
 
   struct Swap {
     address[] path;
     uint256 outMin;
   }
 
-  IMasterChef2 public staking;
-
   address public liquidityRouter;
+
+  IMasterChef2 public staking;
 
   uint256 public pool;
 
@@ -78,25 +79,15 @@ contract MasterChef2LpRestake is Automate {
     address __owner = owner(); // gas optimisation
     IMasterChef2.UserInfo memory userInfo = _staking.userInfo(pool, address(this));
     _staking.withdraw(pool, userInfo.amount);
-    stakingToken.transfer(__owner, stakingToken.balanceOf(address(this)));
-    rewardToken.transfer(__owner, rewardToken.balanceOf(address(this)));
+    stakingToken.safeTransfer(__owner, stakingToken.balanceOf(address(this)));
+    rewardToken.safeTransfer(__owner, rewardToken.balanceOf(address(this)));
   }
 
   function emergencyWithdraw() external onlyOwner {
     address __owner = owner(); // gas optimisation
     staking.emergencyWithdraw(pool);
-    stakingToken.transfer(__owner, stakingToken.balanceOf(address(this)));
-    rewardToken.transfer(__owner, rewardToken.balanceOf(address(this)));
-  }
-
-  function _swap(
-    address[] memory path,
-    uint256[2] memory amount,
-    uint256 _deadline
-  ) internal {
-    if (path[0] == path[path.length - 1]) return;
-
-    IUniswapV2Router02(liquidityRouter).swapExactTokensForTokens(amount[0], amount[1], path, address(this), _deadline);
+    stakingToken.safeTransfer(__owner, stakingToken.balanceOf(address(this)));
+    rewardToken.safeTransfer(__owner, rewardToken.balanceOf(address(this)));
   }
 
   function _addLiquidity(
@@ -133,13 +124,42 @@ contract MasterChef2LpRestake is Automate {
     _staking.deposit(pool, 0); // get all reward
     uint256 rewardAmount = rewardToken.balanceOf(address(this));
     rewardToken.safeApprove(liquidityRouter, rewardAmount);
-    _swap(swap0.path, [rewardAmount / 2, swap0.outMin], _deadline);
-    _swap(swap1.path, [rewardAmount - rewardAmount / 2, swap1.outMin], _deadline);
+    _swap(liquidityRouter, swap0.path, [rewardAmount / 2, swap0.outMin], _deadline);
+    _swap(liquidityRouter, swap1.path, [rewardAmount - rewardAmount / 2, swap1.outMin], _deadline);
 
     IUniswapV2Pair _stakingToken = IUniswapV2Pair(address(stakingToken));
     _addLiquidity(_stakingToken.token0(), _stakingToken.token1(), _deadline);
     uint256 stakingAmount = _stakingToken.balanceOf(address(this));
     stakingToken.safeApprove(address(_staking), stakingAmount);
     _staking.deposit(pool, stakingAmount);
+  }
+
+  function setStopLoss(
+    address[] calldata path,
+    uint256 amountOut,
+    uint256 amountOutMin
+  ) external onlyOwner {
+    stopLoss = StopLoss(path, amountOut, amountOutMin);
+  }
+
+  function runStopLoss(uint256 gasFee, uint256 _deadline) external bill(gasFee, "PancakeSwapMasterChef2LpStopLoss") {
+    staking.withdraw(pool, staking.userInfo(pool, address(this)).amount);
+    IUniswapV2Pair _stakingToken = IUniswapV2Pair(address(stakingToken));
+    address[] memory inTokens;
+    inTokens[0] = _stakingToken.token0();
+    inTokens[1] = _stakingToken.token1();
+    IUniswapV2Router02(liquidityRouter).removeLiquidity(
+      inTokens[0],
+      inTokens[1],
+      _stakingToken.balanceOf(address(this)),
+      0,
+      0,
+      address(this),
+      _deadline
+    );
+
+    address __owner = owner();
+    _runStopLoss(liquidityRouter, inTokens, __owner, _deadline);
+    rewardToken.safeTransfer(__owner, rewardToken.balanceOf(address(this)));
   }
 }
