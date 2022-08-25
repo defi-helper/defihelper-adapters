@@ -39,7 +39,7 @@ export function debugo(obj: Record<string, any>) {
       ) {
         stringifyValue = JSON.stringify(value);
       } else {
-        stringifyValue = value.toString();
+        stringifyValue = value ? value.toString() : `${value}`;
       }
 
       return `${name}: "${stringifyValue}"`;
