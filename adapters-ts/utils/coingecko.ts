@@ -31,21 +31,24 @@ const errorHandler = (e: AxiosError) => {
   throw new Error(`coingecko ${method} ${url}: ${e}`);
 };
 
+
 const uniswapRouterV2ResolveTokenPrice = async (provider: ethersType.ethers.providers.Provider, token: UniswapRouterV2Alias) => {
   const { route, routerAddress, outputDecimals } = token
   const router = uniswap.router.contract(provider, routerAddress);
 
   const inputDecimals = await erc20
     .contract(provider, route[0])
-    .decimals();
+    .decimals().then(ethereum.toBN)
 
   const pairsPathConversionArray = await router.getAmountsOut(
-    ethereum.toBN(`1e${inputDecimals}`).toFixed(0),
+    new bn(`1e${inputDecimals}`).toFixed(0),
     route
   );
 
-  return pairsPathConversionArray[pairsPathConversionArray.length-1].div(`1e${outputDecimals}`);
+  const outputToken = ethereum.toBN(pairsPathConversionArray[pairsPathConversionArray.length-1])
+  return outputToken.div(`1e${outputDecimals}`);
 }
+
 
 export class CoingeckoProvider {
   static DEFAULT_API_URL = "https://coingecko.defihelper.io/api/v3";
@@ -165,7 +168,9 @@ function isNetworkAlias(alias: Alias): alias is NetworkAlias {
 }
 
 function isUniswapRouterV2Alias(alias: Alias): alias is UniswapRouterV2Alias {
-  return Object.hasOwnProperty.call(alias, "route");
+  return Object.hasOwnProperty.call(alias, "route") &&
+    Object.hasOwnProperty.call(alias, "routerAddress") &&
+    Object.hasOwnProperty.call(alias, "outputDecimals");
 }
 
 export function bridgeWrapperBuild(
