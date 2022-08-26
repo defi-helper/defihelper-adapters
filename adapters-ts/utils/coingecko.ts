@@ -40,12 +40,12 @@ const uniswapRouterV2ResolveTokenPrice = async (provider: ethersType.ethers.prov
     .contract(provider, route[0])
     .decimals().then(ethereum.toBN)
 
-  const pairsPathConversionArray = await router.getAmountsOut(
+  const tokensConversionPath = await router.getAmountsOut(
     new bn(`1e${inputDecimals}`).toFixed(0),
     route
   );
 
-  const outputToken = ethereum.toBN(pairsPathConversionArray[pairsPathConversionArray.length-1])
+  const outputToken = ethereum.toBN(tokensConversionPath[tokensConversionPath.length-1])
   return outputToken.div(`1e${outputDecimals}`);
 }
 
