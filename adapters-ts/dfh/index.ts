@@ -195,6 +195,15 @@ module.exports = {
       return {
         name: "DFHBuyLiquidity",
         methods: {
+          fee: async () => {
+            const fee = await automate.fee().then(ethereum.toBN);
+            debugo({ _prefix: "fee", fee });
+
+            return {
+              native: fee.div("1e18").toString(10),
+              usd: "1",
+            };
+          },
           balanceOf: async (tokenAddress: string) => {
             debugo({ _prefix: "balanceOf", tokenAddress });
             const token = erc20.multicallContract(tokenAddress);
@@ -425,6 +434,15 @@ module.exports = {
       return {
         name: "DFHSellLiquidity",
         methods: {
+          fee: async () => {
+            const fee = await automate.fee().then(ethereum.toBN);
+            debugo({ _prefix: "fee", fee });
+
+            return {
+              native: fee.div("1e18").toString(10),
+              usd: "1",
+            };
+          },
           balanceOf: async () => {
             const token = erc20.multicallContract(pair);
             const [balance, tokenDecimals] = await multicall.all([
@@ -493,6 +511,74 @@ module.exports = {
 
             debug("approve: skip approve");
             return {};
+          },
+          amountOut: async (tokenAddress: string, amount: string) => {
+            debugo({
+              _prefix: "amountOut",
+              tokenAddress,
+              amount,
+            });
+            const pairInfo = await uniswap.V2.pair.PairInfo.create(
+              multicall,
+              pair,
+              {
+                signer,
+                blockNumber: "latest",
+              }
+            );
+            const { token0, token1 } = pairInfo;
+            const balance = pairInfo.expandBalance(amount);
+            debugo({
+              _prefix: "amountOut",
+              token0,
+              token1,
+              token0Balance: balance.token0,
+              token1Balance: balance.token1,
+            });
+
+            let token0AmountOut = new bn(balance.token0);
+            if (tokenAddress.toLowerCase() !== token0.toLowerCase()) {
+              const { amountOut } = await uniswap.V2.router.autoRoute(
+                uniswap.V2.router.contract(provider, router),
+                new bn(balance.token0)
+                  .multipliedBy(`1e${pairInfo.token0Decimals}`)
+                  .toFixed(0),
+                token0,
+                tokenAddress,
+                routeTokens[network] ?? []
+              );
+              token0AmountOut = new bn(amountOut);
+            }
+            debugo({
+              _prefix: "amountOut",
+              token0AmountOut,
+            });
+            let token1AmountOut = new bn(balance.token1);
+            if (tokenAddress.toLowerCase() !== token1.toLowerCase()) {
+              const { amountOut } = await uniswap.V2.router.autoRoute(
+                uniswap.V2.router.contract(provider, router),
+                new bn(balance.token1)
+                  .multipliedBy(`1e${pairInfo.token1Decimals}`)
+                  .toFixed(0),
+                token1,
+                tokenAddress,
+                routeTokens[network] ?? []
+              );
+              token1AmountOut = new bn(amountOut);
+            }
+            debugo({
+              _prefix: "amountOut",
+              token1AmountOut,
+            });
+
+            const tokenDecimals = uniswap.V2.pair
+              .contract(provider, pair)
+              .decimals();
+
+            return token0AmountOut
+              .plus(token1AmountOut)
+              .div(`1e${tokenDecimals}`)
+              .toString(10);
           },
           canSell: async (amount: string) => {
             debugo({ _prefix: "canSell", amount });
