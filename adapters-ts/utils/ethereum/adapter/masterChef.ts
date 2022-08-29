@@ -1014,3 +1014,21 @@ export function stakingSingleAutomateAdapter({
     };
   };
 }
+
+export async function usePairStopLoss(
+  masterChefProvider: MasterChefProvider,
+  automate: ethersType.Contract
+) {
+  const pair = uniswap.pair.contract(
+    automate.provider,
+    await automate.stakingToken()
+  );
+
+  return {
+    name: "automateRestake-stopLoss",
+    methods: {
+      tokens: uniswap.pair.useTokensList(pair),
+      setStopLoss: () => {},
+    },
+  };
+}

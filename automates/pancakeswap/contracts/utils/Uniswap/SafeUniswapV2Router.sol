@@ -58,14 +58,8 @@ library SafeUniswapV2Router {
   {
     tokenA = IUniswapV2Pair(pair).token0();
     tokenB = IUniswapV2Pair(pair).token1();
-    (amountA, amountB) = router.removeLiquidity(
-      tokenA,
-      tokenB,
-      IERC20(pair).balanceOf(address(this)),
-      0,
-      0,
-      to,
-      deadline
-    );
+    uint256 balance = IERC20(pair).balanceOf(address(this));
+    IERC20(pair).safeApprove(address(router), balance);
+    (amountA, amountB) = router.removeLiquidity(tokenA, tokenB, balance, 0, 0, to, deadline);
   }
 }

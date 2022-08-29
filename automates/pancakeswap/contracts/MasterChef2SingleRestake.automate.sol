@@ -2,17 +2,21 @@
 pragma solidity ^0.8.6;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./utils/DFH/Automate.sol";
 import "./utils/DFH/IStorage.sol";
 import "./utils/Uniswap/IUniswapV2Router02.sol";
-import {ERC20Tools} from "./utils/ERC20Tools.sol";
+import "./utils/Uniswap/SafeUniswapV2Router.sol";
+import "./utils/Uniswap/StopLoss.sol";
 import "./IMasterChef2.sol";
 
 /**
  * @notice Use with simple token only.
  */
 contract MasterChef2SingleRestake is Automate {
-  using ERC20Tools for IERC20;
+  using SafeERC20 for IERC20;
+  using SafeUniswapV2Router for IUniswapV2Router02;
+  using StopLoss for StopLoss.Order;
 
   struct Swap {
     address[] path;
@@ -32,6 +36,8 @@ contract MasterChef2SingleRestake is Automate {
   IERC20 public stakingToken;
 
   IERC20 public rewardToken;
+
+  StopLoss.Order public stopLoss;
 
   // solhint-disable-next-line no-empty-blocks
   constructor(address _info) Automate(_info) {}
@@ -77,25 +83,15 @@ contract MasterChef2SingleRestake is Automate {
     address __owner = owner(); // gas optimisation
     IMasterChef2.UserInfo memory userInfo = _staking.userInfo(pool, address(this));
     _staking.withdraw(pool, userInfo.amount);
-    stakingToken.transfer(__owner, stakingToken.balanceOf(address(this)));
-    rewardToken.transfer(__owner, rewardToken.balanceOf(address(this)));
+    stakingToken.safeTransfer(__owner, stakingToken.balanceOf(address(this)));
+    rewardToken.safeTransfer(__owner, rewardToken.balanceOf(address(this)));
   }
 
   function emergencyWithdraw() external onlyOwner {
     address __owner = owner(); // gas optimisation
     staking.emergencyWithdraw(pool);
-    stakingToken.transfer(__owner, stakingToken.balanceOf(address(this)));
-    rewardToken.transfer(__owner, rewardToken.balanceOf(address(this)));
-  }
-
-  function _swap(
-    address[] memory path,
-    uint256[2] memory amount,
-    uint256 _deadline
-  ) internal {
-    if (path[0] == path[path.length - 1]) return;
-
-    IUniswapV2Router02(liquidityRouter).swapExactTokensForTokens(amount[0], amount[1], path, address(this), _deadline);
+    stakingToken.safeTransfer(__owner, stakingToken.balanceOf(address(this)));
+    rewardToken.safeTransfer(__owner, rewardToken.balanceOf(address(this)));
   }
 
   function run(
@@ -104,16 +100,42 @@ contract MasterChef2SingleRestake is Automate {
     Swap memory swap
   ) external bill(gasFee, "PancakeSwapMasterChef2SingleRestake") {
     IMasterChef2 _staking = staking; // gas optimization
-    IERC20 _stakingToken = stakingToken;
+    IUniswapV2Router02 _liquidityRouter = IUniswapV2Router02(liquidityRouter);
     require(_staking.pendingCake(pool, address(this)) > 0, "MasterChef2SingleRestake::run: no earned");
 
     _staking.deposit(pool, 0); // get all reward
     uint256 rewardAmount = rewardToken.balanceOf(address(this));
-    rewardToken.safeApprove(liquidityRouter, rewardAmount);
-    _swap(swap.path, [rewardAmount, swap.outMin], _deadline);
+    rewardToken.safeApprove(address(_liquidityRouter), rewardAmount);
+    _liquidityRouter.safeSwapExactTokensForTokens(rewardAmount, swap.outMin, swap.path, address(this), _deadline);
 
+    IERC20 _stakingToken = stakingToken;
     uint256 stakingAmount = _stakingToken.balanceOf(address(this));
     _stakingToken.safeApprove(address(_staking), stakingAmount);
     _staking.deposit(pool, stakingAmount);
+  }
+
+  function setStopLoss(
+    address[] calldata path,
+    uint256 amountOut,
+    uint256 amountOutMin
+  ) external onlyOwner {
+    stopLoss = StopLoss.Order(path, amountOut, amountOutMin);
+  }
+
+  function runStopLoss(uint256 gasFee, uint256 _deadline)
+    external
+    bill(gasFee, "PancakeSwapMasterChef2SingleStopLoss")
+  {
+    staking.withdraw(pool, staking.userInfo(pool, address(this)).amount);
+    address[] memory inTokens = new address[](1);
+    inTokens[0] = address(stakingToken);
+
+    stopLoss.run(liquidityRouter, inTokens, _deadline);
+    address __owner = owner();
+    IERC20 exitToken = IERC20(stopLoss.path[stopLoss.path.length - 1]);
+    exitToken.safeTransfer(__owner, exitToken.balanceOf(address(this)));
+    if (rewardToken != exitToken) {
+      rewardToken.safeTransfer(__owner, rewardToken.balanceOf(address(this)));
+    }
   }
 }

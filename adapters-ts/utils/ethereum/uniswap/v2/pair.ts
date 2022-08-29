@@ -1,3 +1,4 @@
+import type ethersType from "ethers";
 import type { Provider } from "@defihelper/ethers-multicall";
 import type BN from "bignumber.js";
 import { bignumber as bn } from "../../../../lib";
@@ -12,6 +13,9 @@ export const decimals = 18;
 export const contract = base.contract(abi);
 
 export const multicallContract = base.multicallContract(abi);
+
+export const useTokensList = (pair: ethersType.Contract) => () =>
+  Promise.all([pair.token0(), pair.token1()]);
 
 export class PairInfo {
   static async create(

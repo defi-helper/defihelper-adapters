@@ -107,7 +107,7 @@ contract MasterChef2LpRestake is Automate {
 
     _staking.deposit(pool, 0); // get all reward
     uint256 rewardAmount = rewardToken.balanceOf(address(this));
-    rewardToken.safeApprove(liquidityRouter, rewardAmount);
+    rewardToken.safeApprove(address(_liquidityRouter), rewardAmount);
     _liquidityRouter.safeSwapExactTokensForTokens(rewardAmount / 2, swap0.outMin, swap0.path, address(this), _deadline);
     _liquidityRouter.safeSwapExactTokensForTokens(
       rewardAmount - rewardAmount / 2,
@@ -116,6 +116,7 @@ contract MasterChef2LpRestake is Automate {
       address(this),
       _deadline
     );
+
     IUniswapV2Pair _stakingToken = IUniswapV2Pair(address(stakingToken));
     _liquidityRouter.addAllLiquidity(_stakingToken.token0(), _stakingToken.token1(), address(this), _deadline);
     uint256 stakingAmount = _stakingToken.balanceOf(address(this));
@@ -138,13 +139,16 @@ contract MasterChef2LpRestake is Automate {
       address(this),
       _deadline
     );
-    address[] memory inTokens;
+    address[] memory inTokens = new address[](2);
     inTokens[0] = token0;
     inTokens[1] = token1;
 
-    IERC20 exitToken = IERC20(stopLoss.run(liquidityRouter, inTokens, _deadline));
+    stopLoss.run(liquidityRouter, inTokens, _deadline);
     address __owner = owner();
-    rewardToken.safeTransfer(__owner, rewardToken.balanceOf(address(this)));
+    IERC20 exitToken = IERC20(stopLoss.path[stopLoss.path.length - 1]);
     exitToken.safeTransfer(__owner, exitToken.balanceOf(address(this)));
+    if (rewardToken != exitToken) {
+      rewardToken.safeTransfer(__owner, rewardToken.balanceOf(address(this)));
+    }
   }
 }

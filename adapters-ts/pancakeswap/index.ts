@@ -1308,6 +1308,7 @@ module.exports = {
                 autorestakeAdapter: isPair
                   ? "MasterChef2LpRestake"
                   : "MasterChef2SingleRestake",
+                autorestakeStopLoss: true,
                 adapters: isPair ? ["masterChef2Pair"] : ["masterChef2Single"],
                 lpTokensManager: isPair
                   ? {
@@ -1516,10 +1517,7 @@ module.exports = {
       contractAddress: string
     ) => {
       return masterChef.stakingPairAutomateAdapter({
-        masterChefProvider: masterChef2ProviderFactory(
-          signer,
-          "latest",
-        ),
+        masterChefProvider: masterChef2ProviderFactory(signer, "latest"),
         automateABI: masterChef2LpRestakeABI,
         stakingABI: masterChef2ABI,
         routeTokens,
@@ -1541,10 +1539,7 @@ module.exports = {
       contractAddress: string
     ) => {
       return masterChef.stakingSingleAutomateAdapter({
-        masterChefProvider: masterChef2ProviderFactory(
-          signer,
-          "latest",
-        ),
+        masterChefProvider: masterChef2ProviderFactory(signer, "latest"),
         automateABI: masterChef2SingleRestakeABI,
         stakingABI: masterChef2ABI,
         routeTokens,

@@ -21,15 +21,15 @@ library StopLoss {
     address liquidityRouter,
     address[] memory inTokens,
     uint256 _deadline
-  ) internal returns (address) {
-    require(order.path.length > 1 && order.amountOut > 0, "WithStopLoss::_runStopLoss: stop loss disabled");
-    require(inTokens.length <= 256, "WithStopLoss::_runStopLoss: too many in tokens");
+  ) internal {
+    require(order.path.length > 1 && order.amountOut > 0, "StopLoss::run: stop loss disabled");
+    require(inTokens.length <= 256, "StopLoss::run: too many in tokens");
     for (uint8 i = 0; i < inTokens.length; i++) {
       address token = inTokens[i];
       if (token == order.path[0]) continue;
       uint256 balance = IERC20(token).balanceOf(address(this));
       if (balance == 0) continue;
-      address[] memory path;
+      address[] memory path = new address[](2);
       path[0] = token;
       path[1] = order.path[0];
       IERC20(token).safeApprove(liquidityRouter, balance);
@@ -38,7 +38,7 @@ library StopLoss {
 
     address baseToken = order.path[0];
     uint256 baseBalance = IERC20(baseToken).balanceOf(address(this));
-    require(baseBalance > 0, "WithStopLoss::_runStopLoss: insufficient balance of base token");
+    require(baseBalance > 0, "StopLoss::run: insufficient balance of base token");
     IERC20(baseToken).safeApprove(liquidityRouter, baseBalance);
     uint256[] memory amountsOut = IUniswapV2Router02(liquidityRouter).safeSwapExactTokensForTokens(
       baseBalance,
@@ -47,8 +47,6 @@ library StopLoss {
       address(this),
       _deadline
     );
-    require(amountsOut[amountsOut.length - 1] <= order.amountOut, "WithStopLoss::_runStopLoss: invalid output amount");
-
-    return order.path[order.path.length - 1];
+    require(amountsOut[amountsOut.length - 1] <= order.amountOut, "StopLoss::run: invalid output amount");
   }
 }
