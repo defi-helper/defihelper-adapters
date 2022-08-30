@@ -49,7 +49,9 @@ export class Contract {
   get multicall() {
     return new ethersMulticall.Contract(
       this.contract.address,
-      this.contract.interface.format(ethers.utils.FormatTypes.json) as string[]
+      JSON.parse(
+        this.contract.interface.format(ethers.utils.FormatTypes.json) as string
+      )
     );
   }
 

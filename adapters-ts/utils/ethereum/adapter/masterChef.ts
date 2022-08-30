@@ -1025,7 +1025,13 @@ export namespace StopLoss {
     automate: ethersType.Contract;
   }) {
     return async (path: string[], amountOut: string, amountOutMin: string) => {
-      debugo({ _prefix: "setStopLoss", path, amountOut, amountOutMin });
+      debugo({
+        _prefix: "setStopLoss",
+        automate: automate.address,
+        path,
+        amountOut,
+        amountOutMin,
+      });
       const exitToken = await erc20.ConnectedToken.fromAddress(
         signer,
         path[path.length - 1]
@@ -1104,13 +1110,26 @@ export namespace StopLoss {
     automate: ethersType.Contract;
     middleTokens: string[];
   }) {
+    debugo({
+      _prefix: "restakePairStopLossComponent",
+      automate: automate.address,
+    });
+    const stakingTokenAddress = await automate.stakingToken();
+    debugo({
+      _prefix: "restakePairStopLossComponent",
+      stakingToken: stakingTokenAddress,
+    });
     const pair = await uniswap.pair.ConnectedPair.fromAddress(
       signer,
-      await automate.stakingToken()
+      stakingTokenAddress
     );
     const poolId = await automate
       .pool()
       .then((v: ethersType.BigNumber) => Number(v.toString()));
+    debugo({
+      _prefix: "restakePairStopLossComponent",
+      poolId,
+    });
 
     return {
       name: "automateRestake-stopLoss",
@@ -1130,6 +1149,7 @@ export namespace StopLoss {
           const pairBalance = await masterChef
             .userInfo(poolId, automate.address)
             .then(({ amount }) => pair.amountInt(amount));
+          if (pairBalance.int.eq(0)) return "0";
           debugo({ _prefix: "amountOut", pairBalance });
           const balance = await pair.expandBalance(pairBalance);
           const amountIn = await pair.info.then(async ({ token0, token1 }) => {
@@ -1217,13 +1237,26 @@ export namespace StopLoss {
     automate: ethersType.Contract;
     middleTokens: string[];
   }) {
+    debugo({
+      _prefix: "restakeSingleStopLossComponent",
+      automate: automate.address,
+    });
+    const stakingTokenAddress = await automate.stakingToken();
+    debugo({
+      _prefix: "restakeSingleStopLossComponent",
+      stakingToken: stakingTokenAddress,
+    });
     const stakingToken = await erc20.ConnectedToken.fromAddress(
       signer,
-      await automate.stakingToken()
+      stakingTokenAddress
     );
     const poolId = await automate
       .pool()
       .then((v: ethersType.BigNumber) => Number(v.toString()));
+    debugo({
+      _prefix: "restakeSingleStopLossComponent",
+      poolId,
+    });
 
     return {
       name: "automateRestake-stopLoss",
@@ -1236,9 +1269,11 @@ export namespace StopLoss {
             signer,
             path[path.length - 1]
           );
+          debugo({ _prefix: "amountOut", poolId, automate: automate.address });
           const balance = await masterChef
             .userInfo(poolId, automate.address)
             .then(({ amount }) => stakingToken.amountInt(amount));
+          if (balance.int.eq(0)) return "0";
           debugo({ _prefix: "amountOut", balance });
           const amountOut = await uniswap.router.getPrice(
             uniswap.router.contract(

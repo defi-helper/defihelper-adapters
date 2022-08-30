@@ -37,7 +37,11 @@ export function debugo(obj: Record<string, any>) {
           !(value instanceof ethers.BigNumber) &&
           !(value instanceof bignumber))
       ) {
-        stringifyValue = JSON.stringify(value);
+        if (typeof value.toString === "function") {
+          stringifyValue = value.toString();
+        } else {
+          stringifyValue = JSON.stringify(value);
+        }
       } else {
         stringifyValue = value ? value.toString() : `${value}`;
       }

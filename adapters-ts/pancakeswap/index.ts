@@ -1533,7 +1533,7 @@ module.exports = {
 
       return {
         ...component,
-        stopLoss: masterChef.StopLoss.usePairStopLossComponent({
+        stopLoss: await masterChef.StopLoss.usePairStopLossComponent({
           signer: ethSigner,
           masterChef: masterChefProvider,
           automate,
@@ -1560,7 +1560,7 @@ module.exports = {
       const masterChefProvider = masterChef2ProviderFactory(signer, "latest");
       const automate = new ethers.Contract(
         contractAddress,
-        masterChef2LpRestakeABI,
+        masterChef2SingleRestakeABI,
         signer
       );
 
@@ -1573,7 +1573,7 @@ module.exports = {
 
       return {
         ...component,
-        stopLoss: masterChef.StopLoss.useSingleStopLossComponent({
+        stopLoss: await masterChef.StopLoss.useSingleStopLossComponent({
           signer: ethSigner,
           automate,
           masterChef: masterChefProvider,
