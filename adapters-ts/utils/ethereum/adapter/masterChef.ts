@@ -1,14 +1,15 @@
 import type BigNumber from "bignumber.js";
 import type ethersType from "ethers";
 import { bignumber as bn, ethers, ethersMulticall, dayjs } from "../../../lib";
-import { toBN, BlockNumber } from "../base";
+import * as ethereum from "../base";
 import * as erc20 from "../erc20";
 import { V2 as uniswap } from "../uniswap";
 import { Action } from "../../adapter/base";
 import { Staking, Deploy, Automate } from "./base";
+import { debugo } from "../../base";
 
 export interface Options {
-  blockTag: BlockNumber;
+  blockTag: ethereum.BlockNumber;
 }
 
 export interface PoolInfo {
@@ -81,14 +82,14 @@ export const defaultProviderImplementation: Pick<
   totalAllocPoint() {
     return this.contract
       .totalAllocPoint({ blockTag: this.options.blockTag })
-      .then(toBN);
+      .then(ethereum.toBN);
   },
   async totalLocked(pool) {
     const stakingToken = await this.stakingToken(pool);
     return erc20
       .contract(this.contract.provider, stakingToken)
       .balanceOf(this.contract.address, { blockTag: this.options.blockTag })
-      .then(toBN);
+      .then(ethereum.toBN);
   },
   userInfo(poolIndex, wallet) {
     return this.contract
@@ -101,13 +102,13 @@ export const defaultProviderImplementation: Pick<
           amount: ethersType.BigNumber;
           rewardDebt: ethersType.BigNumber;
         }) => ({
-          amount: toBN(amount),
-          rewardDebt: toBN(rewardDebt),
+          amount: ethereum.toBN(amount),
+          rewardDebt: ethereum.toBN(rewardDebt),
         })
       );
   },
   pendingReward(poolIndex, wallet) {
-    return this.contract.pendingRewards(poolIndex, wallet).then(toBN);
+    return this.contract.pendingRewards(poolIndex, wallet).then(ethereum.toBN);
   },
   deposit(poolIndex, amount) {
     return this.contract.deposit(poolIndex, amount);
@@ -217,9 +218,9 @@ export function stakingActionComponents({
       stakingTokenDecimals,
     ] = await Promise.all([
       rewardTokenContract.symbol(),
-      rewardTokenContract.decimals().then(toBN),
+      rewardTokenContract.decimals().then(ethereum.toBN),
       stakingTokenContract.symbol(),
-      stakingTokenContract.decimals().then(toBN),
+      stakingTokenContract.decimals().then(ethereum.toBN),
     ]);
 
     return {
@@ -232,12 +233,12 @@ export function stakingActionComponents({
             stakingTokenContract
               .balanceOf(walletAddress)
               .then((v: ethersType.BigNumber) =>
-                toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
+                ethereum.toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
               ),
           isApproved: async (amount: string) => {
             const allowance = await stakingTokenContract
               .allowance(walletAddress, masterChefProvider.contract.address)
-              .then(toBN);
+              .then(ethereum.toBN);
 
             return allowance.isGreaterThanOrEqualTo(
               new bn(amount).multipliedBy(`1e${stakingTokenDecimals}`)
@@ -264,7 +265,7 @@ export function stakingActionComponents({
 
             const balance = await stakingTokenContract
               .balanceOf(walletAddress)
-              .then(toBN);
+              .then(ethereum.toBN);
             if (amountInt.gt(balance))
               return Error("Insufficient funds on the balance");
 
@@ -538,12 +539,12 @@ export function stakingPairAutomateAdapter({
           stakingToken
             .balanceOf(signerAddress)
             .then((v: ethersType.BigNumber) =>
-              toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
+              ethereum.toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
             ),
         canTransfer: async (amount: string) => {
           const signerBalance = await stakingToken
             .balanceOf(signerAddress)
-            .then(toBN);
+            .then(ethereum.toBN);
           const amountInt = new bn(amount).multipliedBy(
             `1e${stakingTokenDecimals}`
           );
@@ -566,12 +567,12 @@ export function stakingPairAutomateAdapter({
           stakingToken
             .balanceOf(automate.address)
             .then((v: ethersType.BigNumber) =>
-              toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
+              ethereum.toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
             ),
         canDeposit: async () => {
           const automateBalance = await stakingToken
             .balanceOf(automate.address)
-            .then(toBN);
+            .then(ethereum.toBN);
           if (automateBalance.lte(0)) {
             return new Error(
               "Insufficient funds on the automate contract balance"
@@ -680,7 +681,7 @@ export function stakingPairAutomateAdapter({
       const rewardToken = erc20.contract(provider, rewardTokenAddress);
       const rewardTokenBalance = await rewardToken
         .balanceOf(contractAddress)
-        .then(toBN);
+        .then(ethereum.toBN);
       const pendingReward = await masterChefProvider.pendingReward(
         poolId,
         contractAddress
@@ -805,12 +806,12 @@ export function stakingSingleAutomateAdapter({
           stakingToken
             .balanceOf(signerAddress)
             .then((v: ethersType.BigNumber) =>
-              toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
+              ethereum.toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
             ),
         canTransfer: async (amount: string) => {
           const signerBalance = await stakingToken
             .balanceOf(signerAddress)
-            .then(toBN);
+            .then(ethereum.toBN);
           const amountInt = new bn(amount).multipliedBy(
             `1e${stakingTokenDecimals}`
           );
@@ -833,12 +834,12 @@ export function stakingSingleAutomateAdapter({
           stakingToken
             .balanceOf(automate.address)
             .then((v: ethersType.BigNumber) =>
-              toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
+              ethereum.toBN(v).div(`1e${stakingTokenDecimals}`).toString(10)
             ),
         canDeposit: async () => {
           const automateBalance = await stakingToken
             .balanceOf(automate.address)
-            .then(toBN);
+            .then(ethereum.toBN);
           if (automateBalance.lte(0)) {
             return new Error(
               "Insufficient funds on the automate contract balance"
@@ -942,7 +943,7 @@ export function stakingSingleAutomateAdapter({
       const rewardToken = erc20.contract(provider, rewardTokenAddress);
       const rewardTokenBalance = await rewardToken
         .balanceOf(contractAddress)
-        .then(toBN);
+        .then(ethereum.toBN);
       const pendingReward = await masterChefProvider.pendingReward(
         poolId,
         contractAddress
@@ -1015,20 +1016,272 @@ export function stakingSingleAutomateAdapter({
   };
 }
 
-export async function usePairStopLoss(
-  masterChefProvider: MasterChefProvider,
-  automate: ethersType.Contract
-) {
-  const pair = uniswap.pair.contract(
-    automate.provider,
-    await automate.stakingToken()
-  );
+export namespace StopLoss {
+  export function useSetStopLoss({
+    signer,
+    automate,
+  }: {
+    signer: ethereum.Signer;
+    automate: ethersType.Contract;
+  }) {
+    return async (path: string[], amountOut: string, amountOutMin: string) => {
+      debugo({ _prefix: "setStopLoss", path, amountOut, amountOutMin });
+      const exitToken = await erc20.ConnectedToken.fromAddress(
+        signer,
+        path[path.length - 1]
+      );
+      const setStopLossTx = await automate.setStopLoss(
+        path,
+        exitToken.amountFloat(amountOut).toFixed(),
+        exitToken.amountFloat(amountOutMin).toFixed()
+      );
+      debugo({
+        _prefix: "setStopLoss",
+        depositTx: JSON.stringify(setStopLossTx),
+      });
 
-  return {
-    name: "automateRestake-stopLoss",
-    methods: {
-      tokens: uniswap.pair.useTokensList(pair),
-      setStopLoss: () => {},
-    },
-  };
+      return {
+        tx: setStopLossTx,
+      };
+    };
+  }
+
+  export function useRemoveStopLoss({
+    automate,
+  }: {
+    automate: ethersType.Contract;
+  }) {
+    return async () => {
+      debugo({ _prefix: "removeStopLoss" });
+      const removeStopLossTx = await automate.setStopLoss([], "0", "0");
+      debugo({
+        _prefix: "removeStopLoss",
+        depositTx: JSON.stringify(removeStopLossTx),
+      });
+
+      return {
+        tx: removeStopLossTx,
+      };
+    };
+  }
+
+  export function useAutoPath({
+    signer,
+    automate,
+    middleTokens,
+  }: {
+    signer: ethereum.Signer;
+    automate: ethersType.Contract;
+    middleTokens: string[];
+  }) {
+    return async (from: string, to: string) => {
+      debugo({ _prefix: "autoPath", from, to });
+      const router = uniswap.router.contract(
+        signer.provider,
+        await automate.liquidityRouter()
+      );
+      const { path } = await uniswap.router.autoRoute(
+        router,
+        new bn("1e18").toFixed(0),
+        from,
+        to,
+        middleTokens
+      );
+      debugo({ _prefix: "autoPath", path });
+
+      return path;
+    };
+  }
+
+  export async function usePairStopLossComponent({
+    signer,
+    masterChef,
+    automate,
+    middleTokens,
+  }: {
+    signer: ethereum.Signer;
+    masterChef: MasterChefProvider;
+    automate: ethersType.Contract;
+    middleTokens: string[];
+  }) {
+    const pair = await uniswap.pair.ConnectedPair.fromAddress(
+      signer,
+      await automate.stakingToken()
+    );
+    const poolId = await automate
+      .pool()
+      .then((v: ethersType.BigNumber) => Number(v.toString()));
+
+    return {
+      name: "automateRestake-stopLoss",
+      methods: {
+        startTokens: uniswap.pair.useTokensList({ pair }),
+        autoPath: useAutoPath({ signer, automate, middleTokens }),
+        amountOut: async (path: string[]) => {
+          debugo({ _prefix: "amountOut", path });
+          const exitToken = await erc20.ConnectedToken.fromAddress(
+            signer,
+            path[path.length - 1]
+          );
+          const router = uniswap.router.contract(
+            signer.provider,
+            await automate.liquidityRouter()
+          );
+          const pairBalance = await masterChef
+            .userInfo(poolId, automate.address)
+            .then(({ amount }) => pair.amountInt(amount));
+          debugo({ _prefix: "amountOut", pairBalance });
+          const balance = await pair.expandBalance(pairBalance);
+          const amountIn = await pair.info.then(async ({ token0, token1 }) => {
+            if (path[0].toLowerCase() === token0.address.toLowerCase()) {
+              return balance.token0.token.amountInt(
+                balance.token0.int.plus(
+                  await uniswap.router.getPrice(
+                    router,
+                    balance.token1.toFixed(),
+                    [token1.address, token0.address],
+                    { blockNumber: "latest", signer: null }
+                  )
+                )
+              );
+            } else {
+              return balance.token1.token.amountInt(
+                balance.token1.int.plus(
+                  await uniswap.router.getPrice(
+                    router,
+                    balance.token0.toFixed(),
+                    [token0.address, token1.address],
+                    { blockNumber: "latest", signer: null }
+                  )
+                )
+              );
+            }
+          });
+          debugo({ _prefix: "amountOut", amountIn });
+          const amountOut = await uniswap.router.getPrice(
+            router,
+            amountIn.toFixed(),
+            path,
+            {
+              blockNumber: "latest",
+              signer: null,
+            }
+          );
+          debugo({ _prefix: "amountOut", amountOut });
+
+          return exitToken.amountInt(amountOut).toString();
+        },
+        canSetStopLoss: async (
+          path: string[],
+          amountOut: string,
+          amountOutMin: string
+        ) => {
+          debugo({ _prefix: "canSetStopLoss", path, amountOut, amountOutMin });
+          if (path.length <= 1) {
+            return new Error("Path too short");
+          }
+          const { token0, token1 } = await pair.info;
+          if (
+            ![
+              token0.address.toLowerCase(),
+              token1.address.toLowerCase(),
+            ].includes(path[0].toLowerCase())
+          ) {
+            return new Error("Invalid firt token on the path");
+          }
+
+          const exitToken = await erc20.ConnectedToken.fromAddress(
+            signer,
+            path[path.length - 1]
+          );
+          if (exitToken.amountFloat(amountOut).int.lte(0)) {
+            return new Error("Invalid amount out value");
+          }
+
+          return true;
+        },
+        setStopLoss: useSetStopLoss({ signer, automate }),
+        removeStopLoss: useRemoveStopLoss({ automate }),
+      },
+    };
+  }
+
+  export async function useSingleStopLossComponent({
+    signer,
+    masterChef,
+    automate,
+    middleTokens,
+  }: {
+    signer: ethereum.Signer;
+    masterChef: MasterChefProvider;
+    automate: ethersType.Contract;
+    middleTokens: string[];
+  }) {
+    const stakingToken = await erc20.ConnectedToken.fromAddress(
+      signer,
+      await automate.stakingToken()
+    );
+    const poolId = await automate
+      .pool()
+      .then((v: ethersType.BigNumber) => Number(v.toString()));
+
+    return {
+      name: "automateRestake-stopLoss",
+      methods: {
+        startTokens: () => stakingToken.address,
+        autoPath: useAutoPath({ signer, automate, middleTokens }),
+        amountOut: async (path: string[]) => {
+          debugo({ _prefix: "amountOut", path });
+          const exitToken = await erc20.ConnectedToken.fromAddress(
+            signer,
+            path[path.length - 1]
+          );
+          const balance = await masterChef
+            .userInfo(poolId, automate.address)
+            .then(({ amount }) => stakingToken.amountInt(amount));
+          debugo({ _prefix: "amountOut", balance });
+          const amountOut = await uniswap.router.getPrice(
+            uniswap.router.contract(
+              signer.provider,
+              await automate.liquidityRouter()
+            ),
+            balance.toFixed(),
+            path,
+            {
+              blockNumber: signer.blockNumber,
+              signer: null,
+            }
+          );
+          debugo({ _prefix: "amountOut", amountOut });
+
+          return exitToken.amountInt(amountOut).toString();
+        },
+        canSetStopLoss: async (
+          path: string[],
+          amountOut: string,
+          amountOutMin: string
+        ) => {
+          debugo({ _prefix: "canSetStopLoss", path, amountOut, amountOutMin });
+          if (path.length <= 1) {
+            return new Error("Path too short");
+          }
+          if (path[0].toLowerCase() !== stakingToken.address.toLowerCase()) {
+            return new Error("Invalid firt token on the path");
+          }
+
+          const exitToken = await erc20.ConnectedToken.fromAddress(
+            signer,
+            path[path.length - 1]
+          );
+          if (exitToken.amountFloat(amountOut).int.lte(0)) {
+            return new Error("Invalid amount out value");
+          }
+
+          return true;
+        },
+        setStopLoss: useSetStopLoss({ signer, automate }),
+        removeStopLoss: useRemoveStopLoss({ automate }),
+      },
+    };
+  }
 }
