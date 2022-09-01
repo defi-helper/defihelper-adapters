@@ -78,6 +78,18 @@ export function Main() {
           <AutomatesList blockchain="waves" automates={wavesAutomates} />
         </div>
       </div>
+
+      <div className="column">
+        <h2>DFH</h2>
+        <h3>Ethereum</h3>
+        <div>
+          <ul>
+            <li>
+              <Link to={`/client/dfh/smart-trade`}>SmartTrade</Link>
+            </li>
+          </ul>
+        </div>
+      </div>
     </div>
   );
 }

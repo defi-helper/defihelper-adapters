@@ -1,13 +1,13 @@
 import React, { useEffect } from "react";
 import ReactJson from "react-json-view";
-import { ReactJsonWrap } from "../components/ReactJsonWrap";
-import { useProvider } from "../common/ether";
-import { AdapterModalSteps } from "../components";
+import { ReactJsonWrap } from "../../components/ReactJsonWrap";
+import { useProvider } from "../../common/ether";
+import { AdapterModalSteps } from "../../components";
 import networks from "@defihelper/networks/contracts.json";
-import * as adaptersGateway from "../common/adapter";
-import { Button } from "../components/Button";
+import * as adaptersGateway from "../../common/adapter";
+import { Button } from "../../components/Button";
 
-export function DFHAutomate() {
+export function AutomatePage() {
   const [provider, signer] = useProvider();
   const [buyLiquidityAddress, setBuyLiquidityAddress] = React.useState(null);
   const [automateReload, setAutomateReload] = React.useState(false);
