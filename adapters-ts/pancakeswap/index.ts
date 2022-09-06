@@ -1308,6 +1308,7 @@ module.exports = {
                 autorestakeAdapter: isPair
                   ? "MasterChef2LpRestake"
                   : "MasterChef2SingleRestake",
+                autorestakeStopLoss: true,
                 adapters: isPair ? ["masterChef2Pair"] : ["masterChef2Single"],
                 lpTokensManager: isPair
                   ? {
@@ -1515,15 +1516,30 @@ module.exports = {
       signer: ethersType.Signer,
       contractAddress: string
     ) => {
-      return masterChef.stakingPairAutomateAdapter({
-        masterChefProvider: masterChef2ProviderFactory(
-          signer,
-          "latest",
-        ),
+      const ethSigner = new ethereum.Signer(signer);
+      const masterChefProvider = masterChef2ProviderFactory(signer, "latest");
+      const automate = new ethers.Contract(
+        contractAddress,
+        masterChef2LpRestakeABI,
+        signer
+      );
+
+      const component = await masterChef.stakingPairAutomateAdapter({
+        masterChefProvider,
         automateABI: masterChef2LpRestakeABI,
         stakingABI: masterChef2ABI,
         routeTokens,
       })(signer, contractAddress);
+
+      return {
+        ...component,
+        stopLoss: await masterChef.StopLoss.usePairStopLossComponent({
+          signer: ethSigner,
+          masterChef: masterChefProvider,
+          automate,
+          middleTokens: routeTokens,
+        }),
+      };
     },
     MasterChefSingleRestake: async (
       signer: ethersType.Signer,
@@ -1540,15 +1556,30 @@ module.exports = {
       signer: ethersType.Signer,
       contractAddress: string
     ) => {
-      return masterChef.stakingSingleAutomateAdapter({
-        masterChefProvider: masterChef2ProviderFactory(
-          signer,
-          "latest",
-        ),
+      const ethSigner = new ethereum.Signer(signer);
+      const masterChefProvider = masterChef2ProviderFactory(signer, "latest");
+      const automate = new ethers.Contract(
+        contractAddress,
+        masterChef2SingleRestakeABI,
+        signer
+      );
+
+      const component = await masterChef.stakingSingleAutomateAdapter({
+        masterChefProvider,
         automateABI: masterChef2SingleRestakeABI,
         stakingABI: masterChef2ABI,
         routeTokens,
       })(signer, contractAddress);
+
+      return {
+        ...component,
+        stopLoss: await masterChef.StopLoss.useSingleStopLossComponent({
+          signer: ethSigner,
+          automate,
+          masterChef: masterChefProvider,
+          middleTokens: routeTokens,
+        }),
+      };
     },
     SmartChefInitializableRestake: automateAdapter(
       async (signer, contractAddress) => {

@@ -1,4 +1,4 @@
-const { migration } = require('./utils');
+const { migration } = require('../utils');
 
 module.exports = migration(async ({ utils: { dfhNetwork, read, execute } }) => {
   const { GovernorMultisig } = dfhNetwork();

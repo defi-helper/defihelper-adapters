@@ -57,6 +57,13 @@ module.exports = {
       blockGasLimit: 6_000_000,
       accounts: [...maybeAccount(process.env.ETH_ROPSTEN_DEPLOYER)],
     },
+    goerli: {
+      url: process.env.ETH_GOERLI_NODE || 'http://127.0.0.1:8545',
+      chainId: 5,
+      gasPrice: 2_000_000_000,
+      blockGasLimit: 6_000_000,
+      accounts: [...maybeAccount(process.env.ETH_GOERLI_DEPLOYER)],
+    },
     bsc: {
       url: process.env.BSC_NODE || 'http://127.0.0.1:8545',
       chainId: 56,
@@ -112,6 +119,7 @@ module.exports = {
       default: 0,
       1: 0,
       3: 0,
+      5: 0,
       56: 0,
       97: 0,
       43113: 0,
