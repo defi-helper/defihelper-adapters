@@ -34,9 +34,15 @@ describe('MasterChef2SingleRestake', function () {
   });
 
   it('', async function () {
-    await automate.setStopLoss([token0.address, tokenReward.address], new bn('10e18').toFixed(0), 0);
-    console.log(await tokenReward.balanceOf(account.address).then((v) => v.toString()));
-    const tx = await automate.runStopLoss(0, 1661836696);
-    console.log(await tokenReward.balanceOf(account.address).then((v) => v.toString()));
+    const outToken = tokenReward;
+    await automate.setStopLoss(
+      ['0xafd2Dfb918777d9bCC29E315C4Df4551208DBE82', outToken.address],
+      new bn('15e18').toFixed(0),
+      0
+    );
+    const startBalance = await outToken.balanceOf(account.address).then((v) => new bn(v.toString()));
+    const tx = await automate.runStopLoss(0, 1693652783);
+    const endBalance = await outToken.balanceOf(account.address).then((v) => new bn(v.toString()));
+    console.log(endBalance.minus(startBalance).div('1e18').toString(10));
   });
 });

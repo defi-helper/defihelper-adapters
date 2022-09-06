@@ -42,11 +42,12 @@ describe('MasterChef2LpRestake', function () {
   it('', async function () {
     await automate.setStopLoss(
       ['0xafd2Dfb918777d9bCC29E315C4Df4551208DBE82', '0xb181Ea0d2835Df254F8c9E6a0CDFC1024B6Aa3e8'],
-      new bn('100e18').toFixed(0),
+      new bn('50e18').toFixed(0),
       0
     );
-    console.log(await tokenReward.balanceOf(account.address).then(v => v.toString()));
-    const tx = await automate.runStopLoss(0, 1661836696);
-    console.log(await tokenReward.balanceOf(account.address).then(v => v.toString()));
+    const startBalance = await tokenReward.balanceOf(account.address).then((v) => new bn(v.toString()));
+    const tx = await automate.runStopLoss(0, 1693652783);
+    const endBalance = await tokenReward.balanceOf(account.address).then((v) => new bn(v.toString()));
+    console.log(endBalance.minus(startBalance).div('1e18').toString(10));
   });
 });
