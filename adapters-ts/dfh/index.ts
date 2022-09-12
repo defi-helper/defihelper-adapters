@@ -1,4 +1,8 @@
-import type { Signer, ContractTransaction } from "ethers";
+import type {
+  Signer,
+  ContractTransaction,
+  BigNumber as EthersBigNumber,
+} from "ethers";
 import type { Provider as MulticallProvider } from "@defihelper/ethers-multicall";
 import { bignumber as bn, ethers, dayjs, ethersMulticall } from "../lib";
 import { debug, debugo } from "../utils/base";
@@ -790,13 +794,19 @@ module.exports = {
               debugo({ _prefix: "refund", tokenAddress, amount });
               const token = erc20.contract(provider, tokenAddress);
               const tokenDecimals = await token.decimals();
+              if (amount === undefined) {
+              }
               const refundTx = await router.refund(
                 signerAddress,
                 tokenAddress,
-                ethereum
-                  .toBN(amount)
-                  .multipliedBy(`1e${tokenDecimals}`)
-                  .toFixed(0)
+                amount === ""
+                  ? await router
+                      .balanceOf(signerAddress, tokenAddress)
+                      .then((v: EthersBigNumber) => v.toString())
+                  : ethereum
+                      .toBN(amount)
+                      .multipliedBy(`1e${tokenDecimals}`)
+                      .toFixed(0)
               );
               debugo({
                 _prefix: "refund",
