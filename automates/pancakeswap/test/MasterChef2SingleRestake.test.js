@@ -29,8 +29,9 @@ describe('MasterChef2SingleRestake', function () {
       0,
       300
     );
-    await token0.transfer(automate.address, new bn('10e18').toFixed(0));
-    await automate.deposit();
+    const depositAmount = new bn('10e18').toFixed(0);
+    await token0.approve(automate.address, depositAmount);
+    await automate.deposit(depositAmount);
   });
 
   it('', async function () {

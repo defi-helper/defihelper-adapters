@@ -35,8 +35,9 @@ describe('MasterChef2LpRestake', function () {
       0,
       300
     );
-    await pair.transfer(automate.address, new bn('10e18').toFixed(0));
-    await automate.deposit();
+    const depositAmount = new bn('10e18').toFixed(0);
+    await pair.approve(automate.address, depositAmount);
+    await automate.deposit(depositAmount);
   });
 
   it('', async function () {

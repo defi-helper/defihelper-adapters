@@ -71,11 +71,11 @@ contract MasterChef2SingleRestake is Automate {
     }
   }
 
-  function deposit() external onlyOwner {
+  function deposit(uint256 amount) external onlyOwner {
     IERC20 _stakingToken = stakingToken; // gas optimisation
-    uint256 balance = _stakingToken.balanceOf(address(this));
-    _stakingToken.safeApprove(address(staking), balance);
-    staking.deposit(pool, balance);
+    _stakingToken.safeTransferFrom(msg.sender, address(this), amount);
+    _stakingToken.safeApprove(address(staking), amount);
+    staking.deposit(pool, amount);
   }
 
   function refund() external onlyOwner {

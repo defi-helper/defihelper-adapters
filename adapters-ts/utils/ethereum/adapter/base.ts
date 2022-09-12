@@ -209,6 +209,62 @@ export namespace Automate {
       }
     >;
   }
+
+  export namespace AutoRestake {
+    export interface DepositComponent {
+      name: "automateRestake-deposit";
+      methods: {
+        tokenAddress: () => string;
+        symbol: () => string;
+        balanceOf: () => Promise<string>;
+        canTransfer: (amount: string) => Promise<true | Error>;
+        isApproved: (amount: string) => Promise<boolean | Error>;
+        approve: (
+          amount: string
+        ) => Promise<{ tx?: ContractTransaction } | Error>;
+        canDeposit: () => Promise<true | Error>;
+        deposit: (amount: string) => Promise<{ tx: ContractTransaction }>;
+      };
+    }
+
+    export interface RefundComponent {
+      name: "automateRestake-refund";
+      methods: {
+        tokenAddress: () => string;
+        symbol: () => string;
+        staked: () => Promise<string>;
+        can: () => Promise<true | Error>;
+        refund: () => Promise<{ tx: ContractTransaction }>;
+      };
+    }
+
+    export interface MigrateComponent {
+      name: "automateRestake-migrate";
+      methods: {
+        staked: () => Promise<string>;
+        canWithdraw: () => Promise<true | Error>;
+        withdraw: () => Promise<{ tx: ContractTransaction }>;
+      } & DepositComponent["methods"];
+    }
+
+    export interface Adapter {
+      (signer: Signer, contractAddress: string): Promise<{
+        contract: string;
+        deposit: DepositComponent;
+        refund: RefundComponent;
+        migrate: MigrateComponent;
+        runParams: () => Promise<
+          | {
+              gasPrice: string;
+              gasLimit: string;
+              calldata: any[];
+            }
+          | Error
+        >;
+        run: () => Promise<ContractTransaction | Error>;
+      }>;
+    }
+  }
 }
 
 export interface ContractsResolver {
