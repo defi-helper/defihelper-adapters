@@ -86,20 +86,21 @@ module.exports = {
         ...ethereum.defaultOptions(),
         ...initOptions,
       };
+      const networkId = await provider
+        .getNetwork()
+        .then(({ chainId }) => chainId);
       const masterChefSavedPools = await cache.read(
         "lydiaFinance",
+        networkId,
         "croesusPools"
       );
       const blockTag = options.blockNumber;
-      const network = await provider
-        .getNetwork()
-        .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
       const priceFeed = bridgeWrapperBuild(
-        await dfh.getPriceFeeds(network),
+        await dfh.getPriceFeeds(networkId),
         blockTag,
         block,
-        network
+        networkId
       );
       const multicall = new ethersMulticall.Provider(provider);
       await multicall.init();
@@ -274,20 +275,21 @@ module.exports = {
         ...ethereum.defaultOptions(),
         ...initOptions,
       };
+      const networkId = await provider
+        .getNetwork()
+        .then(({ chainId }) => chainId);
       const masterChefSavedPools = await cache.read(
         "lydiaFinance",
+        networkId,
         "croesusPools"
       );
       const blockTag = options.blockNumber;
-      const network = await provider
-        .getNetwork()
-        .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
       const priceFeed = bridgeWrapperBuild(
-        await dfh.getPriceFeeds(network),
+        await dfh.getPriceFeeds(networkId),
         blockTag,
         block,
-        network
+        networkId
       );
 
       const pool = masterChefSavedPools.find(
@@ -412,6 +414,9 @@ module.exports = {
   automates: {
     contractsResolver: {
       default: contractsResolver(async (provider, options = {}) => {
+        const networkId = await provider
+          .getNetwork()
+          .then(({ chainId }) => chainId);
         const multicall = new ethersMulticall.Provider(provider);
         await multicall.init();
 
@@ -488,6 +493,7 @@ module.exports = {
           cache.write(
             options.cacheAuth,
             "lydiaFinance",
+            networkId,
             "croesusPools",
             pools.map(({ poolIndex, stakingToken, adapter }) => ({
               index: poolIndex,
@@ -502,19 +508,19 @@ module.exports = {
     },
     deploy: {
       MasterChefLpRestake: masterChef.stakingAutomateDeployTabs({
-        liquidityRouter: "0xA52aBE4676dbfd04Df42eF7755F01A3c41f28D27",
-        stakingAddress: croesusAddress,
-        poolsLoader: () =>
+        liquidityRouterResolve: "0xA52aBE4676dbfd04Df42eF7755F01A3c41f28D27",
+        stakingAddressResolve: croesusAddress,
+        poolsLoader: (networkId) =>
           cache
-            .read("lydiaFinance", "croesusPools")
+            .read("lydiaFinance", networkId, "croesusPools")
             .then((pools) => pools.filter(({ type }) => type === "lp")),
       }),
       MasterChefSingleRestake: masterChef.stakingAutomateDeployTabs({
-        liquidityRouter: "0xA52aBE4676dbfd04Df42eF7755F01A3c41f28D27",
-        stakingAddress: croesusAddress,
-        poolsLoader: () =>
+        liquidityRouterResolve: "0xA52aBE4676dbfd04Df42eF7755F01A3c41f28D27",
+        stakingAddressResolve: croesusAddress,
+        poolsLoader: (networkId) =>
           cache
-            .read("lydiaFinance", "croesusPools")
+            .read("lydiaFinance", networkId, "croesusPools")
             .then((pools) => pools.filter(({ type }) => type === "single")),
       }),
     },

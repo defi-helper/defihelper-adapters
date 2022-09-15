@@ -36,11 +36,11 @@ const database = knex({
 const app = Express();
 app.use(Express.static(path.resolve(__dirname, '../adapters-public-ts')));
 app.get('/cache', async (req, res) => {
-  const { protocol, key } = req.query;
+  const { protocol, network, key } = req.query;
 
   return res.json(
     await database('cache')
-      .where({ protocol, key })
+      .where({ protocol, network, key })
       .first()
       .then((row) => (row ? row.data : []))
   );
@@ -49,15 +49,16 @@ app.post('/cache', [json()], async (req, res) => {
   const auth = req.header('Auth');
   if (auth !== process.env.CACHE_AUTH) return res.status(403).send('');
 
-  const { protocol, key } = req.query;
+  const { protocol, network, key } = req.query;
   const data = req.body;
 
   const cache = {
     protocol,
+    network,
     key,
     data: JSON.stringify(data, null, 4),
   };
-  const updated = await database('cache').update(cache).where({ protocol, key });
+  const updated = await database('cache').update(cache).where({ protocol, network, key });
   if (updated === 0) {
     await database('cache').insert({ ...cache, id: uuid() });
   }

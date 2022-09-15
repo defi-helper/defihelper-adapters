@@ -30,6 +30,10 @@ export class Node {
 }
 
 export class Signer extends Node {
+  address = new Promise<string>((resolve) => {
+    this.signer.getAddress().then(resolve);
+  });
+
   constructor(public readonly signer: ethersType.Signer) {
     if (!signer.provider) throw new Error("Invalid signer");
     super(signer.provider);
@@ -61,10 +65,7 @@ export class Contract {
 }
 
 export class SignedContract extends Contract {
-  constructor(
-    public readonly signer: Signer,
-    public readonly contract: ethersType.Contract
-  ) {
+  constructor(public readonly signer: Signer, contract: ethersType.Contract) {
     super(signer, contract.connect(signer.signer));
   }
 }

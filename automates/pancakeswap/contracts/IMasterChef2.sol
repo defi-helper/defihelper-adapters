@@ -5,6 +5,7 @@ interface IMasterChef2 {
   struct UserInfo {
     uint256 amount;
     uint256 rewardDebt;
+    uint256 boostMultiplier;
   }
 
   struct PoolInfo {
@@ -16,6 +17,8 @@ interface IMasterChef2 {
 
   // solhint-disable-next-line func-name-mixedcase
   function CAKE() external view returns (address);
+
+  function poolLength() external view returns (uint256);
 
   function poolInfo(uint256 pool) external view returns (PoolInfo memory);
 

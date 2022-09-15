@@ -165,21 +165,21 @@ module.exports = {
         ...ethereum.defaultOptions(),
         ...initOptions,
       };
-
+      const networkId = await provider
+        .getNetwork()
+        .then(({ chainId }) => chainId);
       const masterChefSavedPools = await cache.read(
         "bscApeSwap",
+        networkId,
         "masterChefPools"
       );
       const blockTag = options.blockNumber;
-      const network = await provider
-        .getNetwork()
-        .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
       const priceFeed = bridgeWrapperBuild(
-        await dfh.getPriceFeeds(network),
+        await dfh.getPriceFeeds(networkId),
         blockTag,
         block,
-        network
+        networkId
       );
       const multicall = new ethersMulticall.Provider(provider);
       await multicall.init();
@@ -374,21 +374,21 @@ module.exports = {
         ...ethereum.defaultOptions(),
         ...initOptions,
       };
-
+      const networkId = await provider
+        .getNetwork()
+        .then(({ chainId }) => chainId);
       const masterChefSavedPools = await cache.read(
         "bscApeSwap",
+        networkId,
         "masterChefPolygonPools"
       );
       const blockTag = options.blockNumber;
-      const network = await provider
-        .getNetwork()
-        .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
       const priceFeed = bridgeWrapperBuild(
-        await dfh.getPriceFeeds(network),
+        await dfh.getPriceFeeds(networkId),
         blockTag,
         block,
-        network
+        networkId
       );
       const multicall = new ethersMulticall.Provider(provider);
       await multicall.init();
@@ -588,20 +588,21 @@ module.exports = {
         ...ethereum.defaultOptions(),
         ...initOptions,
       };
+      const networkId = await provider
+        .getNetwork()
+        .then(({ chainId }) => chainId);
       const masterChefSavedPools = await cache.read(
         "bscApeSwap",
+        networkId,
         "masterChefPools"
       );
       const blockTag = options.blockNumber;
-      const network = await provider
-        .getNetwork()
-        .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
       const priceFeed = bridgeWrapperBuild(
-        await dfh.getPriceFeeds(network),
+        await dfh.getPriceFeeds(networkId),
         blockTag,
         block,
-        network
+        networkId
       );
 
       const pool = masterChefSavedPools.find(
@@ -1430,6 +1431,9 @@ module.exports = {
   automates: {
     contractsResolver: {
       default: contractsResolver(async (provider, options = {}) => {
+        const networkId = await provider
+          .getNetwork()
+          .then(({ chainId }) => chainId);
         const multicall = new ethersMulticall.Provider(provider);
         await multicall.init();
 
@@ -1501,6 +1505,7 @@ module.exports = {
           cache.write(
             options.cacheAuth,
             "bscApeSwap",
+            networkId,
             "masterChefPools",
             uniswapLiquidityPools.map(
               ({ poolIndex, stakingToken, adapter }) => ({
@@ -1555,6 +1560,7 @@ module.exports = {
           cache.write(
             options.cacheAuth,
             "bscApeSwap",
+            networkId,
             "apeRewardContracts",
             poolsApeReward.map(({ address }: ResolvedContract) => ({
               stakingContract: address,
@@ -1566,6 +1572,9 @@ module.exports = {
       }),
 
       polygonPools: contractsResolver(async (provider, options = {}) => {
+        const networkId = await provider
+          .getNetwork()
+          .then(({ chainId }) => chainId);
         const multicall = new ethersMulticall.Provider(provider);
         await multicall.init();
 
@@ -1641,6 +1650,7 @@ module.exports = {
           cache.write(
             options.cacheAuth,
             "bscApeSwap",
+            networkId,
             "masterChefPolygonPools",
             uniswapLiquidityPools.map(({ poolIndex, address }) => ({
               index: poolIndex,
@@ -1655,19 +1665,19 @@ module.exports = {
     },
     deploy: {
       MasterChefLpRestake: masterChef.stakingAutomateDeployTabs({
-        liquidityRouter: "0xcF0feBd3f17CEf5b47b0cD257aCf6025c5BFf3b7",
-        stakingAddress: masterChefAddress,
-        poolsLoader: () =>
+        liquidityRouterResolve: "0xcF0feBd3f17CEf5b47b0cD257aCf6025c5BFf3b7",
+        stakingAddressResolve: masterChefAddress,
+        poolsLoader: (networkId) =>
           cache
-            .read("bscApeSwap", "masterChefPools")
+            .read("bscApeSwap", networkId, "masterChefPools")
             .then((pools) => pools.filter(({ type }) => type === "lp")),
       }),
       MasterChefSingleRestake: masterChef.stakingAutomateDeployTabs({
-        liquidityRouter: "0xcF0feBd3f17CEf5b47b0cD257aCf6025c5BFf3b7",
-        stakingAddress: masterChefAddress,
-        poolsLoader: () =>
+        liquidityRouterResolve: "0xcF0feBd3f17CEf5b47b0cD257aCf6025c5BFf3b7",
+        stakingAddressResolve: masterChefAddress,
+        poolsLoader: (networkId) =>
           cache
-            .read("bscApeSwap", "masterChefPools")
+            .read("bscApeSwap", networkId, "masterChefPools")
             .then((pools) => pools.filter(({ type }) => type === "single")),
       }),
       ApeRewardV4Restake: deployAdapter(
@@ -1677,8 +1687,10 @@ module.exports = {
           prototypeAddress,
           contractAddress = undefined
         ) => {
+          const networkId = await signer.getChainId();
           const stakingContracts = await cache.read(
             "bscApeSwap",
+            networkId,
             "apeRewardContracts"
           );
           const stakingContract =

@@ -36,9 +36,17 @@ library SafeUniswapV2Router {
     )
   {
     uint256 amountA = IERC20(tokenA).balanceOf(address(this));
-    uint256 amountB = IERC20(tokenB).balanceOf(address(this));
+    if (IERC20(tokenA).allowance(address(this), address(router)) > 0) {
+      IERC20(tokenA).safeApprove(address(router), 0);
+    }
     IERC20(tokenA).safeApprove(address(router), amountA);
+
+    uint256 amountB = IERC20(tokenB).balanceOf(address(this));
+    if (IERC20(tokenB).allowance(address(this), address(router)) > 0) {
+      IERC20(tokenB).safeApprove(address(router), 0);
+    }
     IERC20(tokenB).safeApprove(address(router), amountB);
+
     return router.addLiquidity(tokenA, tokenB, amountA, amountB, 0, 0, to, deadline);
   }
 
@@ -58,8 +66,13 @@ library SafeUniswapV2Router {
   {
     tokenA = IUniswapV2Pair(pair).token0();
     tokenB = IUniswapV2Pair(pair).token1();
+
     uint256 balance = IERC20(pair).balanceOf(address(this));
+    if (IERC20(pair).allowance(address(this), address(router)) > 0) {
+      IERC20(pair).safeApprove(address(router), 0);
+    }
     IERC20(pair).safeApprove(address(router), balance);
+
     (amountA, amountB) = router.removeLiquidity(tokenA, tokenB, balance, 0, 0, to, deadline);
   }
 }

@@ -42,10 +42,6 @@ export class Token {
     public readonly decimals: number
   ) {}
 
-  get maxValue() {
-    return new TokenAmount(this, new bn(2).pow(this.decimals).minus(1));
-  }
-
   connect(contract: ethereum.Contract) {
     return ConnectedToken.fromToken(this, contract);
   }
@@ -150,7 +146,7 @@ export class SignedToken extends ConnectedToken {
   }
 
   async approveMax(recipient: string) {
-    return this.approve(recipient, this.maxValue);
+    return this.approve(recipient, new bn(2).pow(256).minus(1).toFixed(0));
   }
 }
 
@@ -201,6 +197,10 @@ export class TokenAmount {
 
   eq(amount: TokenAmount) {
     return this.int.eq(amount.int);
+  }
+
+  plus(amount: TokenAmount) {
+    return TokenAmount.fromInt(this.token, this.int.plus(amount.int));
   }
 
   toString() {

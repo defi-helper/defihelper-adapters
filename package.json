@@ -72,6 +72,7 @@
     "remarkable": "^2.0.1",
     "remarkable-react": "^1.4.3",
     "rollup": "^2.55.1",
+    "rollup-plugin-terser": "^7.0.2",
     "rollup-plugin-ts": "^2.0.5",
     "solc": "^0.8.6",
     "solhint": "^3.3.6",

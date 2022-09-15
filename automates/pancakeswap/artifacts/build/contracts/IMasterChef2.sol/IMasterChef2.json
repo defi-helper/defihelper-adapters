@@ -132,6 +132,19 @@
       "type": "function"
     },
     {
+      "inputs": [],
+      "name": "poolLength",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
       "inputs": [
         {
           "internalType": "uint256",
@@ -156,6 +169,11 @@
             {
               "internalType": "uint256",
               "name": "rewardDebt",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "boostMultiplier",
               "type": "uint256"
             }
           ],

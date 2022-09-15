@@ -13,6 +13,8 @@ contract MasterChef2Mock is IMasterChef2, Ownable {
 
   address public override CAKE;
 
+  uint256 public override poolLength;
+
   mapping(uint256 => IMasterChef2.PoolInfo) internal _pools;
 
   mapping(uint256 => address) internal _lpTokens;
@@ -24,6 +26,10 @@ contract MasterChef2Mock is IMasterChef2, Ownable {
   }
 
   function setPool(uint256 pool, address _lpToken) external onlyOwner {
+    require(_lpToken != address(0), "MasterChef2Mock::setPool: invalid lp token address");
+    if (_lpTokens[pool] == address(0)) {
+      poolLength++;
+    }
     _lpTokens[pool] = _lpToken;
   }
 

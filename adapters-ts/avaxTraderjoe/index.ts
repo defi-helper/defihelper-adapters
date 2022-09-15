@@ -112,20 +112,21 @@ module.exports = {
         ...ethereum.defaultOptions(),
         ...initOptions,
       };
+      const networkId = await provider
+        .getNetwork()
+        .then(({ chainId }) => chainId);
       const masterChefSavedPools = await cache.read(
         "avaxTraderjoe",
+        networkId,
         "masterChefV2Pools"
       );
       const blockTag = options.blockNumber;
-      const network = await provider
-        .getNetwork()
-        .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
       const priceFeed = bridgeWrapperBuild(
-        await dfh.getPriceFeeds(network),
+        await dfh.getPriceFeeds(networkId),
         blockTag,
         block,
-        network
+        networkId
       );
       const multicall = new ethersMulticall.Provider(provider);
       await multicall.init();
@@ -321,20 +322,21 @@ module.exports = {
         ...ethereum.defaultOptions(),
         ...initOptions,
       };
+      const networkId = await provider
+        .getNetwork()
+        .then(({ chainId }) => chainId);
       const masterChefSavedPools = await cache.read(
         "avaxTraderjoe",
+        networkId,
         "masterChefV2Pools"
       );
       const blockTag = options.blockNumber;
-      const network = await provider
-        .getNetwork()
-        .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
       const priceFeed = bridgeWrapperBuild(
-        await dfh.getPriceFeeds(network),
+        await dfh.getPriceFeeds(networkId),
         blockTag,
         block,
-        network
+        networkId
       );
 
       const pool = masterChefSavedPools.find(
@@ -509,20 +511,21 @@ module.exports = {
         ...ethereum.defaultOptions(),
         ...initOptions,
       };
+      const networkId = await provider
+        .getNetwork()
+        .then(({ chainId }) => chainId);
       const masterChefSavedPools = await cache.read(
         "avaxTraderjoe",
+        networkId,
         "masterChefV3Pools"
       );
       const blockTag = options.blockNumber;
-      const network = await provider
-        .getNetwork()
-        .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
       const priceFeed = bridgeWrapperBuild(
-        await dfh.getPriceFeeds(network),
+        await dfh.getPriceFeeds(networkId),
         blockTag,
         block,
-        network
+        networkId
       );
       const multicall = new ethersMulticall.Provider(provider);
       await multicall.init();
@@ -697,20 +700,21 @@ module.exports = {
         ...ethereum.defaultOptions(),
         ...initOptions,
       };
+      const networkId = await provider
+        .getNetwork()
+        .then(({ chainId }) => chainId);
       const masterChefSavedPools = await cache.read(
         "avaxTraderjoe",
+        networkId,
         "boostedMasterChefJoePools"
       );
       const blockTag = options.blockNumber;
-      const network = await provider
-        .getNetwork()
-        .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
       const priceFeed = bridgeWrapperBuild(
-        await dfh.getPriceFeeds(network),
+        await dfh.getPriceFeeds(networkId),
         blockTag,
         block,
-        network
+        networkId
       );
       const multicall = new ethersMulticall.Provider(provider);
       await multicall.init();
@@ -1006,6 +1010,9 @@ module.exports = {
   automates: {
     contractsResolver: {
       default: contractsResolver(async (provider, options = {}) => {
+        const networkId = await provider
+          .getNetwork()
+          .then(({ chainId }) => chainId);
         const multicall = new ethersMulticall.Provider(provider);
         await multicall.init();
 
@@ -1242,6 +1249,7 @@ module.exports = {
           cache.write(
             options.cacheAuth,
             "avaxTraderjoe",
+            networkId,
             "masterChefV2Pools",
             poolsV2.map(({ poolIndex, stakingToken, adapter }) => ({
               index: poolIndex,
@@ -1252,6 +1260,7 @@ module.exports = {
           cache.write(
             options.cacheAuth,
             "avaxTraderjoe",
+            networkId,
             "masterChefV3Pools",
             poolsV3.map(({ poolIndex, stakingToken, adapter }) => ({
               index: poolIndex,
@@ -1262,6 +1271,7 @@ module.exports = {
           cache.write(
             options.cacheAuth,
             "avaxTraderjoe",
+            networkId,
             "boostedMasterChefJoePools",
             boostedMasterChefJoePools.map(({ poolIndex, stakingToken, adapter }) => ({
               index: poolIndex,
@@ -1276,35 +1286,35 @@ module.exports = {
     },
     deploy: {
       MasterChefV2LpRestake: masterChef.stakingAutomateDeployTabs({
-        liquidityRouter: "0x60aE616a2155Ee3d9A68541Ba4544862310933d4",
-        stakingAddress: masterChefV2Address,
-        poolsLoader: () =>
+        liquidityRouterResolve: "0x60aE616a2155Ee3d9A68541Ba4544862310933d4",
+        stakingAddressResolve: masterChefV2Address,
+        poolsLoader: (networkId) =>
           cache
-            .read("avaxTraderjoe", "masterChefV2Pools")
+            .read("avaxTraderjoe", networkId, "masterChefV2Pools")
             .then((pools) => pools.filter(({ type }) => type === "lp")),
       }),
       MasterChefV2SingleRestake: masterChef.stakingAutomateDeployTabs({
-        liquidityRouter: "0x60aE616a2155Ee3d9A68541Ba4544862310933d4",
-        stakingAddress: masterChefV2Address,
-        poolsLoader: () =>
+        liquidityRouterResolve: "0x60aE616a2155Ee3d9A68541Ba4544862310933d4",
+        stakingAddressResolve: masterChefV2Address,
+        poolsLoader: (networkId) =>
           cache
-            .read("avaxTraderjoe", "masterChefV2Pools")
+            .read("avaxTraderjoe", networkId, "masterChefV2Pools")
             .then((pools) => pools.filter(({ type }) => type === "single")),
       }),
       MasterChefV3LpRestake2: masterChef.stakingAutomateDeployTabs({
-        liquidityRouter: "0x60aE616a2155Ee3d9A68541Ba4544862310933d4",
-        stakingAddress: masterChefV3Address,
-        poolsLoader: () =>
+        liquidityRouterResolve: "0x60aE616a2155Ee3d9A68541Ba4544862310933d4",
+        stakingAddressResolve: masterChefV3Address,
+        poolsLoader: (networkId) =>
           cache
-            .read("avaxTraderjoe", "masterChefV3Pools")
+            .read("avaxTraderjoe", networkId, "masterChefV3Pools")
             .then((pools) => pools.filter(({ type }) => type === "lp")),
       }),
       BoostedMasterChefJoeLpRestake: masterChef.stakingAutomateDeployTabs({
-        liquidityRouter: "0x60aE616a2155Ee3d9A68541Ba4544862310933d4",
-        stakingAddress: boostedMasterChefJoeAddress,
-        poolsLoader: () =>
+        liquidityRouterResolve: "0x60aE616a2155Ee3d9A68541Ba4544862310933d4",
+        stakingAddressResolve: boostedMasterChefJoeAddress,
+        poolsLoader: (networkId) =>
           cache
-            .read("avaxTraderjoe", "boostedMasterChefJoePools")
+            .read("avaxTraderjoe", networkId, "boostedMasterChefJoePools")
             .then((pools) => pools.filter(({ type }) => type === "lp")),
       }),
     },

@@ -217,12 +217,11 @@ export namespace Automate {
         tokenAddress: () => string;
         symbol: () => string;
         balanceOf: () => Promise<string>;
-        canTransfer: (amount: string) => Promise<true | Error>;
         isApproved: (amount: string) => Promise<boolean | Error>;
         approve: (
           amount: string
         ) => Promise<{ tx?: ContractTransaction } | Error>;
-        canDeposit: () => Promise<true | Error>;
+        canDeposit: (amount: string) => Promise<true | Error>;
         deposit: (amount: string) => Promise<{ tx: ContractTransaction }>;
       };
     }
@@ -247,12 +246,9 @@ export namespace Automate {
       } & DepositComponent["methods"];
     }
 
-    export interface Adapter {
-      (signer: Signer, contractAddress: string): Promise<{
-        contract: string;
-        deposit: DepositComponent;
-        refund: RefundComponent;
-        migrate: MigrateComponent;
+    export interface RunComponent {
+      name: "automateRestake-run";
+      methods: {
         runParams: () => Promise<
           | {
               gasPrice: string;
@@ -261,7 +257,37 @@ export namespace Automate {
             }
           | Error
         >;
-        run: () => Promise<ContractTransaction | Error>;
+        run: () => Promise<{ tx: ContractTransaction } | Error>;
+      };
+    }
+
+    export interface StopLossComponent {
+      name: "automateRestake-stopLoss";
+      methods: {
+        startTokens: () => Promise<string[]>;
+        autoPath: (from: string, to: string) => Promise<string[]>;
+        amountOut: (path: string[]) => Promise<string>;
+        canSetStopLoss: (
+          path: string[],
+          amountOut: string,
+          amountOutMin: string
+        ) => Promise<true | Error>;
+        setStopLoss: (
+          path: string[],
+          amountOut: string,
+          amountOutMin: string
+        ) => Promise<{ tx: ContractTransaction }>;
+        removeStopLoss: () => Promise<{ tx: ContractTransaction }>;
+        runStopLoss: () => Promise<{ tx: ContractTransaction }>;
+      };
+    }
+
+    export interface Adapter {
+      (signer: Signer, contractAddress: string): Promise<{
+        deposit: DepositComponent;
+        refund: RefundComponent;
+        migrate: MigrateComponent;
+        run: RunComponent;
       }>;
     }
   }
