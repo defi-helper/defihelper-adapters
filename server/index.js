@@ -37,6 +37,9 @@ const app = Express();
 app.use(Express.static(path.resolve(__dirname, '../adapters-public-ts')));
 app.get('/cache', async (req, res) => {
   const { protocol, network, key } = req.query;
+  if (!protocol || !network || !key) {
+    return res.status(400).send(`Invalid params ${protocol} ${network} ${key}`);
+  }
 
   return res.json(
     await database('cache')
