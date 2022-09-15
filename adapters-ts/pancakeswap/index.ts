@@ -31,7 +31,7 @@ const masterChefAddressResolver = (chainId: number) =>
   }[chainId]);
 const masterChef2AddressResolver = (chainId: number) =>
   ({
-    5: "0x411256BBe5cb97EF0C6b58BACbfE998c1ceb7f00",
+    5: "0x946BD2cF228e9B458Ab09c8536550C41Bdd14512",
     56: "0xa5f8C5Dbd5F286960b9d90548680aE5ebFf07652",
   }[chainId]);
 const liquidityRouterResolve = (chainId: number) =>
@@ -133,7 +133,7 @@ function masterChef2ProviderFactory(
               .then(ethereum.toBN);
       },
       rewardToken() {
-        return "0x0e09fabb73bd3ade0a17ecc321fd13a19e81ce82";
+        return this.contract.CAKE();
       },
       async poolInfo(poolIndex) {
         const lpToken = await this.contract.lpToken(poolIndex, {

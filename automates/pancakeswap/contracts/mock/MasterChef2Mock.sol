@@ -15,6 +15,10 @@ contract MasterChef2Mock is IMasterChef2, Ownable {
 
   uint256 public override poolLength;
 
+  uint256 public override totalRegularAllocPoint;
+
+  uint256 public override totalSpecialAllocPoint;
+
   mapping(uint256 => IMasterChef2.PoolInfo) internal _pools;
 
   mapping(uint256 => address) internal _lpTokens;
@@ -23,6 +27,10 @@ contract MasterChef2Mock is IMasterChef2, Ownable {
 
   constructor(address _CAKE) {
     CAKE = _CAKE;
+  }
+
+  function cakePerBlock(bool) override external pure returns (uint256) {
+    return 0;
   }
 
   function setPool(uint256 pool, address _lpToken) external onlyOwner {
