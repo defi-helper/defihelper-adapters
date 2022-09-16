@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ path: './configuration/.env' });
 const cla = require('command-line-args');
 const hardhat = require('hardhat');
 const path = require('path');

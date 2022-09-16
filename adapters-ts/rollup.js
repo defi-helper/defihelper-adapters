@@ -1,4 +1,3 @@
-require('dotenv').config();
 const { defineConfig } = require('rollup');
 const json = require('@rollup/plugin-json');
 const { nodeResolve } = require('@rollup/plugin-node-resolve');

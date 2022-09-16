@@ -1,6 +1,6 @@
 require('@nomiclabs/hardhat-ethers');
 require('hardhat-deploy');
-require('dotenv').config();
+require('dotenv').config({ path: './configuration/.env' });
 
 function maybeAccount(account) {
   return account ? [account] : [];

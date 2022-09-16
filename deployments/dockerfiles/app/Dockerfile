@@ -22,4 +22,5 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/public/dist ./public/dist
 COPY --from=build /app/adapters-public-ts ./adapters-public-ts
 EXPOSE 8080
-CMD [ "/bin/sh","-c","ln -s ./configuration/.env ./.env && node ./server/index.js"]
+
+CMD [ "node","./server/index.js" ]
