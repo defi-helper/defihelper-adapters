@@ -85,7 +85,10 @@ export function Main() {
         <div>
           <ul>
             <li>
-              <Link to={`/client/dfh/smart-trade`}>SmartTrade</Link>
+              <Link to="/client/dfh/smart-trade">SmartTrade</Link>
+            </li>
+            <li>
+              <Link to="/client/dfh/zap">LP Tokens manager</Link>
             </li>
           </ul>
         </div>

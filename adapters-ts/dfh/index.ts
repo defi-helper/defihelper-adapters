@@ -266,32 +266,28 @@ module.exports = {
               slippage,
               deadlineSeconds,
             });
-            const pairMulticall = uniswap.V2.pair.multicallContract(pair);
-            const [tokenDecimals, token0, token1, fee] = await multicall.all([
-              erc20.multicallContract(tokenAddress).decimals(),
-              pairMulticall.token0(),
-              pairMulticall.token1(),
-              automate.multicall.fee(),
-            ]);
+            const fee = await automate.contract.fee();
+            const pairInfo = await uniswap.V2.pair.ConnectedPair.fromAddress(
+              signer,
+              pair
+            );
+            const { token0, token1 } = await pairInfo.info;
             debugo({
               _prefix: "buy",
-              tokenDecimals,
-              token0,
-              token1,
+              token0: token0.address,
+              token1: token1.address,
               fee,
             });
 
-            const amountInt = new bn(amount).multipliedBy(
-              `1e${tokenDecimals.toString()}`
-            );
+            const amountInt = pairInfo.amountFloat(amount);
             const outMinPercent = new bn(1).minus(new bn(slippage).div(100));
-            let swap0 = { path: [tokenAddress, token0], outMin: "0" };
-            if (tokenAddress.toLowerCase() !== token0.toLowerCase()) {
+            let swap0 = { path: [tokenAddress, token0.address], outMin: "0" };
+            if (tokenAddress.toLowerCase() !== token0.address.toLowerCase()) {
               const { path, amountOut } = await uniswap.V2.router.autoRoute(
                 uniswap.V2.router.contract(signer.provider, router),
-                amountInt.div(2).toFixed(0),
+                amountInt.int.div(2).toFixed(0),
                 tokenAddress,
-                token0,
+                token0.address,
                 routeTokens[network] ?? []
               );
               swap0 = {
@@ -305,13 +301,13 @@ module.exports = {
               _prefix: "buy",
               swap0: JSON.stringify(swap0),
             });
-            let swap1 = { path: [tokenAddress, token1], outMin: "0" };
-            if (tokenAddress.toLowerCase() !== token1.toLowerCase()) {
+            let swap1 = { path: [tokenAddress, token1.address], outMin: "0" };
+            if (tokenAddress.toLowerCase() !== token1.address.toLowerCase()) {
               const { path, amountOut } = await uniswap.V2.router.autoRoute(
                 uniswap.V2.router.contract(signer.provider, router),
-                amountInt.minus(amountInt.div(2).toFixed(0)).toFixed(0),
+                amountInt.int.minus(amountInt.int.div(2).toFixed(0)).toFixed(0),
                 tokenAddress,
-                token1,
+                token1.address,
                 routeTokens[network] ?? []
               );
               swap1 = {
@@ -327,7 +323,7 @@ module.exports = {
             });
 
             const buyTx = await automate.contract.buyLiquidity(
-              amountInt.toFixed(0),
+              amountInt.toFixed(),
               router,
               swap0,
               swap1,
@@ -502,10 +498,7 @@ module.exports = {
               slippage,
               deadlineSeconds,
             });
-            const [pairDecimals, fee] = await multicall.all([
-              uniswap.V2.pair.multicallContract(pair).decimals(),
-              automate.multicall.fee(),
-            ]);
+            const fee = await automate.contract.fee();
             const pairInfo = await uniswap.V2.pair.ConnectedPair.fromAddress(
               signer,
               pair
@@ -513,10 +506,9 @@ module.exports = {
             const { token0, token1 } = await pairInfo.info;
             debugo({
               _prefix: "sell",
-              pairDecimals,
               fee,
-              token0,
-              token1,
+              token0: token0.address,
+              token1: token1.address,
             });
 
             const balance = await pairInfo.expandBalance(
@@ -528,7 +520,7 @@ module.exports = {
               token1Balance: balance.token1,
             });
             const outMinPercent = new bn(1).minus(new bn(slippage).div(100));
-            let swap0 = { path: [token0, tokenAddress], outMin: "0" };
+            let swap0 = { path: [token0.address, tokenAddress], outMin: "0" };
             if (tokenAddress.toLowerCase() !== token0.address.toLowerCase()) {
               const { path, amountOut } = await uniswap.V2.router.autoRoute(
                 uniswap.V2.router.contract(signer.provider, router),
@@ -545,10 +537,10 @@ module.exports = {
               };
             }
             debugo({
-              _prefix: "buy",
+              _prefix: "sell",
               swap0: JSON.stringify(swap0),
             });
-            let swap1 = { path: [token1, tokenAddress], outMin: "0" };
+            let swap1 = { path: [token1.address, tokenAddress], outMin: "0" };
             if (tokenAddress.toLowerCase() !== token1.address.toLowerCase()) {
               const { path, amountOut } = await uniswap.V2.router.autoRoute(
                 uniswap.V2.router.contract(signer.provider, router),
@@ -565,14 +557,12 @@ module.exports = {
               };
             }
             debugo({
-              _prefix: "buy",
+              _prefix: "sell",
               swap1: JSON.stringify(swap1),
             });
 
             const sellTx = await automate.contract.sellLiquidity(
-              new bn(amount)
-                .multipliedBy(`1e${pairDecimals.toString()}`)
-                .toFixed(0),
+              pairInfo.amountFloat(amount).toFixed(),
               router,
               swap0,
               swap1,
@@ -798,9 +788,8 @@ module.exports = {
         const router = signer.contract(SmartTradeRouterABI, contractAddress);
         const handler = signer.contract(
           SmartTradeSwapHandlerABI,
-          contractAddress,
+          contractAddress
         );
-
 
         return {
           name: "DFHSmartTradeSwapHandler",
@@ -923,7 +912,9 @@ module.exports = {
               let depositToken = { address: ZERO_ADDRESS, amount: "0" };
               if (deposit.token !== undefined) {
                 depositToken.address = path[0];
-                depositToken.amount = inToken.amountFloat(deposit.token).toFixed();
+                depositToken.amount = inToken
+                  .amountFloat(deposit.token)
+                  .toFixed();
               }
               let nativeTokenValue = "0";
               if (deposit.native !== undefined) {
