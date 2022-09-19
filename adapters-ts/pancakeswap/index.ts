@@ -25,21 +25,38 @@ import masterChefLpRestakeABI from "./data/masterChefLpRestakeABI.json";
 import masterChef2SingleRestakeABI from "./data/masterChef2SingleRestakeABI.json";
 import masterChef2LpRestakeABI from "./data/masterChef2LpRestakeABI.json";
 
-const masterChefAddress = "0x73feaa1ee314f8c655e354234017be2193c9e24e";
-const masterChef2Address = "0xa5f8C5Dbd5F286960b9d90548680aE5ebFf07652";
+const masterChefAddressResolver = (chainId: number) =>
+  ({
+    56: "0x73feaa1ee314f8c655e354234017be2193c9e24e",
+  }[chainId]);
+const masterChef2AddressResolver = (chainId: number) =>
+  ({
+    5: "0x946BD2cF228e9B458Ab09c8536550C41Bdd14512",
+    56: "0xa5f8C5Dbd5F286960b9d90548680aE5ebFf07652",
+  }[chainId]);
+const liquidityRouterResolve = (chainId: number) =>
+  ({
+    5: "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
+    56: "0x10ED43C718714eb63d5aA57B78B54704E256024E",
+  }[chainId]);
 const routeTokens = ["0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"];
 
 function masterChefProviderFactory(
   providerOrSigner: ethereum.ProviderOrSigner,
+  networkId: number,
   blockTag: ethereum.BlockNumber
 ) {
   const provider = ethers.providers.Provider.isProvider(providerOrSigner)
     ? providerOrSigner
     : providerOrSigner.provider;
   if (!provider) throw new Error("Provider not found");
+  const address = masterChefAddressResolver(networkId);
+  if (!address) {
+    throw new Error("Master chef contract not found for current network");
+  }
 
   return masterChef.buildMasterChefProvider(
-    new ethers.Contract(masterChefAddress, masterChefABI, providerOrSigner),
+    new ethers.Contract(address, masterChefABI, providerOrSigner),
     { blockTag },
     {
       rewardToken() {
@@ -81,6 +98,7 @@ function masterChefProviderFactory(
 
 function masterChef2ProviderFactory(
   providerOrSigner: ethereum.ProviderOrSigner,
+  networkId: number,
   blockTag: ethereum.BlockNumber,
   poolIndex?: number
 ) {
@@ -88,9 +106,13 @@ function masterChef2ProviderFactory(
     ? providerOrSigner
     : providerOrSigner.provider;
   if (!provider) throw new Error("Provider not found");
+  const address = masterChef2AddressResolver(networkId);
+  if (!address) {
+    throw new Error("Master chef 2 contract not found for current network");
+  }
 
   return masterChef.buildMasterChefProvider(
-    new ethers.Contract(masterChef2Address, masterChef2ABI, providerOrSigner),
+    new ethers.Contract(address, masterChef2ABI, providerOrSigner),
     { blockTag },
     {
       async totalAllocPoint() {
@@ -111,7 +133,7 @@ function masterChef2ProviderFactory(
               .then(ethereum.toBN);
       },
       rewardToken() {
-        return "0x0e09fabb73bd3ade0a17ecc321fd13a19e81ce82";
+        return this.contract.CAKE();
       },
       async poolInfo(poolIndex) {
         const lpToken = await this.contract.lpToken(poolIndex, {
@@ -162,6 +184,7 @@ module.exports = {
       };
       const masterChefSavedPools = await cache.read(
         "pancakeswap",
+        56,
         "masterChefPools"
       );
       const blockTag = options.blockNumber;
@@ -185,7 +208,11 @@ module.exports = {
         throw new Error("Pool is not found");
       }
 
-      const masterChefProvider = masterChefProviderFactory(provider, blockTag);
+      const masterChefProvider = masterChefProviderFactory(
+        provider,
+        network,
+        blockTag
+      );
       const poolInfo = await masterChefProvider.poolInfo(pool.index);
 
       const rewardToken = await masterChefProvider.rewardToken();
@@ -348,6 +375,7 @@ module.exports = {
       };
       const masterChefSavedPools = await cache.read(
         "pancakeswap",
+        56,
         "masterChefPools"
       );
       const blockTag = options.blockNumber;
@@ -369,7 +397,11 @@ module.exports = {
         throw new Error("Pool is not found");
       }
 
-      const masterChefProvider = masterChefProviderFactory(provider, blockTag);
+      const masterChefProvider = masterChefProviderFactory(
+        provider,
+        network,
+        blockTag
+      );
       const poolInfo = await masterChefProvider.poolInfo(pool.index);
 
       const rewardToken = await masterChefProvider.rewardToken();
@@ -489,20 +521,21 @@ module.exports = {
         ...ethereum.defaultOptions(),
         ...initOptions,
       };
-      const masterChefSavedPools = await cache.read(
-        "pancakeswap",
-        "masterChef2Pools"
-      );
       const blockTag = options.blockNumber;
-      const network = await provider
+      const networkId = await provider
         .getNetwork()
         .then(({ chainId }) => chainId);
+      const masterChefSavedPools = await cache.read(
+        "pancakeswap",
+        networkId,
+        "masterChef2Pools"
+      );
       const block = await provider.getBlock(blockTag);
       const priceFeed = bridgeWrapperBuild(
-        await dfh.getPriceFeeds(network),
+        await dfh.getPriceFeeds(networkId),
         blockTag,
         block,
-        network
+        networkId
       );
       const multicall = new ethersMulticall.Provider(provider);
       await multicall.init();
@@ -516,6 +549,7 @@ module.exports = {
 
       const masterChefProvider = masterChef2ProviderFactory(
         provider,
+        networkId,
         blockTag,
         pool.index
       );
@@ -679,20 +713,21 @@ module.exports = {
         ...ethereum.defaultOptions(),
         ...initOptions,
       };
-      const masterChefSavedPools = await cache.read(
-        "pancakeswap",
-        "masterChef2Pools"
-      );
       const blockTag = options.blockNumber;
-      const network = await provider
+      const networkId = await provider
         .getNetwork()
         .then(({ chainId }) => chainId);
+      const masterChefSavedPools = await cache.read(
+        "pancakeswap",
+        networkId,
+        "masterChef2Pools"
+      );
       const block = await provider.getBlock(blockTag);
       const priceFeed = bridgeWrapperBuild(
-        await dfh.getPriceFeeds(network),
+        await dfh.getPriceFeeds(networkId),
         blockTag,
         block,
-        network
+        networkId
       );
 
       const pool = masterChefSavedPools.find(
@@ -704,6 +739,7 @@ module.exports = {
 
       const masterChefProvider = masterChef2ProviderFactory(
         provider,
+        networkId,
         blockTag,
         pool.index
       );
@@ -1164,6 +1200,9 @@ module.exports = {
   automates: {
     contractsResolver: {
       default: contractsResolver(async (provider, options = {}) => {
+        const networkId = await provider
+          .getNetwork()
+          .then(({ chainId }) => chainId);
         const multicall = new ethersMulticall.Provider(provider);
         await multicall.init();
         type ResolvedPool = ResolvedContract & {
@@ -1171,230 +1210,246 @@ module.exports = {
           stakingToken: string;
         };
 
-        const masterChiefContract = new ethersMulticall.Contract(
-          masterChefAddress,
-          masterChefABI
-        );
-        const [totalPools] = await multicall.all([
-          masterChiefContract.poolLength(),
-        ]);
-        const poolsIndex = Array.from(
-          new Array(totalPools.toNumber()).keys()
-        ).filter((poolIndex) => ![64, 105, 444].includes(poolIndex));
-        const poolsInfo = await multicall.all(
-          poolsIndex.map((poolIndex) => masterChiefContract.poolInfo(poolIndex))
-        );
-        const poolsStakingTokensSymbol = await multicall.all(
-          poolsInfo.map(({ lpToken }) =>
-            erc20.multicallContract(lpToken).symbol()
-          )
-        );
-
-        const masterChefPools: ResolvedPool[] = await Promise.all(
-          poolsIndex.map(async (index, i) => {
-            const info = poolsInfo[i];
-            const stakingTokenSymbol = poolsStakingTokensSymbol[i];
-            const isPair = stakingTokenSymbol === "Cake-LP";
-
-            let token0Symbol, token1Symbol;
-            if (isPair) {
-              const [token0, token1] = await multicall.all([
-                uniswap.pair.multicallContract(info.lpToken).token0(),
-                uniswap.pair.multicallContract(info.lpToken).token1(),
-              ]);
-              const pairSymbols = await multicall.all([
-                erc20.multicallContract(token0).symbol(),
-                erc20.multicallContract(token1).symbol(),
-              ]);
-              token0Symbol = pairSymbols[0];
-              token1Symbol = pairSymbols[1];
-            }
-
-            return {
-              poolIndex: index,
-              stakingToken: info.lpToken,
-              name: isPair
-                ? `${token0Symbol}-${token1Symbol}`
-                : stakingTokenSymbol,
-              address: info.lpToken,
-              blockchain: "ethereum",
-              network: "56",
-              layout: "staking",
-              adapter: isPair ? "masterChefPair" : "masterChefSingle",
-              description: "",
-              automate: {
-                autorestakeAdapter: isPair
-                  ? "MasterChefLpRestake"
-                  : "MasterChefSingleRestake",
-                adapters: isPair ? ["masterChefPair"] : ["masterChefSingle"],
-                lpTokensManager: isPair
-                  ? {
-                      router: "0x10ED43C718714eb63d5aA57B78B54704E256024E",
-                      pair: info.lpToken,
-                    }
-                  : undefined,
-              },
-              link: "https://pancakeswap.finance/farms",
-            };
-          })
-        );
-        if (options.cacheAuth) {
-          cache.write(
-            options.cacheAuth,
-            "pancakeswap",
-            "masterChefPools",
-            masterChefPools.map(({ poolIndex, stakingToken, adapter }) => ({
-              index: poolIndex,
-              stakingToken,
-              type: adapter === "masterChefPair" ? "lp" : "single",
-            }))
+        const masterChefAddress = masterChefAddressResolver(networkId);
+        let masterChefPools: ResolvedPool[] = [];
+        if (masterChefAddress) {
+          const masterChiefContract = new ethersMulticall.Contract(
+            masterChefAddress,
+            masterChefABI
           );
-        }
-
-        const masterChief2Contract = new ethersMulticall.Contract(
-          masterChef2Address,
-          masterChef2ABI
-        );
-        const [totalPools2] = await multicall.all([
-          masterChief2Contract.poolLength(),
-        ]);
-        const pools2Index = Array.from(
-          new Array(totalPools2.toNumber()).keys()
-        );
-        const pools2Token = await multicall.all(
-          pools2Index.map((poolIndex) =>
-            masterChief2Contract.lpToken(poolIndex)
-          )
-        );
-        const pools2StakingTokensSymbol = await multicall.all(
-          pools2Token.map((lpToken) =>
-            erc20.multicallContract(lpToken).symbol()
-          )
-        );
-
-        const masterChef2Pools: ResolvedPool[] = await Promise.all(
-          pools2Index.map(async (index, i) => {
-            const lpToken = pools2Token[i];
-            const stakingTokenSymbol = pools2StakingTokensSymbol[i];
-            const isPair = stakingTokenSymbol === "Cake-LP";
-
-            let token0Symbol, token1Symbol;
-            if (isPair) {
-              const [token0, token1] = await multicall.all([
-                uniswap.pair.multicallContract(lpToken).token0(),
-                uniswap.pair.multicallContract(lpToken).token1(),
-              ]);
-              const pairSymbols = await multicall.all([
-                erc20.multicallContract(token0).symbol(),
-                erc20.multicallContract(token1).symbol(),
-              ]);
-              token0Symbol = pairSymbols[0];
-              token1Symbol = pairSymbols[1];
-            }
-
-            return {
-              poolIndex: index,
-              stakingToken: lpToken,
-              name: isPair
-                ? `${token0Symbol}-${token1Symbol}`
-                : stakingTokenSymbol,
-              address: lpToken,
-              blockchain: "ethereum",
-              network: "56",
-              layout: "staking",
-              adapter: isPair ? "masterChef2Pair" : "masterChef2Single",
-              description: "",
-              automate: {
-                autorestakeAdapter: isPair
-                  ? "MasterChef2LpRestake"
-                  : "MasterChef2SingleRestake",
-                adapters: isPair ? ["masterChef2Pair"] : ["masterChef2Single"],
-                lpTokensManager: isPair
-                  ? {
-                      router: "0x10ED43C718714eb63d5aA57B78B54704E256024E",
-                      pair: lpToken,
-                    }
-                  : undefined,
-              },
-              link: "https://pancakeswap.finance/farms",
-            };
-          })
-        );
-        if (options.cacheAuth) {
-          cache.write(
-            options.cacheAuth,
-            "pancakeswap",
-            "masterChef2Pools",
-            masterChef2Pools.map(({ poolIndex, stakingToken, adapter }) => ({
-              index: poolIndex,
-              stakingToken,
-              type: adapter === "masterChef2Pair" ? "lp" : "single",
-            }))
+          const [totalPools] = await multicall.all([
+            masterChiefContract.poolLength(),
+          ]);
+          const poolsIndex = Array.from(
+            new Array(totalPools.toNumber()).keys()
+          ).filter((poolIndex) => ![64, 105, 444].includes(poolIndex));
+          const poolsInfo = await multicall.all(
+            poolsIndex.map((poolIndex) =>
+              masterChiefContract.poolInfo(poolIndex)
+            )
           );
-        }
+          const poolsStakingTokensSymbol = await multicall.all(
+            poolsInfo.map(({ lpToken }) =>
+              erc20.multicallContract(lpToken).symbol()
+            )
+          );
 
-        const chefInitializableAddresses = [
-          "0x80762101bd79D6e7A175E9678d05c7f815b8D7d7",
-          "0xAaF43935a526DF88AB57FC69b1d80a8d35e1De82",
-          "0x921Ea7e12A66025F2BD287eDbff6dc5cEABd6477",
-          "0xeAd7b8fc5F2E5672FAe9dCf14E902287F35CB169",
-          "0x1c9E3972fdBa29b40954Bb7594Da6611998F8830",
-          "0xa34832efe74133763A85060a64103542031B0A7E",
-          "0x92c07c325cE7b340Da2591F5e9CbB1F5Bab73FCF",
-          "0x25ca61796D786014FfE15E42aC11C7721d46E120",
-          "0x1A777aE604CfBC265807A46Db2d228d4CC84E09D",
-          "0x09e727c83a75fFdB729280639eDBf947dB76EeB7",
-          "0x2718D56aE2b8F08B3076A409bBF729542233E451",
-          "0x2461ea28907A2028b2bCa40040396F64B4141004",
-          "0x1c0C7F3B07a42efb4e15679a9ed7e70B2d7Cc157",
-          "0x56Bfb98EBEF4344dF2d88c6b80694Cba5EfC56c8",
-          "0x9e31aef040941E67356519f44bcA07c5f82215e5",
-        ];
-        const chefInitializablePools: ResolvedContract[] = await Promise.all(
-          chefInitializableAddresses.map(async (address) => {
-            const [stakedToken, rewardToken] = await multicall.all([
-              new ethersMulticall.Contract(
-                address,
-                smartChefInitializableABI
-              ).stakedToken(),
-              new ethersMulticall.Contract(
-                address,
-                smartChefInitializableABI
-              ).rewardToken(),
-            ]);
-            const [stakingTokenSymbol, rewardTokenSymbol] = await multicall.all(
-              [
-                erc20.multicallContract(stakedToken).symbol(),
-                erc20.multicallContract(rewardToken).symbol(),
-              ]
+          masterChefPools = await Promise.all(
+            poolsIndex.map(async (index, i) => {
+              const info = poolsInfo[i];
+              const stakingTokenSymbol = poolsStakingTokensSymbol[i];
+              const isPair = stakingTokenSymbol === "Cake-LP";
+
+              let token0Symbol, token1Symbol;
+              if (isPair) {
+                const [token0, token1] = await multicall.all([
+                  uniswap.pair.multicallContract(info.lpToken).token0(),
+                  uniswap.pair.multicallContract(info.lpToken).token1(),
+                ]);
+                const pairSymbols = await multicall.all([
+                  erc20.multicallContract(token0).symbol(),
+                  erc20.multicallContract(token1).symbol(),
+                ]);
+                token0Symbol = pairSymbols[0];
+                token1Symbol = pairSymbols[1];
+              }
+
+              return {
+                poolIndex: index,
+                stakingToken: info.lpToken,
+                name: isPair
+                  ? `${token0Symbol}-${token1Symbol}`
+                  : stakingTokenSymbol,
+                address: info.lpToken,
+                blockchain: "ethereum",
+                network: String(networkId),
+                layout: "staking",
+                adapter: isPair ? "masterChefPair" : "masterChefSingle",
+                description: "",
+                automate: {
+                  /*
+                  autorestakeAdapter: isPair
+                    ? "MasterChefLpRestake"
+                    : "MasterChefSingleRestake",
+                    */
+                  adapters: isPair ? ["masterChefPair"] : ["masterChefSingle"],
+                  lpTokensManager: isPair
+                    ? {
+                        router: "0x10ED43C718714eb63d5aA57B78B54704E256024E",
+                        pair: info.lpToken,
+                      }
+                    : undefined,
+                },
+                link: "https://pancakeswap.finance/farms",
+              };
+            })
+          );
+          if (options.cacheAuth) {
+            cache.write(
+              options.cacheAuth,
+              "pancakeswap",
+              networkId,
+              "masterChefPools",
+              masterChefPools.map(({ poolIndex, stakingToken, adapter }) => ({
+                index: poolIndex,
+                stakingToken,
+                type: adapter === "masterChefPair" ? "lp" : "single",
+              }))
             );
+          }
+        }
 
-            return {
-              stakingToken: stakedToken,
-              name: `${rewardTokenSymbol} from ${stakingTokenSymbol}`,
-              address,
-              blockchain: "ethereum",
-              network: "56",
-              layout: "staking",
-              adapter: "smartChefInitializable",
-              description: "",
-              automate: {
-                autorestakeAdapter: "SmartChefInitializableRestake",
-                adapters: ["smartChefInitializable"],
-              },
-              link: "https://pancakeswap.finance/pools",
-            };
-          })
-        );
-        if (options.cacheAuth) {
-          cache.write(
-            options.cacheAuth,
-            "pancakeswap",
-            "smartChefInitializableContracts",
-            masterChefPools.map(({ address }) => ({
-              stakingContract: address,
-            }))
+        const masterChef2Address = masterChef2AddressResolver(networkId);
+        let masterChef2Pools: ResolvedPool[] = [];
+        if (masterChef2Address) {
+          const liquidityRouter = liquidityRouterResolve(networkId);
+          const contract = new ethersMulticall.Contract(
+            masterChef2Address,
+            masterChef2ABI
           );
+          const [poolLength] = await multicall.all([contract.poolLength()]);
+          const poolIndex = Array.from(new Array(poolLength.toNumber()).keys());
+          const poolTokens = await multicall.all(
+            poolIndex.map((poolIndex) => contract.lpToken(poolIndex))
+          );
+          const poolTokensSymbol = await multicall.all(
+            poolTokens.map((lpToken) =>
+              erc20.multicallContract(lpToken).symbol()
+            )
+          );
+
+          masterChef2Pools = await Promise.all(
+            poolIndex.map(async (index, i) => {
+              const lpToken = poolTokens[i];
+              const stakingTokenSymbol = poolTokensSymbol[i];
+              const isPair = ["UNI-V2", "Cake-LP"].includes(stakingTokenSymbol);
+
+              let token0Symbol, token1Symbol;
+              if (isPair) {
+                const [token0, token1] = await multicall.all([
+                  uniswap.pair.multicallContract(lpToken).token0(),
+                  uniswap.pair.multicallContract(lpToken).token1(),
+                ]);
+                const pairSymbols = await multicall.all([
+                  erc20.multicallContract(token0).symbol(),
+                  erc20.multicallContract(token1).symbol(),
+                ]);
+                token0Symbol = pairSymbols[0];
+                token1Symbol = pairSymbols[1];
+              }
+
+              return {
+                poolIndex: index,
+                stakingToken: lpToken,
+                name: isPair
+                  ? `${token0Symbol}-${token1Symbol}`
+                  : stakingTokenSymbol,
+                address: lpToken,
+                blockchain: "ethereum",
+                network: String(networkId),
+                layout: "staking",
+                adapter: isPair ? "masterChef2Pair" : "masterChef2Single",
+                description: "",
+                automate: {
+                  autorestakeAdapter: isPair
+                    ? "MasterChef2LpRestake"
+                    : "MasterChef2SingleRestake",
+                  autorestakeStopLoss: true,
+                  adapters: isPair
+                    ? ["masterChef2Pair"]
+                    : ["masterChef2Single"],
+                  lpTokensManager:
+                    isPair && liquidityRouter
+                      ? {
+                          router: liquidityRouter,
+                          pair: lpToken,
+                        }
+                      : undefined,
+                },
+                link: "https://pancakeswap.finance/farms",
+              };
+            })
+          );
+          if (options.cacheAuth) {
+            cache.write(
+              options.cacheAuth,
+              "pancakeswap",
+              networkId,
+              "masterChef2Pools",
+              masterChef2Pools.map(({ poolIndex, stakingToken, adapter }) => ({
+                index: poolIndex,
+                stakingToken,
+                type: adapter === "masterChef2Pair" ? "lp" : "single",
+              }))
+            );
+          }
+        }
+
+        let chefInitializablePools: ResolvedContract[] = [];
+        if (networkId === 56) {
+          const chefInitializableAddresses = [
+            "0x80762101bd79D6e7A175E9678d05c7f815b8D7d7",
+            "0xAaF43935a526DF88AB57FC69b1d80a8d35e1De82",
+            "0x921Ea7e12A66025F2BD287eDbff6dc5cEABd6477",
+            "0xeAd7b8fc5F2E5672FAe9dCf14E902287F35CB169",
+            "0x1c9E3972fdBa29b40954Bb7594Da6611998F8830",
+            "0xa34832efe74133763A85060a64103542031B0A7E",
+            "0x92c07c325cE7b340Da2591F5e9CbB1F5Bab73FCF",
+            "0x25ca61796D786014FfE15E42aC11C7721d46E120",
+            "0x1A777aE604CfBC265807A46Db2d228d4CC84E09D",
+            "0x09e727c83a75fFdB729280639eDBf947dB76EeB7",
+            "0x2718D56aE2b8F08B3076A409bBF729542233E451",
+            "0x2461ea28907A2028b2bCa40040396F64B4141004",
+            "0x1c0C7F3B07a42efb4e15679a9ed7e70B2d7Cc157",
+            "0x56Bfb98EBEF4344dF2d88c6b80694Cba5EfC56c8",
+            "0x9e31aef040941E67356519f44bcA07c5f82215e5",
+          ];
+          chefInitializablePools = await Promise.all(
+            chefInitializableAddresses.map(async (address) => {
+              const [stakedToken, rewardToken] = await multicall.all([
+                new ethersMulticall.Contract(
+                  address,
+                  smartChefInitializableABI
+                ).stakedToken(),
+                new ethersMulticall.Contract(
+                  address,
+                  smartChefInitializableABI
+                ).rewardToken(),
+              ]);
+              const [stakingTokenSymbol, rewardTokenSymbol] =
+                await multicall.all([
+                  erc20.multicallContract(stakedToken).symbol(),
+                  erc20.multicallContract(rewardToken).symbol(),
+                ]);
+
+              return {
+                stakingToken: stakedToken,
+                name: `${rewardTokenSymbol} from ${stakingTokenSymbol}`,
+                address,
+                blockchain: "ethereum",
+                network: String(networkId),
+                layout: "staking",
+                adapter: "smartChefInitializable",
+                description: "",
+                automate: {
+                  // autorestakeAdapter: "SmartChefInitializableRestake",
+                  adapters: ["smartChefInitializable"],
+                },
+                link: "https://pancakeswap.finance/pools",
+              };
+            })
+          );
+          if (options.cacheAuth) {
+            cache.write(
+              options.cacheAuth,
+              "pancakeswap",
+              networkId,
+              "smartChefInitializableContracts",
+              chefInitializablePools.map(({ address }) => ({
+                stakingContract: address,
+              }))
+            );
+          }
         }
 
         return [
@@ -1406,35 +1461,35 @@ module.exports = {
     },
     deploy: {
       MasterChefLpRestake: masterChef.stakingAutomateDeployTabs({
-        liquidityRouter: "0x10ED43C718714eb63d5aA57B78B54704E256024E",
-        stakingAddress: masterChefAddress,
+        liquidityRouterResolve,
+        stakingAddressResolve: masterChefAddressResolver,
         poolsLoader: () =>
           cache
-            .read("pancakeswap", "masterChefPools")
+            .read("pancakeswap", 56, "masterChefPools")
             .then((pools) => pools.filter(({ type }) => type === "lp")),
       }),
       MasterChefSingleRestake: masterChef.stakingAutomateDeployTabs({
-        liquidityRouter: "0x10ED43C718714eb63d5aA57B78B54704E256024E",
-        stakingAddress: masterChefAddress,
+        liquidityRouterResolve,
+        stakingAddressResolve: masterChefAddressResolver,
         poolsLoader: () =>
           cache
-            .read("pancakeswap", "masterChefPools")
+            .read("pancakeswap", 56, "masterChefPools")
             .then((pools) => pools.filter(({ type }) => type === "single")),
       }),
       MasterChef2LpRestake: masterChef.stakingAutomateDeployTabs({
-        liquidityRouter: "0x10ED43C718714eb63d5aA57B78B54704E256024E",
-        stakingAddress: masterChef2Address,
-        poolsLoader: () =>
+        liquidityRouterResolve,
+        stakingAddressResolve: masterChef2AddressResolver,
+        poolsLoader: (networkId) =>
           cache
-            .read("pancakeswap", "masterChef2Pools")
+            .read("pancakeswap", networkId, "masterChef2Pools")
             .then((pools) => pools.filter(({ type }) => type === "lp")),
       }),
       MasterChef2SingleRestake: masterChef.stakingAutomateDeployTabs({
-        liquidityRouter: "0x10ED43C718714eb63d5aA57B78B54704E256024E",
-        stakingAddress: masterChef2Address,
-        poolsLoader: () =>
+        liquidityRouterResolve,
+        stakingAddressResolve: masterChef2AddressResolver,
+        poolsLoader: (networkId) =>
           cache
-            .read("pancakeswap", "masterChef2Pools")
+            .read("pancakeswap", networkId, "masterChef2Pools")
             .then((pools) => pools.filter(({ type }) => type === "single")),
       }),
       SmartChefInitializableRestake: deployAdapter(
@@ -1444,8 +1499,10 @@ module.exports = {
           prototypeAddress,
           contractAddress = undefined
         ) => {
+          const networkId = await signer.getChainId();
           const stakingContracts = await cache.read(
             "pancakeswap",
+            networkId,
             "smartChefInitializableContracts"
           );
           const stakingContract =
@@ -1504,51 +1561,119 @@ module.exports = {
       signer: ethersType.Signer,
       contractAddress: string
     ) => {
+      const chainId = await signer.getChainId();
       return masterChef.stakingPairAutomateAdapter({
-        masterChefProvider: masterChefProviderFactory(signer, "latest"),
+        masterChefProvider: masterChefProviderFactory(
+          signer,
+          chainId,
+          "latest"
+        ),
         automateABI: masterChefLpRestakeABI,
         stakingABI: masterChefABI,
         routeTokens,
       })(signer, contractAddress);
     },
     MasterChef2LpRestake: async (
-      signer: ethersType.Signer,
+      ethSigner: ethersType.Signer,
       contractAddress: string
     ) => {
-      return masterChef.stakingPairAutomateAdapter({
-        masterChefProvider: masterChef2ProviderFactory(
+      const signer = new ethereum.Signer(ethSigner);
+      const chainId = await signer.chainId;
+      const masterChefProvider = masterChef2ProviderFactory(
+        signer.signer,
+        chainId,
+        "latest"
+      );
+      const automate = signer.contract(
+        masterChef2LpRestakeABI,
+        contractAddress
+      );
+
+      return {
+        deposit: await masterChef.AutoRestake.useDeposit({ signer, automate }),
+        refund: await masterChef.AutoRestake.useRefund({
           signer,
-          "latest",
-        ),
-        automateABI: masterChef2LpRestakeABI,
-        stakingABI: masterChef2ABI,
-        routeTokens,
-      })(signer, contractAddress);
+          automate,
+          masterChefProvider,
+        }),
+        migrate: await masterChef.AutoRestake.useMigrate({
+          signer,
+          automate,
+          masterChefProvider,
+        }),
+        run: await masterChef.AutoRestake.usePairRun({
+          signer,
+          automate,
+          masterChefProvider,
+          routeTokens,
+        }),
+        stopLoss:
+          await masterChef.AutoRestake.StopLoss.usePairStopLossComponent({
+            signer,
+            automate,
+            masterChef: masterChefProvider,
+            middleTokens: routeTokens,
+          }),
+      };
     },
     MasterChefSingleRestake: async (
       signer: ethersType.Signer,
       contractAddress: string
     ) => {
+      const chainId = await signer.getChainId();
       return masterChef.stakingSingleAutomateAdapter({
-        masterChefProvider: masterChefProviderFactory(signer, "latest"),
+        masterChefProvider: masterChefProviderFactory(
+          signer,
+          chainId,
+          "latest"
+        ),
         automateABI: masterChefSingleRestakeABI,
         stakingABI: masterChefABI,
         routeTokens,
       })(signer, contractAddress);
     },
     MasterChef2SingleRestake: async (
-      signer: ethersType.Signer,
+      ethSigner: ethersType.Signer,
       contractAddress: string
     ) => {
-      return masterChef.stakingSingleAutomateAdapter({
-        masterChefProvider: masterChef2ProviderFactory(
+      const signer = new ethereum.Signer(ethSigner);
+      const chainId = await signer.chainId;
+      const masterChefProvider = masterChef2ProviderFactory(
+        signer.signer,
+        chainId,
+        "latest"
+      );
+      const automate = signer.contract(
+        masterChef2SingleRestakeABI,
+        contractAddress
+      );
+
+      return {
+        deposit: await masterChef.AutoRestake.useDeposit({ signer, automate }),
+        refund: await masterChef.AutoRestake.useRefund({
           signer,
-          "latest",
-        ),
-        automateABI: masterChef2SingleRestakeABI,
-        stakingABI: masterChef2ABI,
-        routeTokens,
-      })(signer, contractAddress);
+          automate,
+          masterChefProvider,
+        }),
+        migrate: await masterChef.AutoRestake.useMigrate({
+          signer,
+          automate,
+          masterChefProvider,
+        }),
+        run: await masterChef.AutoRestake.useSingleRun({
+          signer,
+          automate,
+          masterChefProvider,
+          routeTokens,
+        }),
+        stopLoss:
+          await masterChef.AutoRestake.StopLoss.useSingleStopLossComponent({
+            signer,
+            automate,
+            masterChef: masterChefProvider,
+            middleTokens: routeTokens,
+          }),
+      };
     },
     SmartChefInitializableRestake: automateAdapter(
       async (signer, contractAddress) => {

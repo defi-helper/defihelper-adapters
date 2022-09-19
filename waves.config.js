@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ path: './configuration/.env' });
 
 module.exports = {
   ride: {

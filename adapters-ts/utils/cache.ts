@@ -1,8 +1,14 @@
 import { axios, env } from "../lib";
 
-export function read<T = any[]>(protocol: string, key: string) {
+export function read<T = any[]>(
+  protocol: string,
+  network: number | string,
+  key: string
+) {
   return axios
-    .get<T>(`${env.CACHE_HOST}?protocol=${protocol}&key=${key}`)
+    .get<T>(
+      `${env.CACHE_HOST}?protocol=${protocol}&network=${network}&key=${key}`
+    )
     .then(({ data }) => data)
     .catch((e) => {
       if (e.response) {
@@ -14,11 +20,19 @@ export function read<T = any[]>(protocol: string, key: string) {
     });
 }
 
-export function write(auth: string, protocol: string, key: string, data: any) {
+export function write(
+  auth: string,
+  protocol: string,
+  network: number | string,
+  key: string,
+  data: any
+) {
   return axios
-    .post(`${env.CACHE_HOST}?protocol=${protocol}&key=${key}`, data, {
-      headers: { Auth: auth },
-    })
+    .post(
+      `${env.CACHE_HOST}?protocol=${protocol}&network=${network}&key=${key}`,
+      data,
+      { headers: { Auth: auth } }
+    )
     .catch((e) => {
       console.log(e.message);
       if (e.response) {

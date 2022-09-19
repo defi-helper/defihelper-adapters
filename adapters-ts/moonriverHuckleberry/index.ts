@@ -77,20 +77,21 @@ module.exports = {
         ...ethereum.defaultOptions(),
         ...initOptions,
       };
+      const networkId = await provider
+        .getNetwork()
+        .then(({ chainId }) => chainId);
       const masterChefSavedPools = await cache.read(
         "moonriverHuckleberry",
+        networkId,
         "masterChefPools"
       );
       const blockTag = options.blockNumber;
-      const network = await provider
-        .getNetwork()
-        .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
       const priceFeed = bridgeWrapperBuild(
-        await dfh.getPriceFeeds(network),
+        await dfh.getPriceFeeds(networkId),
         blockTag,
         block,
-        network
+        networkId
       );
       const multicall = new ethersMulticall.Provider(provider);
       await multicall.init();
@@ -262,20 +263,21 @@ module.exports = {
         ...ethereum.defaultOptions(),
         ...initOptions,
       };
+      const networkId = await provider
+        .getNetwork()
+        .then(({ chainId }) => chainId);
       const masterChefSavedPools = await cache.read(
         "moonriverHuckleberry",
+        networkId,
         "masterChefPools"
       );
       const blockTag = options.blockNumber;
-      const network = await provider
-        .getNetwork()
-        .then(({ chainId }) => chainId);
       const block = await provider.getBlock(blockTag);
       const priceFeed = bridgeWrapperBuild(
-        await dfh.getPriceFeeds(network),
+        await dfh.getPriceFeeds(networkId),
         blockTag,
         block,
-        network
+        networkId
       );
 
       const pool = masterChefSavedPools.find(
@@ -548,6 +550,9 @@ module.exports = {
   automates: {
     contractsResolver: {
       default: contractsResolver(async (provider, options = {}) => {
+        const networkId = await provider
+          .getNetwork()
+          .then(({ chainId }) => chainId);
         const multicall = new ethersMulticall.Provider(provider);
         await multicall.init();
 
@@ -606,9 +611,11 @@ module.exports = {
               description: "",
               automate: {
                 adapters: isPair ? ["masterChefPair"] : ["masterChefSingle"],
+                /*
                 autorestakeAdapter: isPair
                   ? "MasterChefFinnLpRestake"
                   : undefined,
+                  */
                 lpTokensManager: isPair
                   ? {
                       router: "0x2d4e873f9Ab279da9f1bb2c532d4F06f67755b77",
@@ -624,6 +631,7 @@ module.exports = {
           cache.write(
             options.cacheAuth,
             "moonriverHuckleberry",
+            networkId,
             "masterChefPools",
             pools.map(({ poolIndex, stakingToken, adapter }) => ({
               index: poolIndex,
@@ -638,11 +646,11 @@ module.exports = {
     },
     deploy: {
       MasterChefFinnLpRestake: masterChef.stakingAutomateDeployTabs({
-        liquidityRouter: "0x2d4e873f9Ab279da9f1bb2c532d4F06f67755b77",
-        stakingAddress: masterChefAddress,
-        poolsLoader: () =>
+        liquidityRouterResolve: "0x2d4e873f9Ab279da9f1bb2c532d4F06f67755b77",
+        stakingAddressResolve: masterChefAddress,
+        poolsLoader: (networkId) =>
           cache
-            .read("moonriverHuckleberry", "masterChefPools")
+            .read("moonriverHuckleberry", networkId, "masterChefPools")
             .then((pools) => pools.filter(({ type }) => type === "lp")),
       }),
     },

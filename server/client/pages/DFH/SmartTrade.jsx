@@ -43,11 +43,11 @@ function TabButton({ id, label, activeId, onClick }) {
   );
 }
 
-function MockHandler({ signer, adapters, searchParams }) {
+function MockHandler({ signer, routerAdapter, adapters, searchParams }) {
   return <div>Mock handler</div>;
 }
 
-function SwapHandler({ signer, adapters, searchParams }) {
+function SwapHandler({ signer, routerAdapter, adapters, searchParams }) {
   const [error, setError] = useState("");
   const [handlerAddress, setHandlerAddress] = useState(
     searchParams.get("handler") ?? ""
@@ -140,12 +140,12 @@ function SwapHandler({ signer, adapters, searchParams }) {
     }
 
     if (depositTokenAmount !== "") {
-      const isApproved = await handlerAdapter.methods.isApproved(
+      const isApproved = await routerAdapter.methods.isApproved(
         path[0],
         depositTokenAmount
       );
       if (!isApproved) {
-        await handlerAdapter.methods
+        await routerAdapter.methods
           .approve(path[0], depositTokenAmount)
           .then(({ tx }) => tx?.wait());
       }
@@ -410,7 +410,7 @@ function SwapHandler({ signer, adapters, searchParams }) {
   );
 }
 
-function Handler({ name, signer, adapters, searchParams }) {
+function Handler({ name, signer, routerAdapter, adapters, searchParams }) {
   const Component = {
     "mock-handler": MockHandler,
     "swap-handler": SwapHandler,
@@ -422,6 +422,7 @@ function Handler({ name, signer, adapters, searchParams }) {
       <Component
         signer={signer}
         adapters={adapters}
+        routerAdapter={routerAdapter}
         searchParams={searchParams}
       />
     </div>
@@ -440,6 +441,9 @@ export function SmartTradePage() {
   const [currentHandlerName, setCurrentHandlerName] = useState(
     (location.hash !== "" ? location.hash : "#mock-handler").slice(1)
   );
+  const [approveTokenAddress, setApproveTokenAddress] = useState("");
+  const [approveAmount, setApproveAmount] = useState("");
+  const [approveTx, setApproveTx] = useState(null);
   const [depositTokenAddress, setDepositTokenAddress] = useState("");
   const [depositAmount, setDepositAmount] = useState("");
   const [depositTx, setDepositTx] = useState(null);
@@ -466,6 +470,35 @@ export function SmartTradePage() {
     setRouterAdapter(
       await adapters.automates.smartTrade.router(signer, routerAddress)
     );
+  };
+
+  const onApprove = async () => {
+    setError("");
+    setApproveTx(null);
+    if (!routerAdapter) return;
+
+    if (Number.isNaN(Number(approveAmount))) {
+      return setError(`Invalid approve amount: "${approveAmount}"`);
+    }
+    if (!ethers.utils.isAddress(approveTokenAddress)) {
+      return setError(
+        `Invalid approve token address: "${approveTokenAddress}"`
+      );
+    }
+
+    const isApproved = await routerAdapter.methods.isApproved(
+      approveTokenAddress,
+      approveAmount
+    );
+    if (isApproved instanceof Error) {
+      return setError(isApproved.message);
+    }
+
+    const { tx } = await routerAdapter.methods.approve(
+      approveTokenAddress,
+      approveAmount
+    );
+    setApproveTx(tx);
   };
 
   const onDeposit = async () => {
@@ -582,6 +615,38 @@ export function SmartTradePage() {
       </div>
       {routerAdapter && (
         <div>
+          <div>
+            <div>
+              <label>Approve:</label>
+            </div>
+            <div className="row">
+              <div className="column column-80">
+                <input
+                  type="text"
+                  placeholder="token"
+                  value={approveTokenAddress}
+                  onChange={(e) => setApproveTokenAddress(e.target.value)}
+                />
+                <input
+                  type="text"
+                  placeholder="amount"
+                  value={approveAmount}
+                  onChange={(e) => setApproveAmount(e.target.value)}
+                />
+              </div>
+              <div className="column column-20">
+                <button onClick={onApprove}>Send</button>
+              </div>
+            </div>
+            {approveTx !== null && (
+              <ReactJsonWrap>
+                <ReactJson
+                  src={JSON.parse(JSON.stringify(approveTx))}
+                  collapsed={1}
+                />
+              </ReactJsonWrap>
+            )}
+          </div>
           <div>
             <div>
               <label>Deposit:</label>
@@ -721,6 +786,7 @@ export function SmartTradePage() {
               <Handler
                 name={currentHandlerName}
                 signer={signer}
+                routerAdapter={routerAdapter}
                 adapters={adapters}
                 searchParams={searchParams}
               />

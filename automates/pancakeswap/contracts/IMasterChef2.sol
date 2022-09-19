@@ -5,17 +5,27 @@ interface IMasterChef2 {
   struct UserInfo {
     uint256 amount;
     uint256 rewardDebt;
+    uint256 boostMultiplier;
   }
 
   struct PoolInfo {
-    uint256 allocPoint;
-    uint256 lastRewardBlock;
     uint256 accCakePerShare;
+    uint256 lastRewardBlock;
+    uint256 allocPoint;
+    uint256 totalBoostedShare;
     bool isRegular;
   }
 
+  function totalRegularAllocPoint() external view returns (uint256);
+
+  function totalSpecialAllocPoint() external view returns (uint256);
+
+  function cakePerBlock(bool _isRegular) external view returns (uint256 amount);
+
   // solhint-disable-next-line func-name-mixedcase
   function CAKE() external view returns (address);
+
+  function poolLength() external view returns (uint256);
 
   function poolInfo(uint256 pool) external view returns (PoolInfo memory);
 

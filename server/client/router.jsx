@@ -48,6 +48,10 @@ export function Router() {
             component={DFH.SmartTradePage}
           ></Route>
           <Route
+            path="/client/dfh/zap"
+            component={DFH.LPTokensManagerPage}
+          ></Route>
+          <Route
             path="/client/dfh/automate"
             component={DFH.AutomatePage}
           ></Route>
