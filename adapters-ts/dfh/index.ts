@@ -784,11 +784,13 @@ module.exports = {
         const signer = new ethereum.Signer(ethSigner);
         const signerAddress = await signer.address;
         debug(`Signer address "${signerAddress}"`);
-        const multicall = await signer.multicall;
-        const router = signer.contract(SmartTradeRouterABI, contractAddress);
         const handler = signer.contract(
           SmartTradeSwapHandlerABI,
           contractAddress
+        );
+        const router = signer.contract(
+          SmartTradeRouterABI,
+          await handler.contract.router()
         );
 
         return {
@@ -813,16 +815,6 @@ module.exports = {
                 )
                 .then((amountOut) => outToken.amountInt(amountOut).toString());
             },
-            isApproved: erc20.useIsApproved({
-              node: signer,
-              spender: signerAddress,
-              recipient: router.contract.address,
-            }),
-            approve: erc20.useApprove({
-              signer,
-              spender: signerAddress,
-              recipient: router.contract.address,
-            }),
             createOrder: async (
               exchangeAddress: string,
               path: string[],

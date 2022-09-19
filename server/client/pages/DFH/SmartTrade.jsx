@@ -43,11 +43,11 @@ function TabButton({ id, label, activeId, onClick }) {
   );
 }
 
-function MockHandler({ signer, adapters, searchParams }) {
+function MockHandler({ signer, routerAdapter, adapters, searchParams }) {
   return <div>Mock handler</div>;
 }
 
-function SwapHandler({ signer, adapters, searchParams }) {
+function SwapHandler({ signer, routerAdapter, adapters, searchParams }) {
   const [error, setError] = useState("");
   const [handlerAddress, setHandlerAddress] = useState(
     searchParams.get("handler") ?? ""
@@ -140,12 +140,12 @@ function SwapHandler({ signer, adapters, searchParams }) {
     }
 
     if (depositTokenAmount !== "") {
-      const isApproved = await handlerAdapter.methods.isApproved(
+      const isApproved = await routerAdapter.methods.isApproved(
         path[0],
         depositTokenAmount
       );
       if (!isApproved) {
-        await handlerAdapter.methods
+        await routerAdapter.methods
           .approve(path[0], depositTokenAmount)
           .then(({ tx }) => tx?.wait());
       }
@@ -410,7 +410,7 @@ function SwapHandler({ signer, adapters, searchParams }) {
   );
 }
 
-function Handler({ name, signer, adapters, searchParams }) {
+function Handler({ name, signer, routerAdapter, adapters, searchParams }) {
   const Component = {
     "mock-handler": MockHandler,
     "swap-handler": SwapHandler,
@@ -422,6 +422,7 @@ function Handler({ name, signer, adapters, searchParams }) {
       <Component
         signer={signer}
         adapters={adapters}
+        routerAdapter={routerAdapter}
         searchParams={searchParams}
       />
     </div>
@@ -785,6 +786,7 @@ export function SmartTradePage() {
               <Handler
                 name={currentHandlerName}
                 signer={signer}
+                routerAdapter={routerAdapter}
                 adapters={adapters}
                 searchParams={searchParams}
               />
