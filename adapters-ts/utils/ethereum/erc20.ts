@@ -71,7 +71,7 @@ export class ConnectedToken extends Token {
       contract.multicall.decimals(),
     ]);
 
-    return new ConnectedToken(name, symbol, decimals.toString(), contract);
+    return new ConnectedToken(name, symbol, Number(decimals.toString()), contract);
   }
 
   static fromAddress(node: ethereum.Node, address: string) {
