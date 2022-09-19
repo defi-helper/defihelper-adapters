@@ -475,9 +475,11 @@ module.exports = {
               description: "",
               automate: {
                 adapters: isPair ? ["croesusPair"] : ["croesusSingle"],
+                /*
                 autorestakeAdapter: isPair
                   ? "CroesusLpRestake"
                   : "CroesusSingleRestake",
+                  */
                 lpTokensManager: isPair
                   ? {
                       router: "0xA52aBE4676dbfd04Df42eF7755F01A3c41f28D27",

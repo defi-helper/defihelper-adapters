@@ -1124,7 +1124,7 @@ module.exports = {
               adapter: isPair ? "masterChefV2Pair" : "masterChefV2Single",
               description: "",
               automate: {
-                autorestakeAdapter,
+                // autorestakeAdapter,
                 adapters: isPair
                   ? ["masterChefV2Pair"]
                   : ["masterChefV2Single"],
@@ -1172,9 +1172,11 @@ module.exports = {
               adapter: isPair ? "masterChefV3Pair" : "masterChefV3Single",
               description: "",
               automate: {
+                /*
                 autorestakeAdapter: isPair
                   ? "MasterChefV3LpRestake"
                   : "MasterChefV3SingleRestake",
+                  */
                 adapters: isPair
                   ? ["masterChefV3Pair"]
                   : ["masterChefV3Single"],
@@ -1225,9 +1227,11 @@ module.exports = {
               adapter: isPair ? "boostedMasterChefJoePair" : "boostedMasterChefJoeSingle",
               description: "",
               automate: {
+                /*
                 autorestakeAdapter: isPair
                   ? "boostedMasterChefJoeLpRestake"
                   : "boostedMasterChefJoeSingleRestake",
+                  */
                 adapters: isPair
                   ? ["boostedMasterChefJoePair"]
                   : ["boostedMasterChefJoeSingle"],

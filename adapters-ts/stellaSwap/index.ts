@@ -354,7 +354,7 @@ module.exports = {
               adapter: "stellaSwapDistributor",
               description: "",
               automate: {
-                autorestakeAdapter,
+                // autorestakeAdapter,
                 adapters: ["stellaSwapDistributor"],
                 lpTokensManager: isPair
                   ? {

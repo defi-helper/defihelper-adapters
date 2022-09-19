@@ -1267,9 +1267,11 @@ module.exports = {
                 adapter: isPair ? "masterChefPair" : "masterChefSingle",
                 description: "",
                 automate: {
+                  /*
                   autorestakeAdapter: isPair
                     ? "MasterChefLpRestake"
                     : "MasterChefSingleRestake",
+                    */
                   adapters: isPair ? ["masterChefPair"] : ["masterChefSingle"],
                   lpTokensManager: isPair
                     ? {
@@ -1430,7 +1432,7 @@ module.exports = {
                 adapter: "smartChefInitializable",
                 description: "",
                 automate: {
-                  autorestakeAdapter: "SmartChefInitializableRestake",
+                  // autorestakeAdapter: "SmartChefInitializableRestake",
                   adapters: ["smartChefInitializable"],
                 },
                 link: "https://pancakeswap.finance/pools",

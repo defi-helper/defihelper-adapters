@@ -1486,9 +1486,11 @@ module.exports = {
               adapter: isPair ? "masterChefPair" : "masterChefSingle",
               description: "",
               automate: {
+                /*
                 autorestakeAdapter: isPair
                   ? "MasterChefLpRestake"
                   : "MasterChefSingleRestake",
+                  */
                 adapters: isPair ? ["masterChefPair"] : ["masterChefSingle"],
                 lpTokensManager: isPair
                   ? {
@@ -1550,7 +1552,9 @@ module.exports = {
             adapter: "apeRewardV4",
             description: "",
             automate: {
+              /*
               autorestakeAdapter: "ApeRewardV4Restake",
+              */
               adapters: ["apeRewardV4"],
             },
             link: "https://apeswap.finance/pools",

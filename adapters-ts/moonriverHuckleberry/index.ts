@@ -611,9 +611,11 @@ module.exports = {
               description: "",
               automate: {
                 adapters: isPair ? ["masterChefPair"] : ["masterChefSingle"],
+                /*
                 autorestakeAdapter: isPair
                   ? "MasterChefFinnLpRestake"
                   : undefined,
+                  */
                 lpTokensManager: isPair
                   ? {
                       router: "0x2d4e873f9Ab279da9f1bb2c532d4F06f67755b77",
