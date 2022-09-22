@@ -1,3 +1,5 @@
+const path = require('path');
+const glob = require('tiny-glob');
 const { defineConfig } = require('rollup');
 const json = require('@rollup/plugin-json');
 const { nodeResolve } = require('@rollup/plugin-node-resolve');
@@ -5,8 +7,7 @@ const ts = require('rollup-plugin-ts');
 const replace = require('@rollup/plugin-replace');
 const commonjs = require('@rollup/plugin-commonjs');
 const { terser } = require('rollup-plugin-terser');
-const path = require('path');
-const glob = require('tiny-glob');
+require('dotenv').config({ path: path.resolve(__dirname, '../configuration/.env') });
 
 export default glob(path.resolve(__dirname, '*/index.ts')).then((files) => {
   return files.map((adapter) => {

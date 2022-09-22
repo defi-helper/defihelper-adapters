@@ -1,3 +1,4 @@
+const path = require('path');
 const { defineConfig } = require('rollup');
 const json = require('@rollup/plugin-json');
 const { nodeResolve } = require('@rollup/plugin-node-resolve');
@@ -5,7 +6,7 @@ const ts = require('rollup-plugin-ts');
 const replace = require('@rollup/plugin-replace');
 const commonjs = require('@rollup/plugin-commonjs');
 const { terser } = require('rollup-plugin-terser');
-const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../../configuration/.env') });
 
 export default defineConfig({
   input: path.resolve(__dirname, 'index.ts'),
