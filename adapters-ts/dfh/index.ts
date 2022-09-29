@@ -796,25 +796,7 @@ module.exports = {
         return {
           name: "DFHSmartTradeSwapHandler",
           methods: {
-            amountOut: async (
-              exchangeAddress: string,
-              path: string[],
-              amountIn: string
-            ) => {
-              const [inToken, outToken] = await Promise.all([
-                erc20.ConnectedToken.fromAddress(signer, path[0]),
-                erc20.ConnectedToken.fromAddress(signer, path[path.length - 1]),
-              ]);
-
-              return uniswap.V2.router
-                .getPrice(
-                  uniswap.V2.router.contract(signer.provider, exchangeAddress),
-                  inToken.amountFloat(amountIn).toFixed(),
-                  path,
-                  { blockNumber: "latest", signer: null }
-                )
-                .then((amountOut) => outToken.amountInt(amountOut).toString());
-            },
+            amountOut: uniswap.V2.router.useAmountOut({ node: signer }),
             createOrder: async (
               exchangeAddress: string,
               path: string[],
@@ -822,6 +804,7 @@ module.exports = {
               stopLoss: {
                 amountOut: string;
                 slippage: string | number;
+                moving: boolean;
               } | null,
               takeProfit: {
                 amountOut: string;
@@ -862,6 +845,7 @@ module.exports = {
               const createRoute = (
                 amountOut: string,
                 slippage: string | number,
+                moving: boolean,
                 direction: "gt" | "lt"
               ) => ({
                 get amountOut() {
@@ -875,14 +859,25 @@ module.exports = {
                     .multipliedBy(new bn(1).minus(this.slippage))
                     .toFixed(0);
                 },
+                moving,
                 direction,
               });
               const routes = [
                 stopLoss
-                  ? createRoute(stopLoss.amountOut, stopLoss.slippage, "lt")
+                  ? createRoute(
+                      stopLoss.amountOut,
+                      stopLoss.slippage,
+                      stopLoss.moving,
+                      "lt"
+                    )
                   : null,
                 takeProfit
-                  ? createRoute(takeProfit.amountOut, takeProfit.slippage, "gt")
+                  ? createRoute(
+                      takeProfit.amountOut,
+                      takeProfit.slippage,
+                      false,
+                      "gt"
+                    )
                   : null,
               ];
               debugo({
@@ -935,6 +930,11 @@ module.exports = {
                 tokenInDecimals: inToken.decimals,
                 tokenOutDecimals: outToken.decimals,
                 amountIn: inToken.amountFloat(amountIn).toFixed(),
+                amountOut: await uniswap.V2.router.getPrice(
+                  uniswap.V2.router.contract(signer.provider, exchangeAddress),
+                  inToken.amountFloat(amountIn).toFixed(),
+                  path
+                ),
                 stopLoss: routes[0],
                 takeProfit: routes[1],
               };
