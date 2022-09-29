@@ -2,6 +2,9 @@ import type { Contract, ethers } from "ethers";
 import type BN from "bignumber.js";
 import { bignumber as bn } from "../../../../lib";
 import * as base from "../../base";
+import * as ethereum from "../../base";
+import * as erc20 from "../../erc20";
+import { debugo } from "../../../base";
 import abi from "./abi/router.json";
 
 export { abi };
@@ -70,3 +73,21 @@ export async function autoRoute(
     { path: [from, to], amountOut: amountsOut[0][1].toString() }
   );
 }
+
+export const useAmountOut =
+  ({ node }: { node: ethereum.Node }) =>
+  async (exchangeAddress: string, path: string[], amountIn: string) => {
+    debugo({ _prefix: "amountOut", exchangeAddress, path, amountIn });
+    const [inToken, outToken] = await Promise.all([
+      erc20.ConnectedToken.fromAddress(node, path[0]),
+      erc20.ConnectedToken.fromAddress(node, path[path.length - 1]),
+    ]);
+
+    return getPrice(
+        contract(node.provider, exchangeAddress),
+        inToken.amountFloat(amountIn).toFixed(),
+        path,
+        { blockNumber: "latest", signer: null }
+      )
+      .then((amountOut) => outToken.amountInt(amountOut).toString());
+  };
