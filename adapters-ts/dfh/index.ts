@@ -3,7 +3,6 @@ import type {
   ContractTransaction,
   BigNumber as EthersBigNumber,
 } from "ethers";
-import type { Provider as MulticallProvider } from "@defihelper/ethers-multicall";
 import { bignumber as bn, ethers, dayjs, ethersMulticall } from "../lib";
 import { debug, debugo } from "../utils/base";
 import * as ethereum from "../utils/ethereum/base";
@@ -11,6 +10,7 @@ import * as erc20 from "../utils/ethereum/erc20";
 import * as uniswap from "../utils/ethereum/uniswap";
 import { abi as BalanceABI } from "@defihelper/networks/abi/Balance.json";
 import { abi as StoreABI } from "@defihelper/networks/abi/StoreV2.json";
+import { abi as StorageABI } from "@defihelper/networks/abi/Storage.json";
 import { abi as LPTokensManagerABI } from "@defihelper/networks/abi/LPTokensManager.json";
 import { abi as SmartTradeRouterABI } from "@defihelper/networks/abi/SmartTradeRouter.json";
 import { abi as SmartTradeSwapHandlerABI } from "@defihelper/networks/abi/SmartTradeSwapHandler.json";
@@ -191,6 +191,10 @@ module.exports = {
       const network = await signer.chainId;
       const multicall = await signer.multicall;
       const automate = signer.contract(LPTokensManagerABI, contractAddress);
+      const storage = signer.contract(
+        StorageABI,
+        await automate.contract.info()
+      );
 
       return {
         name: "DFHBuyLiquidity",
@@ -341,6 +345,129 @@ module.exports = {
               tx: buyTx,
             };
           },
+          balanceETHOf: ethereum.useBalanceOf({
+            node: signer,
+            account: signerAddress,
+          }),
+          canBuyETH: async (amount: string) => {
+            debugo({ _prefix: "canBuyETH", amount });
+            const fee = await automate.contract.fee();
+            const feeBalance = await signer.provider
+              .getBalance(signerAddress)
+              .then(ethereum.toBN);
+            const signerBalance = await signer.provider
+              .getBalance(signerAddress)
+              .then(ethereum.toBN);
+            debugo({
+              _prefix: "canBuyETH",
+              signerBalance,
+              fee,
+              feeBalance,
+            });
+
+            const amountInt = new bn(amount).multipliedBy("1e18");
+            if (amountInt.lte(0)) return new Error("Invalid amount");
+            if (amountInt.gt(signerBalance.toFixed(0)))
+              return new Error("Insufficient funds on the balance");
+            if (ethereum.toBN(fee).multipliedBy(1.05).gt(feeBalance)) {
+              return new Error("Insufficient fee funds on the balance");
+            }
+
+            return true;
+          },
+          buyETH: async (
+            amount: string,
+            slippage: number | string,
+            deadlineSeconds: number = 300
+          ) => {
+            debugo({
+              _prefix: "buyETH",
+              amount,
+              slippage,
+              deadlineSeconds,
+            });
+            const fee = await automate.contract.fee();
+            const pairInfo = await uniswap.V2.pair.ConnectedPair.fromAddress(
+              signer,
+              pair
+            );
+            const wrapperAddress = await storage.contract.getAddress(
+              ethers.utils.keccak256(
+                ethers.utils.toUtf8Bytes("NativeWrapper:Contract")
+              )
+            );
+            const { token0, token1 } = await pairInfo.info;
+            debugo({
+              _prefix: "buyETH",
+              wrapperAddress,
+              token0: token0.address,
+              token1: token1.address,
+              fee,
+            });
+
+            const amountInt = pairInfo.amountFloat(amount);
+            const outMinPercent = new bn(1).minus(new bn(slippage).div(100));
+            let swap0 = { path: [wrapperAddress, token0.address], outMin: "0" };
+            if (wrapperAddress.toLowerCase() !== token0.address.toLowerCase()) {
+              const { path, amountOut } = await uniswap.V2.router.autoRoute(
+                uniswap.V2.router.contract(signer.provider, router),
+                amountInt.int.div(2).toFixed(0),
+                wrapperAddress,
+                token0.address,
+                routeTokens[network] ?? []
+              );
+              swap0 = {
+                path,
+                outMin: new bn(amountOut)
+                  .multipliedBy(outMinPercent)
+                  .toFixed(0),
+              };
+            }
+            debugo({
+              _prefix: "buyETH",
+              swap0: JSON.stringify(swap0),
+            });
+            let swap1 = { path: [wrapperAddress, token1.address], outMin: "0" };
+            if (wrapperAddress.toLowerCase() !== token1.address.toLowerCase()) {
+              const { path, amountOut } = await uniswap.V2.router.autoRoute(
+                uniswap.V2.router.contract(signer.provider, router),
+                amountInt.int.minus(amountInt.int.div(2).toFixed(0)).toFixed(0),
+                wrapperAddress,
+                token1.address,
+                routeTokens[network] ?? []
+              );
+              swap1 = {
+                path,
+                outMin: new bn(amountOut)
+                  .multipliedBy(outMinPercent)
+                  .toFixed(0),
+              };
+            }
+            debugo({
+              _prefix: "buyETH",
+              swap1: JSON.stringify(swap1),
+            });
+
+            const buyTx = await automate.contract.buyLiquidityETH(
+              router,
+              swap0,
+              swap1,
+              pair,
+              dayjs().add(deadlineSeconds, "seconds").unix(),
+              {
+                value: amountInt.value
+                  .plus(ethereum.toBN(fee).multipliedBy(1.05))
+                  .toFixed(0),
+              }
+            );
+            debugo({
+              _prefix: "buyETH",
+              buyTx: JSON.stringify(buyTx),
+            });
+            return {
+              tx: buyTx,
+            };
+          },
         },
       };
     },
@@ -361,6 +488,10 @@ module.exports = {
       const network = await signer.chainId;
       const multicall = await signer.multicall;
       const automate = signer.contract(LPTokensManagerABI, contractAddress);
+      const storage = signer.contract(
+        StorageABI,
+        await automate.contract.info()
+      );
 
       return {
         name: "DFHSellLiquidity",
@@ -456,7 +587,7 @@ module.exports = {
             const [signerBalance, allowance, tokenDecimals, fee] =
               await multicall.all([
                 token.balanceOf(signerAddress),
-                token.allowance(signerAddress, contractAddress),
+                token.allowance(signerAddress, automate.contract.address),
                 token.decimals(),
                 automate.multicall.fee(),
               ]);
@@ -574,6 +705,105 @@ module.exports = {
             );
             debugo({
               _prefix: "sell",
+              sellTx: JSON.stringify(sellTx),
+            });
+            return {
+              tx: sellTx,
+            };
+          },
+          sellETH: async (
+            amount: string,
+            slippage: number | string,
+            deadlineSeconds: number = 300
+          ) => {
+            debugo({
+              _prefix: "sellETH",
+              amount,
+              slippage,
+              deadlineSeconds,
+            });
+            const fee = await automate.contract.fee();
+            const pairInfo = await uniswap.V2.pair.ConnectedPair.fromAddress(
+              signer,
+              pair
+            );
+            const wrapperAddress = await storage.contract.getAddress(
+              ethers.utils.keccak256(
+                ethers.utils.toUtf8Bytes("NativeWrapper:Contract")
+              )
+            );
+            const { token0, token1 } = await pairInfo.info;
+            debugo({
+              _prefix: "sell",
+              fee,
+              wrapperAddress,
+              token0: token0.address,
+              token1: token1.address,
+            });
+
+            const balance = await pairInfo.expandBalance(
+              pairInfo.amountFloat(amount)
+            );
+            debugo({
+              _prefix: "sell",
+              token0Balance: balance.token0,
+              token1Balance: balance.token1,
+            });
+            const outMinPercent = new bn(1).minus(new bn(slippage).div(100));
+            let swap0 = { path: [token0.address, wrapperAddress], outMin: "0" };
+            if (wrapperAddress.toLowerCase() !== token0.address.toLowerCase()) {
+              const { path, amountOut } = await uniswap.V2.router.autoRoute(
+                uniswap.V2.router.contract(signer.provider, router),
+                balance.token0.toFixed(),
+                token0.address,
+                wrapperAddress,
+                routeTokens[network] ?? []
+              );
+              swap0 = {
+                path,
+                outMin: new bn(amountOut)
+                  .multipliedBy(outMinPercent)
+                  .toFixed(0),
+              };
+            }
+            debugo({
+              _prefix: "sell",
+              swap0: JSON.stringify(swap0),
+            });
+            let swap1 = { path: [token1.address, wrapperAddress], outMin: "0" };
+            if (wrapperAddress.toLowerCase() !== token1.address.toLowerCase()) {
+              const { path, amountOut } = await uniswap.V2.router.autoRoute(
+                uniswap.V2.router.contract(signer.provider, router),
+                balance.token1.toFixed(),
+                token1.address,
+                wrapperAddress,
+                routeTokens[network] ?? []
+              );
+              swap1 = {
+                path,
+                outMin: new bn(amountOut)
+                  .multipliedBy(outMinPercent)
+                  .toFixed(0),
+              };
+            }
+            debugo({
+              _prefix: "sellETH",
+              swap1: JSON.stringify(swap1),
+            });
+
+            const sellTx = await automate.contract.sellLiquidityETH(
+              pairInfo.amountFloat(amount).toFixed(),
+              router,
+              swap0,
+              swap1,
+              pair,
+              dayjs().add(deadlineSeconds, "seconds").unix(),
+              {
+                value: ethereum.toBN(fee).multipliedBy(1.05).toFixed(0),
+              }
+            );
+            debugo({
+              _prefix: "sellETH",
               sellTx: JSON.stringify(sellTx),
             });
             return {
