@@ -1,6 +1,7 @@
 import type { Provider as MulticallProvider } from "@defihelper/ethers-multicall";
 import ethersType from "ethers";
 import { bignumber as bn, ethers, ethersMulticall } from "../../lib";
+import { debugo } from "../base";
 
 export type BlockNumber = "latest" | number;
 
@@ -114,3 +115,16 @@ export const getAvgBlockTime = async (
 export function toBN(v: ethersType.BigNumber | number | string) {
   return new bn(v.toString());
 }
+
+export const useBalanceOf =
+  ({ node, account }: { node: Node; account: string }) =>
+  async () => {
+    debugo({ _prefix: "balanceOf", account });
+    const balance = await node.provider.getBalance(account).then(toBN);
+    debugo({
+      _prefix: "balanceOf",
+      balance,
+    });
+
+    return balance.div("1e18").toString(10);
+  };
