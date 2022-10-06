@@ -271,10 +271,10 @@ module.exports = {
               deadlineSeconds,
             });
             const fee = await automate.contract.fee();
-            const pairInfo = await uniswap.V2.pair.ConnectedPair.fromAddress(
-              signer,
-              pair
-            );
+            const [inToken, pairInfo] = await Promise.all([
+              erc20.SignedToken.fromAddress(signer, tokenAddress),
+              uniswap.V2.pair.ConnectedPair.fromAddress(signer, pair),
+            ]);
             const { token0, token1 } = await pairInfo.info;
             debugo({
               _prefix: "buy",
@@ -283,7 +283,7 @@ module.exports = {
               fee,
             });
 
-            const amountInt = pairInfo.amountFloat(amount);
+            const amountInt = inToken.amountFloat(amount);
             const outMinPercent = new bn(1).minus(new bn(slippage).div(100));
             let swap0 = { path: [tokenAddress, token0.address], outMin: "0" };
             if (tokenAddress.toLowerCase() !== token0.address.toLowerCase()) {
@@ -351,26 +351,35 @@ module.exports = {
           }),
           canBuyETH: async (amount: string) => {
             debugo({ _prefix: "canBuyETH", amount });
-            const fee = await automate.contract.fee();
-            const feeBalance = await signer.provider
-              .getBalance(signerAddress)
+            const fee = await automate.contract.fee().then(ethereum.toBN);
+            const feeMultiplicator = 1.05;
+            const gasLimit = 700000;
+            const gasPrice = await signer.provider
+              .getGasPrice()
               .then(ethereum.toBN);
             const signerBalance = await signer.provider
               .getBalance(signerAddress)
               .then(ethereum.toBN);
+            const inToken = new erc20.Token("", "", 18); // Native token
+            const amountInt = inToken.amountFloat(amount);
+            const amountIntWithoutFees = amountInt
+              .minus(inToken.amountInt(fee.multipliedBy(feeMultiplicator)))
+              .minus(inToken.amountInt(gasPrice.multipliedBy(gasLimit)));
             debugo({
               _prefix: "canBuyETH",
               signerBalance,
               fee,
-              feeBalance,
+              gasLimit,
+              gasPrice,
+              amountInt,
+              amountIntWithoutFees,
             });
 
-            const amountInt = new bn(amount).multipliedBy("1e18");
-            if (amountInt.lte(0)) return new Error("Invalid amount");
-            if (amountInt.gt(signerBalance.toFixed(0)))
+            if (amountIntWithoutFees.int.lte(0)) {
+              return new Error("Too little amount for pay fees");
+            }
+            if (amountInt.int.gt(signerBalance)) {
               return new Error("Insufficient funds on the balance");
-            if (ethereum.toBN(fee).multipliedBy(1.05).gt(feeBalance)) {
-              return new Error("Insufficient fee funds on the balance");
             }
 
             return true;
@@ -386,7 +395,13 @@ module.exports = {
               slippage,
               deadlineSeconds,
             });
-            const fee = await automate.contract.fee();
+            const fee = await automate.contract.fee().then(ethereum.toBN);
+            const feeMultiplicator = 1.05;
+            const gasLimit = 700000;
+            const gasPrice = await signer.provider
+              .getGasPrice()
+              .then(ethereum.toBN);
+            const inToken = new erc20.Token("", "", 18); // Native token
             const pairInfo = await uniswap.V2.pair.ConnectedPair.fromAddress(
               signer,
               pair
@@ -397,15 +412,24 @@ module.exports = {
               )
             );
             const { token0, token1 } = await pairInfo.info;
+            const amountInt = inToken
+              .amountFloat(amount)
+              .minus(inToken.amountInt(fee.multipliedBy(feeMultiplicator)))
+              .minus(inToken.amountInt(gasPrice.multipliedBy(gasLimit)));
+            if (amountInt.int.lt(0)) {
+              throw new Error("Too little amount for pay fees");
+            }
             debugo({
               _prefix: "buyETH",
               wrapperAddress,
               token0: token0.address,
               token1: token1.address,
               fee,
+              gasLimit,
+              gasPrice,
+              amountInt,
             });
 
-            const amountInt = pairInfo.amountFloat(amount);
             const outMinPercent = new bn(1).minus(new bn(slippage).div(100));
             let swap0 = { path: [wrapperAddress, token0.address], outMin: "0" };
             if (wrapperAddress.toLowerCase() !== token0.address.toLowerCase()) {
@@ -456,8 +480,10 @@ module.exports = {
               dayjs().add(deadlineSeconds, "seconds").unix(),
               {
                 value: amountInt.value
-                  .plus(ethereum.toBN(fee).multipliedBy(1.05))
+                  .plus(fee.multipliedBy(feeMultiplicator))
                   .toFixed(0),
+                gasLimit,
+                gasPrice: gasPrice.toFixed(0),
               }
             );
             debugo({

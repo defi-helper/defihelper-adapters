@@ -203,6 +203,10 @@ export class TokenAmount {
     return TokenAmount.fromInt(this.token, this.int.plus(amount.int));
   }
 
+  minus(amount: TokenAmount) {
+    return TokenAmount.fromInt(this.token, this.int.minus(amount.int));
+  }
+
   toString() {
     return this.float.toString(10);
   }
