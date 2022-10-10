@@ -1,6 +1,7 @@
 import { ethers } from "ethers";
 import React, { useEffect, useState } from "react";
 import { useQueryParams } from "../../common/useQueryParams";
+import { useDebounce } from "react-use";
 import { useProvider } from "../../common/ether";
 import * as adaptersGateway from "../../common/adapter";
 
@@ -107,6 +108,25 @@ export function LPTokensManagerPage() {
     fetchSellBalance();
   }, [sellLiquidityAdapter]);
 
+  useDebounce(
+    () => {
+      if (
+        !sellLiquidityAdapter ||
+        !ethers.utils.isAddress(sellOutToken) ||
+        Number.isNaN(Number(sellAmount))
+      ) {
+        return;
+      }
+      if (sellAmount === "0") return;
+
+      sellLiquidityAdapter.methods
+        .amountOut(sellOutToken, sellAmount)
+        .then((v) => console.info(`Amount out: ${v}`));
+    },
+    500,
+    [sellAmount, sellOutToken]
+  );
+
   const onBuyApprove = async () => {
     if (!buyLiquidityAdapter || !ethers.utils.isAddress(buyInToken)) return;
 
@@ -197,9 +217,7 @@ export function LPTokensManagerPage() {
 
     setSellProcess(true);
     try {
-      const canSell = await sellLiquidityAdapter.methods.canSell(
-        sellAmount
-      );
+      const canSell = await sellLiquidityAdapter.methods.canSell(sellAmount);
       if (canSell instanceof Error) {
         setSellError(canSell.message);
         setSellProcess(false);
@@ -239,9 +257,7 @@ export function LPTokensManagerPage() {
 
     setSellETHProcess(true);
     try {
-      const canSell = await sellLiquidityAdapter.methods.canSell(
-        sellETHAmount
-      );
+      const canSell = await sellLiquidityAdapter.methods.canSell(sellETHAmount);
       if (canSell instanceof Error) {
         setSellETHError(canSell.message);
         setSellETHProcess(false);
