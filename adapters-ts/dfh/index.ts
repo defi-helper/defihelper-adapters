@@ -535,6 +535,13 @@ module.exports = {
             .useBalanceOf({ node: signer, account: signerAddress })
             .bind(null, pair),
           amountOut: async (tokenAddress: string, amount: string) => {
+            if (tokenAddress === ZERO_ADDRESS) {
+              tokenAddress = await storage.contract.getAddress(
+                ethers.utils.keccak256(
+                  ethers.utils.toUtf8Bytes("NativeWrapper:Contract")
+                )
+              );
+            }
             debugo({
               _prefix: "amountOut",
               tokenAddress,

@@ -127,6 +127,21 @@ export function LPTokensManagerPage() {
     [sellAmount, sellOutToken]
   );
 
+  useDebounce(
+    () => {
+      if (!sellLiquidityAdapter || Number.isNaN(Number(sellETHAmount))) {
+        return;
+      }
+      if (sellETHAmount === "0") return;
+
+      sellLiquidityAdapter.methods
+        .amountOut("0x0000000000000000000000000000000000000000", sellETHAmount)
+        .then((v) => console.info(`ETH Amount out: ${v}`));
+    },
+    500,
+    [sellETHAmount]
+  );
+
   const onBuyApprove = async () => {
     if (!buyLiquidityAdapter || !ethers.utils.isAddress(buyInToken)) return;
 
