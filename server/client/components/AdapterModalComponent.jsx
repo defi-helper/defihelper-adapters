@@ -722,14 +722,14 @@ export function EthereumAutomateRestakeStopLoss({ methods }) {
               }
               onClick={onSetStopLoss}
             >
-              Set stop loss
+              Set stop-loss
             </button>
           </div>
           <div>
-            <button onClick={onRemoveStopLoss}>Remove stop loss</button>
+            <button onClick={onRemoveStopLoss}>Remove stop-loss</button>
           </div>
           <div>
-            <button onClick={onRunStopLoss}>Run stop loss</button>
+            <button onClick={onRunStopLoss}>Run stop-loss</button>
           </div>
         </div>
       )}

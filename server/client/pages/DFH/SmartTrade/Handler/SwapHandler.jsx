@@ -302,7 +302,7 @@ export function SwapHandler({ signer, routerAdapter, adapters, searchParams }) {
             </div>
             <div>
               <div>
-                <label htmlFor="stopLoss">Stop loss:</label>
+                <label htmlFor="stopLoss">Stop-loss:</label>
                 <input
                   id="stopLoss"
                   type="checkbox"
