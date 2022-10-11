@@ -92,7 +92,7 @@ module.exports = {
     return {
       name: "DFHBalance",
       balance: async () => {
-        const signerBalance = balance
+        const signerBalance = await balance
           .balanceOf(signerAddress)
           .then(ethereum.toBN);
         debugo({ _prefix: "balance", signerBalance });
@@ -100,7 +100,7 @@ module.exports = {
         return signerBalance.div("1e18").toString(10);
       },
       netBalance: async () => {
-        const signerNetBalance = balance
+        const signerNetBalance = await balance
           .netBalanceOf(signerAddress)
           .then(ethereum.toBN);
         debugo({ _prefix: "netBalance", signerNetBalance });

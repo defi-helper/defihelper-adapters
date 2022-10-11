@@ -44,6 +44,10 @@ export function Router() {
             )}
           ></Route>
           <Route
+            path="/client/dfh/balance"
+            component={DFH.BalancePage}
+          ></Route>
+          <Route
             path="/client/dfh/smart-trade"
             component={DFH.SmartTradePage}
           ></Route>

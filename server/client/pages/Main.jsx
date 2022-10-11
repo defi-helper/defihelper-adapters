@@ -85,6 +85,9 @@ export function Main() {
         <div>
           <ul>
             <li>
+              <Link to="/client/dfh/balance">Balance</Link>
+            </li>
+            <li>
               <Link to="/client/dfh/smart-trade">SmartTrade</Link>
             </li>
             <li>
