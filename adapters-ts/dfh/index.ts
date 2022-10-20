@@ -116,6 +116,9 @@ module.exports = {
           _prefix: "canDeposit",
           signerBalance,
         });
+        if (Number(amount) <= 0) {
+          return new Error('Invalid amount');
+        }
         if (
           signerBalance.lt(
             ethereum.toBN(amount).multipliedBy("1e18").toFixed(0)
@@ -148,6 +151,9 @@ module.exports = {
           _prefix: "canRefund",
           signerNetBalance,
         });
+        if (Number(amount) <= 0) {
+          return new Error('Invalid amount');
+        }
         if (
           signerNetBalance.lt(
             ethereum.toBN(amount).multipliedBy("1e18").toFixed(0)
@@ -561,8 +567,8 @@ module.exports = {
             );
             debugo({
               _prefix: "amountOut",
-              token0,
-              token1,
+              token0: token0.address,
+              token1: token1.address,
               token0Balance: balance.token0,
               token1Balance: balance.token1,
             });

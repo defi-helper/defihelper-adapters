@@ -1,7 +1,5 @@
 import { ethers } from "ethers";
 import React, { useEffect, useState } from "react";
-import { useQueryParams } from "../../common/useQueryParams";
-import { useDebounce } from "react-use";
 import { useProvider } from "../../common/ether";
 import * as adaptersGateway from "../../common/adapter";
 import contracts from "@defihelper/networks/contracts.json";
@@ -13,6 +11,10 @@ export function BalancePage() {
   const [balanceAdapter, setBalanceAdapter] = useState(null);
   const [balance, setBalance] = useState("0");
   const [netBalance, setNetBalance] = useState("0");
+  const [depositAmount, setDepositAmount] = useState("0");
+  const [depositProcess, setDepositProcess] = useState(false);
+  const [refundAmount, setRefundAmount] = useState("0");
+  const [refundProcess, setRefundProcess] = useState(false);
 
   const fetchAdapter = async () => {
     if (!ethers.utils.isAddress(balanceAddress)) return;
@@ -35,6 +37,38 @@ export function BalancePage() {
     balanceAdapter.netBalance().then(setNetBalance);
   };
 
+  const deposit = async () => {
+    if (Number.isNaN(Number(depositAmount))) return;
+
+    setDepositProcess(true);
+    try {
+      const canDeposit = await balanceAdapter.canDeposit(depositAmount);
+      if (canDeposit instanceof Error) return setError(`${canDeposit}`);
+
+      await balanceAdapter.deposit(depositAmount);
+    } catch (e) {
+      setError(`${e}`);
+    } finally {
+      setDepositProcess(false);
+    }
+  };
+
+  const refund = async () => {
+    if (Number.isNaN(Number(refundAmount))) return;
+
+    setRefundProcess(true);
+    try {
+      const canRefund = await balanceAdapter.canRefund(refundAmount);
+      if (canRefund instanceof Error) return setError(`${canRefund}`);
+
+      await balanceAdapter.refund(refundAmount);
+    } catch (e) {
+      setError(`${e}`);
+    } finally {
+      setRefundProcess(false);
+    }
+  };
+
   useEffect(() => {
     if (!signer || !ethers.utils.isAddress(balanceAddress)) {
       return;
@@ -50,7 +84,7 @@ export function BalancePage() {
     signer
       .getChainId()
       .then((chainId) =>
-        setBalanceAddress(contracts[chainId]?.Balance?.address ?? "")
+        setBalanceAddress(contracts[chainId]?.BalanceUpgradable?.address ?? "")
       );
   }, [signer]);
 
@@ -76,6 +110,38 @@ export function BalancePage() {
           </div>
           <div>
             <button onClick={fetchNetBalance}>Net balance {netBalance}</button>
+          </div>
+          <div className="line">
+            <div>
+              <input
+                type="text"
+                value={depositAmount}
+                onChange={(e) => setDepositAmount(e.target.value)}
+              />
+            </div>
+            <div>
+              {depositProcess ? (
+                <div>Process...</div>
+              ) : (
+                <button onClick={deposit}>Deposit</button>
+              )}
+            </div>
+          </div>
+          <div className="line">
+            <div>
+              <input
+                type="text"
+                value={refundAmount}
+                onChange={(e) => setRefundAmount(e.target.value)}
+              />
+            </div>
+            <div>
+              {refundProcess ? (
+                <div>Process...</div>
+              ) : (
+                <button onClick={refund}>Refund</button>
+              )}
+            </div>
           </div>
         </div>
       ) : (
