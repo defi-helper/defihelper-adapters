@@ -156,7 +156,7 @@ export function bridgeWrapperBuild(
       aliases[address.toLowerCase()] ??
       Object.entries(aliases).find(
         ([aliasAddress]) =>
-          aliasAddress.toLocaleLowerCase() === address.toLowerCase()
+          aliasAddress.toLowerCase() === address.toLowerCase()
       )?.[1] ??
       null;
 

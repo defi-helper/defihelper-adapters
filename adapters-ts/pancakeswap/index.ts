@@ -8,6 +8,7 @@ import {
   automateAdapter,
   Deploy,
   Automate,
+  mixComponent,
 } from "../utils/ethereum/adapter/base";
 import { bridgeWrapperBuild } from "../utils/coingecko";
 import * as cache from "../utils/cache";
@@ -1590,7 +1591,21 @@ module.exports = {
       );
 
       return {
-        deposit: await masterChef.AutoRestake.useDeposit({ signer, automate }),
+        deposit: mixComponent(
+          await masterChef.AutoRestake.useDeposit({
+            signer,
+            automate,
+          }),
+          {
+            tokenPriceUSD: uniswap.pair.usePriceUSD({
+              pair: await uniswap.pair.PairInfo.create(
+                await signer.multicall,
+                await automate.contract.stakingToken()
+              ),
+              network: await signer.chainId,
+            }),
+          }
+        ),
         refund: await masterChef.AutoRestake.useRefund({
           signer,
           automate,
@@ -1703,6 +1718,7 @@ module.exports = {
           methods: {
             tokenAddress: () => stakingTokenAddress,
             symbol: () => stakingTokenSymbol,
+            tokenPriceUSD: () => Promise.resolve("0"),
             balanceOf: () =>
               stakingToken
                 .balanceOf(signerAddress)

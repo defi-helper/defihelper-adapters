@@ -187,7 +187,10 @@ export function EthereumAutomateProtocol(props) {
         if (actionsName.length > 0) setCurrentAction(actionsName[0]);
         setAdapterActionsLoad(false);
       })
-      .catch(() => setAdapterActionsLoad(false));
+      .catch((e) => {
+        console.error(e);
+        setAdapterActionsLoad(false);
+      });
   }, [adapters, automateArtifact, instance]);
 
   const onAutomateReload = async ({ protocol }, artifact) => {

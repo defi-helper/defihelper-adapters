@@ -387,14 +387,18 @@ export function GovernanceSwapUnstake({ methods }) {
 export function EthereumAutomateRestakeDeposit({ methods }) {
   const [process, setProcess] = React.useState(false);
   const [balance, setBalance] = React.useState("0");
+  const [priceUSD, setPriceUSD] = React.useState("0");
   const [amount, setAmount] = React.useState("0");
   const [isApproved, setApproved] = React.useState(false);
   const [canDeposit, setCanDeposit] = React.useState(null);
 
   const fetchBalance = () => methods.balanceOf().then(setBalance);
 
+  const fetchPriceUSD = () => methods.tokenPriceUSD().then(setPriceUSD);
+
   React.useEffect(() => {
     fetchBalance();
+    fetchPriceUSD();
   }, []);
 
   useDebounce(
@@ -438,6 +442,7 @@ export function EthereumAutomateRestakeDeposit({ methods }) {
     <div>
       <div>
         <div>Balance: {balance}</div>
+        <div>Price: ${priceUSD}</div>
       </div>
       <div>
         <div>

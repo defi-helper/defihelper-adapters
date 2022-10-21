@@ -951,6 +951,7 @@ module.exports = {
         methods: {
           tokenAddress: () => stakingTokenAddress,
           symbol: () => stakingTokenSymbol,
+          tokenPriceUSD: () => Promise.resolve("0"),
           balanceOf: () =>
             stakingToken
               .balanceOf(signerAddress)
@@ -1186,6 +1187,7 @@ module.exports = {
         methods: {
           tokenAddress: () => stakingTokenAddress,
           symbol: () => stakingTokenSymbol,
+          tokenPriceUSD: () => Promise.resolve("0"),
           balanceOf: () =>
             stakingToken
               .balanceOf(signerAddress)

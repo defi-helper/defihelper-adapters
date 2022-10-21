@@ -5,7 +5,9 @@ import { bignumber as bn } from "../../../../lib";
 import * as ethereum from "../../base";
 import * as erc20 from "../../erc20";
 import abi from "./abi/pair.json";
+import * as dfh from "../../../dfh";
 import { debugo } from "../../../base";
+import { bridgeWrapperBuild } from "../../../coingecko";
 
 export { abi };
 
@@ -190,3 +192,29 @@ export class PairInfo {
     return reserve0.plus(reserve1).div(this.totalSupply);
   }
 }
+
+export const usePriceUSD =
+  ({ pair, network }: { pair: PairInfo; network: number }) =>
+  async () => {
+    debugo({
+      _prefix: "usePriceUSD",
+      pair: pair.address,
+      network,
+    });
+    const priceFeed = bridgeWrapperBuild(
+      await dfh.getPriceFeeds(network),
+      "latest",
+      { timestamp: 0 },
+      network
+    );
+
+    const [token0PriceUSD, token1PriceUSD] = await Promise.all([
+      priceFeed(pair.token0),
+      priceFeed(pair.token1),
+    ]);
+    debugo({
+      token0PriceUSD,
+      token1PriceUSD,
+    });
+    return pair.calcPrice(token0PriceUSD, token1PriceUSD).toString(10);
+  };
