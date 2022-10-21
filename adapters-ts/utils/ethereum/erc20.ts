@@ -6,7 +6,9 @@ import type BN from "bignumber.js";
 import { bignumber as bn } from "../../lib";
 import abi from "./abi/erc20.json";
 import * as ethereum from "./base";
+import * as dfh from "../dfh";
 import { debug, debugo } from "../base";
+import { bridgeWrapperBuild } from "../coingecko";
 
 export { abi };
 
@@ -71,7 +73,12 @@ export class ConnectedToken extends Token {
       contract.multicall.decimals(),
     ]);
 
-    return new ConnectedToken(name, symbol, Number(decimals.toString()), contract);
+    return new ConnectedToken(
+      name,
+      symbol,
+      Number(decimals.toString()),
+      contract
+    );
   }
 
   static fromAddress(node: ethereum.Node, address: string) {
@@ -309,4 +316,21 @@ export const useApprove =
 
     debug("approve: skip approve");
     return {};
+  };
+
+export const usePriceUSD =
+  ({ tokenAddress, network }: { tokenAddress: string; network: number }) =>
+  async () => {
+    debugo({
+      _prefix: "usePriceUSD",
+      tokenAddress,
+      network,
+    });
+    const priceFeed = bridgeWrapperBuild(
+      await dfh.getPriceFeeds(network),
+      "latest",
+      { timestamp: 0 },
+      network
+    );
+    return priceFeed(tokenAddress).then((v) => v.toString(10));
   };

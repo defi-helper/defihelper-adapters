@@ -165,6 +165,7 @@ export namespace Automate {
       methods: {
         tokenAddress: () => string;
         symbol: () => string;
+        tokenPriceUSD: () => Promise<string>;
         balanceOf: () => Promise<string>;
         canTransfer: (amount: string) => Promise<true | Error>;
         transfer: (amount: string) => Promise<{ tx: ContractTransaction }>;
@@ -216,6 +217,7 @@ export namespace Automate {
       methods: {
         tokenAddress: () => string;
         symbol: () => string;
+        tokenPriceUSD: () => Promise<string>;
         balanceOf: () => Promise<string>;
         isApproved: (amount: string) => Promise<boolean | Error>;
         approve: (
@@ -292,6 +294,22 @@ export namespace Automate {
     }
   }
 }
+
+export interface Component<M> {
+  name: string;
+  methods: M;
+}
+
+export const mixComponent = <T extends Component<any>>(
+  component: T,
+  mixin: Partial<T["methods"]>
+) => ({
+  name: component.name,
+  methods: {
+    ...component.methods,
+    ...mixin,
+  },
+});
 
 export interface ContractsResolver {
   (provider: providers.Provider, options?: { cacheAuth?: string }): Promise<

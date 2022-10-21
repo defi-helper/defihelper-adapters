@@ -547,6 +547,7 @@ export function stakingPairAutomateAdapter({
       methods: {
         tokenAddress: () => stakingTokenAddress,
         symbol: () => stakingTokenSymbol,
+        tokenPriceUSD: () => Promise.resolve("0"),
         balanceOf: () =>
           stakingToken
             .balanceOf(signerAddress)
@@ -814,6 +815,7 @@ export function stakingSingleAutomateAdapter({
       methods: {
         tokenAddress: () => stakingTokenAddress,
         symbol: () => stakingTokenSymbol,
+        tokenPriceUSD: () => Promise.resolve("0"),
         balanceOf: () =>
           stakingToken
             .balanceOf(signerAddress)
@@ -1053,6 +1055,10 @@ export namespace AutoRestake {
       methods: {
         tokenAddress: () => stakingToken.address,
         symbol: () => stakingToken.symbol,
+        tokenPriceUSD: erc20.usePriceUSD({
+          tokenAddress: stakingToken.address,
+          network: await signer.chainId,
+        }),
         balanceOf: erc20
           .useBalanceOf({ node: signer, account: signerAddress })
           .bind(null, stakingToken.address),

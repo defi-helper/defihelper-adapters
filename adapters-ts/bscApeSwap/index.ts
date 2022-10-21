@@ -191,10 +191,7 @@ module.exports = {
         throw new Error("Pool is not found");
       }
 
-      const masterChefProvider = masterChefProviderFactory(
-        provider,
-        blockTag,
-      );
+      const masterChefProvider = masterChefProviderFactory(provider, blockTag);
       const poolInfo = await masterChefProvider.poolInfo(pool.index);
 
       const rewardToken = await masterChefProvider.rewardToken();
@@ -612,10 +609,7 @@ module.exports = {
         throw new Error("Pool is not found");
       }
 
-      const masterChefProvider = masterChefProviderFactory(
-        provider,
-        blockTag,
-      );
+      const masterChefProvider = masterChefProviderFactory(provider, blockTag);
       const poolInfo = await masterChefProvider.poolInfo(pool.index);
 
       const rewardToken = await masterChefProvider.rewardToken();
@@ -1754,10 +1748,7 @@ module.exports = {
       contractAddress: string
     ) => {
       return masterChef.stakingPairAutomateAdapter({
-        masterChefProvider: masterChefProviderFactory(
-          signer,
-          "latest",
-        ),
+        masterChefProvider: masterChefProviderFactory(signer, "latest"),
         automateABI: masterChefLpRestakeABI,
         stakingABI: masterChefABI,
         routeTokens,
@@ -1768,10 +1759,7 @@ module.exports = {
       contractAddress: string
     ) => {
       return masterChef.stakingSingleAutomateAdapter({
-        masterChefProvider: masterChefProviderFactory(
-          signer,
-          "latest",
-        ),
+        masterChefProvider: masterChefProviderFactory(signer, "latest"),
         automateABI: masterChefSingleRestakeABI,
         stakingABI: masterChefABI,
         routeTokens,
@@ -1804,6 +1792,7 @@ module.exports = {
         methods: {
           tokenAddress: () => stakingTokenAddress,
           symbol: () => stakingTokenSymbol,
+          tokenPriceUSD: () => Promise.resolve("0"),
           balanceOf: () =>
             stakingToken
               .balanceOf(signerAddress)
