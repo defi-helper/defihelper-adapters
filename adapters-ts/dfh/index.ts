@@ -117,7 +117,7 @@ module.exports = {
           signerBalance,
         });
         if (Number(amount) <= 0) {
-          return new Error('Invalid amount');
+          return new Error("Invalid amount");
         }
         if (
           signerBalance.lt(
@@ -152,7 +152,7 @@ module.exports = {
           signerNetBalance,
         });
         if (Number(amount) <= 0) {
-          return new Error('Invalid amount');
+          return new Error("Invalid amount");
         }
         if (
           signerNetBalance.lt(
@@ -332,6 +332,28 @@ module.exports = {
               swap1: JSON.stringify(swap1),
             });
 
+            const estimateGas =
+              await automate.contract.estimateGas.buyLiquidity(
+                amountInt.toFixed(),
+                router,
+                swap0,
+                swap1,
+                pair,
+                dayjs().add(deadlineSeconds, "seconds").unix(),
+                {
+                  value: ethereum.toBN(fee).multipliedBy(1.05).toFixed(0),
+                }
+              );
+            const gasLimit = ethereum
+              .toBN(estimateGas)
+              .multipliedBy(1.1)
+              .toFixed(0);
+            debugo({
+              _prefix: "buy",
+              estimateGas,
+              gasLimit,
+            });
+
             const buyTx = await automate.contract.buyLiquidity(
               amountInt.toFixed(),
               router,
@@ -341,6 +363,7 @@ module.exports = {
               dayjs().add(deadlineSeconds, "seconds").unix(),
               {
                 value: ethereum.toBN(fee).multipliedBy(1.05).toFixed(0),
+                gasLimit,
               }
             );
             debugo({
@@ -731,6 +754,28 @@ module.exports = {
               swap1: JSON.stringify(swap1),
             });
 
+            const estimateGas =
+              await automate.contract.estimateGas.sellLiquidity(
+                pairInfo.amountFloat(amount).toFixed(),
+                router,
+                swap0,
+                swap1,
+                pair,
+                dayjs().add(deadlineSeconds, "seconds").unix(),
+                {
+                  value: ethereum.toBN(fee).multipliedBy(1.05).toFixed(0),
+                }
+              );
+            const gasLimit = ethereum
+              .toBN(estimateGas)
+              .multipliedBy(1.1)
+              .toFixed(0);
+            debugo({
+              _prefix: "sell",
+              estimateGas,
+              gasLimit,
+            });
+
             const sellTx = await automate.contract.sellLiquidity(
               pairInfo.amountFloat(amount).toFixed(),
               router,
@@ -740,6 +785,7 @@ module.exports = {
               dayjs().add(deadlineSeconds, "seconds").unix(),
               {
                 value: ethereum.toBN(fee).multipliedBy(1.05).toFixed(0),
+                gasLimit,
               }
             );
             debugo({
@@ -830,6 +876,28 @@ module.exports = {
               swap1: JSON.stringify(swap1),
             });
 
+            const estimateGas =
+              await automate.contract.estimateGas.sellLiquidityETH(
+                pairInfo.amountFloat(amount).toFixed(),
+                router,
+                swap0,
+                swap1,
+                pair,
+                dayjs().add(deadlineSeconds, "seconds").unix(),
+                {
+                  value: ethereum.toBN(fee).multipliedBy(1.05).toFixed(0),
+                }
+              );
+            const gasLimit = ethereum
+              .toBN(estimateGas)
+              .multipliedBy(1.1)
+              .toFixed(0);
+            debugo({
+              _prefix: "sellETH",
+              estimateGas,
+              gasLimit,
+            });
+
             const sellTx = await automate.contract.sellLiquidityETH(
               pairInfo.amountFloat(amount).toFixed(),
               router,
@@ -839,6 +907,7 @@ module.exports = {
               dayjs().add(deadlineSeconds, "seconds").unix(),
               {
                 value: ethereum.toBN(fee).multipliedBy(1.05).toFixed(0),
+                gasLimit,
               }
             );
             debugo({
