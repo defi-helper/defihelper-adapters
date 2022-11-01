@@ -44,6 +44,9 @@ export function SwapHandler({ signer, routerAdapter, adapters, searchParams }) {
   const [stopLossSlippage, setStopLossSlippage] = useState("1");
   const [stopLossAmountOutMin, setStopLossAmountOutMin] = useState("0");
   const [stopLossPrice, setStopLossPrice] = useState("0");
+  const [activate, setActivate] = useState(false);
+  const [activateAmountOut, setActivateAmountOut] = useState("0");
+  const [activateDirection, setActivateDirection] = useState("gt");
   const [depositTokenAmount, setDepositTokenAmount] = useState("");
   const [depositBalanceAmount, setDepositBalanceAmount] = useState("");
   const [createOrderTx, setCreateOrderTx] = useState(null);
@@ -146,6 +149,12 @@ export function SwapHandler({ signer, routerAdapter, adapters, searchParams }) {
         ? {
             amountOut: takeProfitAmountOut,
             slippage: takeProfitSlippage,
+          }
+        : null,
+      activate
+        ? {
+            amountOut: activateAmountOut,
+            direction: activateDirection,
           }
         : null,
       {
@@ -352,6 +361,70 @@ export function SwapHandler({ signer, routerAdapter, adapters, searchParams }) {
                     </div>
                     <div>Amount out min: {stopLossAmountOutMin}</div>
                     <div>Price: {stopLossPrice}</div>
+                  </div>
+                </>
+              )}
+            </div>
+            <div>
+              <div>
+                <label htmlFor="activate">Activate:</label>
+                <input
+                  id="activate"
+                  type="checkbox"
+                  checked={activate}
+                  onChange={(e) => setActivate(e.target.checked)}
+                />
+              </div>
+              {activate && (
+                <>
+                  <div>
+                    <div>
+                      <label>Amount out:</label>
+                    </div>
+                    <div>
+                      <input
+                        type="text"
+                        value={activateAmountOut}
+                        onChange={(e) => setActivateAmountOut(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <div>
+                      <label>Direction:</label>
+                    </div>
+                    <div>
+                      <div>
+                        <label
+                          htmlFor="directionGt"
+                          style={{ display: "inline" }}
+                        >
+                          Great
+                        </label>{" "}
+                        <input
+                          type="radio"
+                          name="direction"
+                          id="directionGt"
+                          checked={activateDirection === "gt"}
+                          onChange={(e) => setActivateDirection("gt")}
+                        />
+                      </div>
+                      <div>
+                        <label
+                          htmlFor="directionLt"
+                          style={{ display: "inline" }}
+                        >
+                          Less
+                        </label>{" "}
+                        <input
+                          type="radio"
+                          name="direction"
+                          id="directionLt"
+                          checked={activateDirection === "lt"}
+                          onChange={(e) => setActivateDirection("lt")}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </>
               )}
