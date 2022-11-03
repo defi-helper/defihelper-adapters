@@ -48,6 +48,8 @@ export function SwapHandler({ signer, routerAdapter, adapters, searchParams }) {
   const [depositBalanceAmount, setDepositBalanceAmount] = useState("");
   const [createOrderTx, setCreateOrderTx] = useState(null);
   const [createOrderCallData, setCreateOrderCallData] = useState(null);
+  const [cancelOrderId, setCancelOrderId] = useState("");
+  const [cancelOrderTx, setCancelOrderTx] = useState(null);
 
   const onHandlerReload = async () => {
     if (!ethers.utils.isAddress(handlerAddress)) {
@@ -107,9 +109,6 @@ export function SwapHandler({ signer, routerAdapter, adapters, searchParams }) {
     if (takeProfit && Number.isNaN(Number(takeProfitSlippage))) {
       return setError(`Invalid take profit slippage: "${takeProfitSlippage}"`);
     }
-    if (depositTokenAmount !== "" && Number.isNaN(Number(depositTokenAmount))) {
-      return setError(`Invalid deposit token amount: "${depositAmount}"`);
-    }
     if (
       depositBalanceAmount !== "" &&
       Number.isNaN(Number(depositBalanceAmount))
@@ -119,16 +118,14 @@ export function SwapHandler({ signer, routerAdapter, adapters, searchParams }) {
       );
     }
 
-    if (depositTokenAmount !== "") {
-      const isApproved = await routerAdapter.methods.isApproved(
-        path[0],
-        depositTokenAmount
-      );
-      if (!isApproved) {
-        await routerAdapter.methods
-          .approve(path[0], depositTokenAmount)
-          .then(({ tx }) => tx?.wait());
-      }
+    const isApproved = await routerAdapter.methods.isApproved(
+      path[0],
+      amountIn
+    );
+    if (!isApproved) {
+      await routerAdapter.methods
+        .approve(path[0], amountIn)
+        .then(({ tx }) => tx?.wait());
     }
 
     const data = await handlerAdapter.methods.createOrder(
@@ -149,7 +146,7 @@ export function SwapHandler({ signer, routerAdapter, adapters, searchParams }) {
           }
         : null,
       {
-        token: depositTokenAmount !== "" ? depositTokenAmount : undefined,
+        token: amountIn,
         native: depositBalanceAmount !== "" ? depositBalanceAmount : undefined,
       }
     );
@@ -160,6 +157,27 @@ export function SwapHandler({ signer, routerAdapter, adapters, searchParams }) {
       callData: data.callData,
       number: await data.getOrderNumber(),
     });
+  };
+
+  const onCancelOrder = async () => {
+    if(Number.isNaN(Number(cancelOrderId))) return;
+
+    setError("");
+    setCancelOrderTx(null);
+    if (!handlerAdapter) return;
+
+    const orderId = Number(cancelOrderId);
+    if (Number.isNaN(orderId)) {
+      return setError(`Invalid order id: "${orderId}"`);
+    }
+
+    const canCancelOrder = await handlerAdapter.methods.canCancelOrder(orderId);
+    if (canCancelOrder instanceof Error) {
+      return setError(canCancelOrder.message);
+    }
+
+    const { tx } = await handlerAdapter.methods.cancelOrder(orderId);
+    setCancelOrderTx(tx);
   };
 
   useEffect(
@@ -216,7 +234,7 @@ export function SwapHandler({ signer, routerAdapter, adapters, searchParams }) {
       {handlerAdapter && (
         <div>
           <div>
-            <label>Create order</label>
+            <h3>Create order</h3>
             <div>
               <div>
                 <label>Exchange address:</label>
@@ -358,19 +376,6 @@ export function SwapHandler({ signer, routerAdapter, adapters, searchParams }) {
             </div>
             <div>
               <div>
-                <label>Deposit token:</label>
-              </div>
-              <div>
-                <input
-                  type="text"
-                  placeholder="amount"
-                  value={depositTokenAmount}
-                  onChange={(e) => setDepositTokenAmount(e.target.value)}
-                />
-              </div>
-            </div>
-            <div>
-              <div>
                 <label>Deposit balance:</label>
               </div>
               <div>
@@ -401,6 +406,38 @@ export function SwapHandler({ signer, routerAdapter, adapters, searchParams }) {
             {createOrderCallData !== null && (
               <ReactJsonWrap>
                 <ReactJson src={createOrderCallData} collapsed={1} />
+              </ReactJsonWrap>
+            )}
+          </div>
+          <div>
+            <h3>Cancel order</h3>
+            <div>
+              <div>
+                <label>Order id:</label>
+              </div>
+              <div>
+                <input
+                  type="text"
+                  placeholder="..."
+                  value={cancelOrderId}
+                  onChange={(e) => setCancelOrderId(e.target.value)}
+                />
+              </div>
+            </div>
+            <div>
+              <button
+                onClick={onCancelOrder}
+                disabled={cancelOrderId === ''}
+              >
+                Send
+              </button>
+            </div>
+            {cancelOrderTx !== null && (
+              <ReactJsonWrap>
+                <ReactJson
+                  src={JSON.parse(JSON.stringify(cancelOrderTx))}
+                  collapsed={1}
+                />
               </ReactJsonWrap>
             )}
           </div>

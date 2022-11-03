@@ -982,42 +982,79 @@ module.exports = {
               spender: signerAddress,
               recipient: router.contract.address,
             }),
-            canDeposit: async (tokenAddress: string, amount: string) => {
-              debugo({ _prefix: "canDeposit", tokenAddress, amount });
-              const token = erc20.multicallContract(tokenAddress);
-              const [signerBalance, allowance, tokenDecimals] =
-                await multicall.all([
-                  token.balanceOf(signerAddress),
-                  token.allowance(signerAddress, router.contract.address),
-                  token.decimals(),
-                ]);
+            canDeposit: async (
+              orderId: string,
+              deposit: Array<{ token: string; amount: string }>
+            ) => {
               debugo({
                 _prefix: "canDeposit",
-                signerBalance,
-                allowance,
-                tokenDecimals,
+                deposit: JSON.stringify(deposit),
               });
-              const amountInt = new bn(amount).multipliedBy(
-                `1e${tokenDecimals.toString()}`
-              );
-              if (amountInt.lte(0)) return new Error("Invalid amount");
-              if (amountInt.gt(signerBalance.toString()))
-                return new Error("Insufficient funds on the balance");
-              if (amountInt.gt(allowance.toString()))
-                return new Error("Not approved");
+              return deposit.reduce<Promise<true | Error>>(
+                async (prev, { token: tokenAddress, amount }) => {
+                  const res = await prev;
+                  if (res instanceof Error) return res;
 
-              return true;
-            },
-            deposit: async (tokenAddress: string, amount: string) => {
-              debugo({ _prefix: "deposit", tokenAddress, amount });
-              const token = await erc20.ConnectedToken.fromAddress(
-                signer,
-                tokenAddress
+                  const token = erc20.multicallContract(tokenAddress);
+                  const [signerBalance, allowance, tokenDecimals, order] =
+                    await multicall.all([
+                      token.balanceOf(signerAddress),
+                      token.allowance(signerAddress, router.contract.address),
+                      token.decimals(),
+                      router.multicall.order(orderId),
+                    ]);
+                  debugo({
+                    _prefix: "canDeposit",
+                    signerBalance,
+                    allowance,
+                    tokenDecimals,
+                    order: JSON.stringify(order),
+                  });
+                  if (order.owner === ZERO_ADDRESS) {
+                    return new Error("Order not found");
+                  }
+                  const amountInt = new bn(amount).multipliedBy(
+                    `1e${tokenDecimals.toString()}`
+                  );
+                  if (amountInt.lte(0)) return new Error("Invalid amount");
+                  if (amountInt.gt(signerBalance.toString()))
+                    return new Error("Insufficient funds on the balance");
+                  if (amountInt.gt(allowance.toString()))
+                    return new Error("Not approved");
+
+                  return true;
+                },
+                Promise.resolve(true)
               );
+            },
+            deposit: async (
+              orderId: string,
+              deposit: Array<{ token: string; amount: string }>
+            ) => {
+              debugo({
+                _prefix: "deposit",
+                orderId,
+                deposit: JSON.stringify(deposit),
+              });
+              const tokens = deposit.map(({ token }) => token);
+              const amounts = await Promise.all(
+                deposit.map(async ({ token: tokenAddress, amount }) => {
+                  const token = await erc20.ConnectedToken.fromAddress(
+                    signer,
+                    tokenAddress
+                  );
+                  return token.amountFloat(amount).toFixed();
+                })
+              );
+              debugo({
+                _prefix: "deposit",
+                tokens,
+                amounts,
+              });
               const depositTx = await router.contract.deposit(
-                signerAddress,
-                tokenAddress,
-                token.amountFloat(amount).toFixed()
+                orderId,
+                tokens,
+                amounts
               );
               debugo({
                 _prefix: "deposit",
@@ -1027,47 +1064,83 @@ module.exports = {
                 tx: depositTx,
               };
             },
-            canRefund: async (tokenAddress: string, amount: string) => {
-              debugo({ _prefix: "canRefund", tokenAddress, amount });
-              const token = erc20.multicallContract(tokenAddress);
-              const [depositBalance, tokenDecimals] = await multicall.all([
-                router.multicall.balanceOf(signerAddress, tokenAddress),
-                token.decimals(),
-              ]);
-              debugo({
-                _prefix: "canRefund",
-                depositBalance,
-                tokenDecimals,
-              });
-              if (
-                ethereum
-                  .toBN(depositBalance)
-                  .lt(
-                    ethereum
-                      .toBN(amount)
-                      .multipliedBy(`1e${tokenDecimals.toString()}`)
-                      .toFixed(0)
-                  )
-              ) {
-                return new Error("Insufficient funds on balance");
-              }
+            canRefund: async (
+              orderId: string,
+              refund: Array<{ token: string; amount: string }>
+            ) => {
+              debugo({ _prefix: "canRefund", refund: JSON.stringify(refund) });
+              return refund.reduce<Promise<true | Error>>(
+                async (prev, { token: tokenAddress, amount }) => {
+                  const res = await prev;
+                  if (res instanceof Error) return res;
 
-              return true;
-            },
-            refund: async (tokenAddress: string, amount: string) => {
-              debugo({ _prefix: "refund", tokenAddress, amount });
-              const token = await erc20.ConnectedToken.fromAddress(
-                signer,
-                tokenAddress
+                  const token = erc20.multicallContract(tokenAddress);
+                  const [depositBalance, tokenDecimals, order] =
+                    await multicall.all([
+                      router.multicall.balanceOf(signerAddress, tokenAddress),
+                      token.decimals(),
+                      router.multicall.order(orderId),
+                    ]);
+                  debugo({
+                    _prefix: "canRefund",
+                    depositBalance,
+                    tokenDecimals,
+                    order: JSON.stringify(order),
+                  });
+                  if (order.owner === ZERO_ADDRESS) {
+                    return new Error("Order not found");
+                  }
+                  if (
+                    ethereum
+                      .toBN(depositBalance)
+                      .lt(
+                        ethereum
+                          .toBN(amount)
+                          .multipliedBy(`1e${tokenDecimals.toString()}`)
+                          .toFixed(0)
+                      )
+                  ) {
+                    return new Error("Insufficient funds on balance");
+                  }
+
+                  return true;
+                },
+                Promise.resolve(true)
               );
+            },
+            refund: async (
+              orderId: string,
+              refund: Array<{ token: string; amount: string }>
+            ) => {
+              debugo({
+                _prefix: "refund",
+                orderId,
+                refund: JSON.stringify(refund),
+              });
+              const tokens = refund.map(({ token }) => token);
+              const amounts = await Promise.all(
+                refund.map(async ({ token: tokenAddress, amount }) => {
+                  const token = await erc20.ConnectedToken.fromAddress(
+                    signer,
+                    tokenAddress
+                  );
+                  return amount === ""
+                    ? await router.contract
+                        .balanceOf(orderId, tokenAddress)
+                        .then((v: EthersBigNumber) => v.toString())
+                    : token.amountFloat(amount).toFixed();
+                })
+              );
+              debugo({
+                _prefix: "refund",
+                tokens,
+                amounts
+              });
               const refundTx = await router.contract.refund(
-                signerAddress,
-                tokenAddress,
-                amount === ""
-                  ? await router.contract
-                      .balanceOf(signerAddress, tokenAddress)
-                      .then((v: EthersBigNumber) => v.toString())
-                  : token.amountFloat(amount).toFixed()
+                orderId,
+                tokens,
+                amounts,
+                signerAddress
               );
               debugo({
                 _prefix: "refund",
@@ -1075,40 +1148,6 @@ module.exports = {
               });
               return {
                 tx: refundTx,
-              };
-            },
-            canCancelOrder: async (id: number | string) => {
-              debugo({ _prefix: "canCancelOrder", id });
-              const order = await router.contract.order(id);
-              debugo({
-                _prefix: "canCancelOrder",
-                id: order.id.toString(),
-                owner: order.owner,
-                status: order.status.toString(),
-                handler: order.handler,
-                callData: order.callData,
-              });
-              if (order.owner.toLowerCase() === ZERO_ADDRESS) {
-                return new Error("Order not found");
-              }
-              if (order.owner.toLowerCase() !== signerAddress.toLowerCase()) {
-                return new Error("Forbidden");
-              }
-              if (order.status.toString() !== "0") {
-                return new Error("Order already processed");
-              }
-
-              return true;
-            },
-            cancelOrder: async (id: number | string) => {
-              debugo({ _prefix: "cancelOrder", id });
-              const cancelOrderTx = await router.contract.cancelOrder(id);
-              debugo({
-                _prefix: "cancelOrder",
-                depositTx: JSON.stringify(cancelOrderTx),
-              });
-              return {
-                tx: cancelOrderTx,
               };
             },
           },
@@ -1220,7 +1259,7 @@ module.exports = {
               ];
               debugo({
                 _prefix: "createOrder",
-                routes,
+                routes: JSON.stringify(routes),
               });
 
               const callData = await handler.contract.callDataEncode({
@@ -1234,12 +1273,15 @@ module.exports = {
                 callData,
               });
 
-              let depositToken = { address: ZERO_ADDRESS, amount: "0" };
+              const depositToken: { tokens: string[]; amounts: string[] } = {
+                tokens: [],
+                amounts: [],
+              };
               if (deposit.token !== undefined) {
-                depositToken.address = path[0];
-                depositToken.amount = inToken
-                  .amountFloat(deposit.token)
-                  .toFixed();
+                depositToken.tokens.push(path[0]);
+                depositToken.amounts.push(
+                  inToken.amountFloat(deposit.token).toFixed()
+                );
               }
               let nativeTokenValue = "0";
               if (deposit.native !== undefined) {
@@ -1249,7 +1291,7 @@ module.exports = {
               }
               debugo({
                 _prefix: "createOrder",
-                depositToken,
+                depositToken: JSON.stringify(depositToken),
                 nativeTokenValue,
               });
 
@@ -1257,8 +1299,8 @@ module.exports = {
                 await router.contract.createOrder(
                   handler.contract.address,
                   callData,
-                  depositToken.address,
-                  depositToken.amount,
+                  depositToken.tokens,
+                  depositToken.amounts,
                   { value: nativeTokenValue }
                 );
               const orderParam = {
@@ -1294,6 +1336,56 @@ module.exports = {
                   );
                   return event?.args?.id.toString() ?? null;
                 },
+              };
+            },
+            canCancelOrder: async (id: number | string) => {
+              debugo({ _prefix: "canCancelOrder", id });
+              const order = await router.contract.order(id);
+              debugo({
+                _prefix: "canCancelOrder",
+                id: order.id.toString(),
+                owner: order.owner,
+                status: order.status.toString(),
+                handler: order.handler,
+                callData: order.callData,
+              });
+              if (order.owner.toLowerCase() === ZERO_ADDRESS) {
+                return new Error("Order not found");
+              }
+              if (order.owner.toLowerCase() !== signerAddress.toLowerCase()) {
+                return new Error("Forbidden");
+              }
+              if (order.status.toString() !== "0") {
+                return new Error("Order already processed");
+              }
+
+              return true;
+            },
+            cancelOrder: async (id: number | string) => {
+              debugo({ _prefix: "cancelOrder", id });
+              const order = await router.contract.order(id);
+              const callDataEncodeInterface =
+                handler.contract.interface.functions[
+                  "callDataEncode((address,uint256,address[],uint256[]))"
+                ].inputs[0].components.map(
+                  ({ name, type }) => `${type} ${name}`
+                );
+              const [{ path }] = ethers.utils.defaultAbiCoder.decode(
+                [`tuple(${callDataEncodeInterface.join(", ")})`],
+                order.callData
+              );
+              debugo({
+                _prefix: "cancelOrder",
+                path,
+              });
+
+              const cancelOrderTx = await router.contract.cancelOrder(id, path);
+              debugo({
+                _prefix: "cancelOrder",
+                cancelOrderTx: JSON.stringify(cancelOrderTx),
+              });
+              return {
+                tx: cancelOrderTx,
               };
             },
           },
