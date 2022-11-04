@@ -146,7 +146,6 @@ export function SwapHandler({ signer, routerAdapter, adapters, searchParams }) {
           }
         : null,
       {
-        token: amountIn,
         native: depositBalanceAmount !== "" ? depositBalanceAmount : undefined,
       }
     );
@@ -160,7 +159,7 @@ export function SwapHandler({ signer, routerAdapter, adapters, searchParams }) {
   };
 
   const onCancelOrder = async () => {
-    if(Number.isNaN(Number(cancelOrderId))) return;
+    if (Number.isNaN(Number(cancelOrderId))) return;
 
     setError("");
     setCancelOrderTx(null);
@@ -425,10 +424,7 @@ export function SwapHandler({ signer, routerAdapter, adapters, searchParams }) {
               </div>
             </div>
             <div>
-              <button
-                onClick={onCancelOrder}
-                disabled={cancelOrderId === ''}
-              >
+              <button onClick={onCancelOrder} disabled={cancelOrderId === ""}>
                 Send
               </button>
             </div>

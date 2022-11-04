@@ -1134,7 +1134,7 @@ module.exports = {
               debugo({
                 _prefix: "refund",
                 tokens,
-                amounts
+                amounts,
               });
               const refundTx = await router.contract.refund(
                 orderId,
@@ -1188,7 +1188,6 @@ module.exports = {
                 slippage: string | number;
               } | null,
               deposit: {
-                token?: string;
                 native?: string;
               } = {}
             ) => {
@@ -1277,12 +1276,10 @@ module.exports = {
                 tokens: [],
                 amounts: [],
               };
-              if (deposit.token !== undefined) {
-                depositToken.tokens.push(path[0]);
-                depositToken.amounts.push(
-                  inToken.amountFloat(deposit.token).toFixed()
-                );
-              }
+              depositToken.tokens.push(path[0]);
+              depositToken.amounts.push(
+                inToken.amountFloat(amountIn).toFixed()
+              );
               let nativeTokenValue = "0";
               if (deposit.native !== undefined) {
                 nativeTokenValue = new bn(deposit.native)
