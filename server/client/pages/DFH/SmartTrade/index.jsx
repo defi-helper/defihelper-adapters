@@ -38,16 +38,16 @@ export function SmartTradePage() {
   const [approveTokenAddress, setApproveTokenAddress] = useState("");
   const [approveAmount, setApproveAmount] = useState("");
   const [approveTx, setApproveTx] = useState(null);
+  const [depositOrderId, setDepositOrderId] = useState("");
   const [depositTokenAddress, setDepositTokenAddress] = useState("");
   const [depositAmount, setDepositAmount] = useState("");
   const [depositTx, setDepositTx] = useState(null);
+  const [refundOrderId, setRefundOrderId] = useState("");
   const [refundTokenAddress, setRefundTokenAddress] = useState("");
   const [refundAmount, setRefundAmount] = useState("");
   const [refundTx, setRefundTx] = useState(null);
   const [orderId, setOrderId] = useState("");
   const [order, setOrder] = useState(null);
-  const [cancelOrderId, setCancelOrderId] = useState("");
-  const [cancelOrderTx, setCancelOrderTx] = useState(null);
 
   const onAdaptersReload = async () => {
     setAdapters(null);
@@ -100,6 +100,9 @@ export function SmartTradePage() {
     setDepositTx(null);
     if (!routerAdapter) return;
 
+    if (Number.isNaN(Number(depositOrderId))) {
+      return setError(`Invalid deposit order id: "${depositOrderId}"`);
+    }
     if (Number.isNaN(Number(depositAmount))) {
       return setError(`Invalid deposit amount: "${depositAmount}"`);
     }
@@ -109,18 +112,16 @@ export function SmartTradePage() {
       );
     }
 
-    const canDeposit = await routerAdapter.methods.canDeposit(
-      depositTokenAddress,
-      depositAmount
-    );
+    const canDeposit = await routerAdapter.methods.canDeposit(depositOrderId, [
+      { token: depositTokenAddress, amount: depositAmount },
+    ]);
     if (canDeposit instanceof Error) {
       return setError(canDeposit.message);
     }
 
-    const { tx } = await routerAdapter.methods.deposit(
-      depositTokenAddress,
-      depositAmount
-    );
+    const { tx } = await routerAdapter.methods.deposit(depositOrderId, [
+      { token: depositTokenAddress, amount: depositAmount },
+    ]);
     setDepositTx(tx);
   };
 
@@ -129,6 +130,9 @@ export function SmartTradePage() {
     setRefundTx(null);
     if (!routerAdapter) return;
 
+    if (Number.isNaN(Number(refundOrderId))) {
+      return setError(`Invalid refund order id: "${refundOrderid}"`);
+    }
     if (Number.isNaN(Number(refundAmount))) {
       return setError(`Invalid refund amount: "${refundAmount}"`);
     }
@@ -136,18 +140,16 @@ export function SmartTradePage() {
       return setError(`Invalid refund token address: "${refundTokenAddress}"`);
     }
 
-    const canRefund = await routerAdapter.methods.canRefund(
-      refundTokenAddress,
-      refundAmount
-    );
+    const canRefund = await routerAdapter.methods.canRefund(refundOrderId, [
+      { token: refundTokenAddress, amount: refundAmount },
+    ]);
     if (canRefund instanceof Error) {
       return setError(canRefund.message);
     }
 
-    const { tx } = await routerAdapter.methods.refund(
-      refundTokenAddress,
-      refundAmount
-    );
+    const { tx } = await routerAdapter.methods.refund(refundOrderId, [
+      { token: refundTokenAddress, amount: refundAmount },
+    ]);
     setRefundTx(tx);
   };
 
@@ -162,25 +164,6 @@ export function SmartTradePage() {
     }
 
     setOrder(await routerAdapter.methods.order(id));
-  };
-
-  const onCancelOrder = async () => {
-    setError("");
-    setCancelOrderTx(null);
-    if (!routerAdapter) return;
-
-    const orderId = Number(cancelOrderId);
-    if (Number.isNaN(orderId)) {
-      return setError(`Invalid order id: "${orderId}"`);
-    }
-
-    const canCancelOrder = await routerAdapter.methods.canCancelOrder(orderId);
-    if (canCancelOrder instanceof Error) {
-      return setError(canCancelOrder.message);
-    }
-
-    const { tx } = await routerAdapter.methods.cancelOrder(orderId);
-    setCancelOrderTx(tx);
   };
 
   useEffect(onAdaptersReload, []);
@@ -249,6 +232,12 @@ export function SmartTradePage() {
               <div className="column column-80">
                 <input
                   type="text"
+                  placeholder="order"
+                  value={depositOrderId}
+                  onChange={(e) => setDepositOrderId(e.target.value)}
+                />
+                <input
+                  type="text"
                   placeholder="token"
                   value={depositTokenAddress}
                   onChange={(e) => setDepositTokenAddress(e.target.value)}
@@ -279,6 +268,12 @@ export function SmartTradePage() {
             </div>
             <div className="row">
               <div className="column column-80">
+                <input
+                  type="text"
+                  placeholder="order"
+                  value={refundOrderId}
+                  onChange={(e) => setRefundOrderId(e.target.value)}
+                />
                 <input
                   type="text"
                   placeholder="token"
@@ -326,32 +321,6 @@ export function SmartTradePage() {
               <ReactJsonWrap>
                 <ReactJson
                   src={JSON.parse(JSON.stringify(order))}
-                  collapsed={1}
-                />
-              </ReactJsonWrap>
-            )}
-          </div>
-          <div>
-            <div>
-              <label>Cancel order:</label>
-            </div>
-            <div className="row">
-              <div className="column column-80">
-                <input
-                  type="text"
-                  placeholder="id"
-                  value={cancelOrderId}
-                  onChange={(e) => setCancelOrderId(e.target.value)}
-                />
-              </div>
-              <div className="column column-20">
-                <button onClick={onCancelOrder}>Send</button>
-              </div>
-            </div>
-            {cancelOrderTx !== null && (
-              <ReactJsonWrap>
-                <ReactJson
-                  src={JSON.parse(JSON.stringify(cancelOrderTx))}
                   collapsed={1}
                 />
               </ReactJsonWrap>
