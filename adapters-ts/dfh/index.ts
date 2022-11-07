@@ -1187,6 +1187,10 @@ module.exports = {
                 amountOut: string;
                 slippage: string | number;
               } | null,
+              activate: {
+                amountOut: string;
+                direction: "gt" | "lt";
+              } | null,
               deposit: {
                 native?: string;
               } = {}
@@ -1314,6 +1318,14 @@ module.exports = {
                 ),
                 stopLoss: routes[0],
                 takeProfit: routes[1],
+                activate: activate
+                  ? {
+                      amountOut: outToken
+                        .amountFloat(activate.amountOut)
+                        .toFixed(),
+                      direction: activate.direction,
+                    }
+                  : null,
               };
               debugo({
                 _prefix: "createOrder",
