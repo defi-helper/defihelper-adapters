@@ -55,6 +55,7 @@ export class CoingeckoProvider {
 
   static platformMap = {
     1: "ethereum",
+    5: "ethereum",
     10: "optimistic-ethereum",
     56: "binance-smart-chain",
     128: "huobi-token",
@@ -186,7 +187,7 @@ export function bridgeWrapperBuild(
       aliases[address.toLowerCase()] ??
       Object.entries(aliases).find(
         ([aliasAddress]) =>
-          aliasAddress.toLocaleLowerCase() === address.toLowerCase()
+          aliasAddress.toLowerCase() === address.toLowerCase()
       )?.[1] ??
       null;
 

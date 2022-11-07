@@ -11,7 +11,6 @@ import { Button } from "../components/Button";
 
 export function AdapterProtocol(props) {
   const searchParams = useQueryParams();
-
   const [ethProvider, ethSigner] = useEthProvider();
   const [wavesProvider, wavesSigner] = useWavesProvider();
   const [blockchain, setBlockchain] = React.useState(

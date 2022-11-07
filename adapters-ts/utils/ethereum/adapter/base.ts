@@ -165,6 +165,7 @@ export namespace Automate {
       methods: {
         tokenAddress: () => string;
         symbol: () => string;
+        tokenPriceUSD: () => Promise<string>;
         balanceOf: () => Promise<string>;
         canTransfer: (amount: string) => Promise<true | Error>;
         transfer: (amount: string) => Promise<{ tx: ContractTransaction }>;
@@ -209,7 +210,106 @@ export namespace Automate {
       }
     >;
   }
+
+  export namespace AutoRestake {
+    export interface DepositComponent {
+      name: "automateRestake-deposit";
+      methods: {
+        tokenAddress: () => string;
+        symbol: () => string;
+        tokenPriceUSD: () => Promise<string>;
+        balanceOf: () => Promise<string>;
+        isApproved: (amount: string) => Promise<boolean | Error>;
+        approve: (
+          amount: string
+        ) => Promise<{ tx?: ContractTransaction } | Error>;
+        canDeposit: (amount: string) => Promise<true | Error>;
+        deposit: (amount: string) => Promise<{ tx: ContractTransaction }>;
+      };
+    }
+
+    export interface RefundComponent {
+      name: "automateRestake-refund";
+      methods: {
+        tokenAddress: () => string;
+        symbol: () => string;
+        staked: () => Promise<string>;
+        can: () => Promise<true | Error>;
+        refund: () => Promise<{ tx: ContractTransaction }>;
+      };
+    }
+
+    export interface MigrateComponent {
+      name: "automateRestake-migrate";
+      methods: {
+        staked: () => Promise<string>;
+        canWithdraw: () => Promise<true | Error>;
+        withdraw: () => Promise<{ tx: ContractTransaction }>;
+      } & DepositComponent["methods"];
+    }
+
+    export interface RunComponent {
+      name: "automateRestake-run";
+      methods: {
+        runParams: () => Promise<
+          | {
+              gasPrice: string;
+              gasLimit: string;
+              calldata: any[];
+            }
+          | Error
+        >;
+        run: () => Promise<{ tx: ContractTransaction } | Error>;
+      };
+    }
+
+    export interface StopLossComponent {
+      name: "automateRestake-stopLoss";
+      methods: {
+        startTokens: () => Promise<string[]>;
+        autoPath: (from: string, to: string) => Promise<string[]>;
+        amountOut: (path: string[]) => Promise<string>;
+        canSetStopLoss: (
+          path: string[],
+          amountOut: string,
+          amountOutMin: string
+        ) => Promise<true | Error>;
+        setStopLoss: (
+          path: string[],
+          amountOut: string,
+          amountOutMin: string
+        ) => Promise<{ tx: ContractTransaction }>;
+        removeStopLoss: () => Promise<{ tx: ContractTransaction }>;
+        runStopLoss: () => Promise<{ tx: ContractTransaction }>;
+      };
+    }
+
+    export interface Adapter {
+      (signer: Signer, contractAddress: string): Promise<{
+        deposit: DepositComponent;
+        refund: RefundComponent;
+        migrate: MigrateComponent;
+        run: RunComponent;
+      }>;
+    }
+  }
 }
+
+export interface Component<M> {
+  name: string;
+  methods: M;
+}
+
+export const mixComponent = <T extends Component<any>>(
+  component: T,
+  mixin: Partial<T["methods"]>
+) => ({
+  name: component.name,
+  methods: {
+    ...component.methods,
+    ...mixin,
+  },
+});
 
 export interface ContractsResolver {
   (provider: providers.Provider, options?: { cacheAuth?: string }): Promise<

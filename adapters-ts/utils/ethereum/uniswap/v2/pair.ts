@@ -1,23 +1,139 @@
+import type ethersType from "ethers";
 import type { Provider } from "@defihelper/ethers-multicall";
 import type BN from "bignumber.js";
 import { bignumber as bn } from "../../../../lib";
-import * as base from "../../base";
+import * as ethereum from "../../base";
 import * as erc20 from "../../erc20";
 import abi from "./abi/pair.json";
+import * as dfh from "../../../dfh";
+import { debugo } from "../../../base";
+import { bridgeWrapperBuild } from "../../../coingecko";
 
 export { abi };
 
 export const decimals = 18;
 
-export const contract = base.contract(abi);
+export const contract = ethereum.contract(abi);
 
-export const multicallContract = base.multicallContract(abi);
+export const multicallContract = ethereum.multicallContract(abi);
+
+export class ConnectedPair extends erc20.ConnectedToken {
+  static async fromContract(contract: ethereum.Contract) {
+    const multicall = await contract.node.multicall;
+    const [name, symbol, decimals] = await multicall.all([
+      contract.multicall.name(),
+      contract.multicall.symbol(),
+      contract.multicall.decimals(),
+    ]);
+
+    return new ConnectedPair(name, symbol, decimals.toString(), contract);
+  }
+
+  static fromAddress(node: ethereum.Node, address: string) {
+    return ConnectedPair.fromContract(node.contract(abi, address));
+  }
+
+  public readonly info = new Promise<{
+    token0: erc20.ConnectedToken;
+    token1: erc20.ConnectedToken;
+    reserves: [erc20.TokenAmount, erc20.TokenAmount];
+    totalSupply: erc20.TokenAmount;
+  }>((resolve) => {
+    this.contract.node.multicall.then(async (multicall) => {
+      const [token0Address, token1Address, reserves, totalSupply] =
+        await multicall.all(
+          [
+            this.contract.multicall.token0(),
+            this.contract.multicall.token1(),
+            this.contract.multicall.getReserves(),
+            this.contract.multicall.totalSupply(),
+          ],
+          { blockTag: this.contract.node.blockNumber }
+        );
+      const [token0, token1] = await Promise.all([
+        erc20.ConnectedToken.fromAddress(this.contract.node, token0Address),
+        erc20.ConnectedToken.fromAddress(this.contract.node, token1Address),
+      ]);
+
+      resolve({
+        token0,
+        token1,
+        reserves: [
+          token0.amountInt(reserves[0].toString()),
+          token1.amountInt(reserves[1].toString()),
+        ],
+        totalSupply: this.amountInt(totalSupply.toString()),
+      });
+    });
+  });
+
+  constructor(
+    name: string,
+    symbol: string,
+    decimals: number,
+    public readonly contract: ethereum.Contract
+  ) {
+    super(name, symbol, decimals, contract);
+  }
+
+  async price(token0Price: erc20.TokenAmount, token1Price: erc20.TokenAmount) {
+    if (token0Price.token.decimals !== token1Price.token.decimals) {
+      throw new Error("Tokens must be equal to calculate the price");
+    }
+
+    const {
+      reserves: [token0Reserve, token1Reserve],
+      totalSupply,
+    } = await this.info;
+    const reserve0 = token0Reserve.int.multipliedBy(token0Price.int);
+    const reserve1 = token1Reserve.int.multipliedBy(token1Price.int);
+
+    return reserve0.plus(reserve1).div(totalSupply.int);
+  }
+
+  async expandBalance(balance: erc20.TokenAmount) {
+    const {
+      token0,
+      token1,
+      reserves: [token0Reserve, token1Reserve],
+      totalSupply,
+    } = await this.info;
+
+    return {
+      token0: token0.amountInt(
+        balance.int
+          .multipliedBy(token0Reserve.int)
+          .div(totalSupply.int)
+          .toFixed(0)
+      ),
+      token1: token1.amountInt(
+        balance.int
+          .multipliedBy(token1Reserve.int)
+          .div(totalSupply.int)
+          .toFixed(0)
+      ),
+    };
+  }
+}
+
+export const useTokensList =
+  ({ pair }: { pair: ConnectedPair }) =>
+  async () => {
+    debugo({ _prefix: "tokensList", pair: pair.contract.contract.address });
+    const { token0, token1 } = await pair.info;
+    debugo({
+      _prefix: "tokensList",
+      token0: token0.address,
+      token1: token1.address,
+    });
+    return [token0.address, token1.address];
+  };
 
 export class PairInfo {
   static async create(
     multicall: Provider,
     address: string,
-    options = base.defaultOptions()
+    options = ethereum.defaultOptions()
   ) {
     const multicallPair = multicallContract(address);
     const [token0, token1, reserves, totalSupply] = await multicall.all(
@@ -76,3 +192,29 @@ export class PairInfo {
     return reserve0.plus(reserve1).div(this.totalSupply);
   }
 }
+
+export const usePriceUSD =
+  ({ pair, network }: { pair: PairInfo; network: number }) =>
+  async () => {
+    debugo({
+      _prefix: "usePriceUSD",
+      pair: pair.address,
+      network,
+    });
+    const priceFeed = bridgeWrapperBuild(
+      await dfh.getPriceFeeds(network),
+      "latest",
+      { timestamp: 0 },
+      network
+    );
+
+    const [token0PriceUSD, token1PriceUSD] = await Promise.all([
+      priceFeed(pair.token0),
+      priceFeed(pair.token1),
+    ]);
+    debugo({
+      token0PriceUSD,
+      token1PriceUSD,
+    });
+    return pair.calcPrice(token0PriceUSD, token1PriceUSD).toString(10);
+  };

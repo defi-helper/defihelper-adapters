@@ -29,30 +29,28 @@ build:app:
     KUBERNETES_MEMORY_REQUEST: 3072Mi
     KUBERNETES_MEMORY_LIMIT: 3072Mi
     APP_NAME: "app"
+    BUILD_ARGS: "--build-arg NODE_ENV=development --build-arg DFH_HOST=https://backend-dev.defihelper.info --build-arg CACHE_HOST=https://adapters-dev.defihelper.info/cache --build-arg CACHE_AUTH=${DEV_CACHE_AUTH}"
   extends: .build_image
   rules:
-    - if: $CI_COMMIT_REF_NAME == "master"
-      variables:
-        BUILD_ARGS: "--build-arg NODE_ENV=development --build-arg DFH_HOST=https://backend-dev.defihelper.info --build-arg CACHE_HOST=https://adapters-dev.defihelper.info/cache --build-arg CACHE_AUTH=${DEV_CACHE_AUTH}"
     - if: $CI_COMMIT_REF_NAME == "release"
       variables:
         BUILD_ARGS: "--build-arg NODE_ENV=production --build-arg DFH_HOST=https://backend.defihelper.io --build-arg CACHE_HOST=https://adapters.defihelper.io/cache --build-arg CACHE_AUTH=${PROD_CACHE_AUTH}"
         ENVIRONMENT: prod
+    - if: $CI_COMMIT_REF_NAME == "master"
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH'
 
 build:nginx:
   stage: build
   variables:
     APP_NAME: "nginx"
+    BUILD_ARGS: "--build-arg NODE_ENV=development"
   extends: .build_image
   rules:
-    - if: $CI_COMMIT_REF_NAME == "master"
-      variables:
-        BUILD_ARGS: "--build-arg NODE_ENV=development"
     - if: $CI_COMMIT_REF_NAME == "release"
       variables:
         BUILD_ARGS: "--build-arg NODE_ENV=production"
         ENVIRONMENT: prod
+    - if: $CI_COMMIT_REF_NAME == "master"
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH'
 
 deploy:
@@ -60,7 +58,7 @@ deploy:
   stage: deploy
   rules:
     - if: '$CI_COMMIT_REF_NAME == "master"'
-      when: always
+      when: manual
     - if: '$CI_COMMIT_REF_NAME == "release"'
       when: on_success
       variables:

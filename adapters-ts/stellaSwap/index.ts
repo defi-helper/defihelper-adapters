@@ -101,6 +101,7 @@ module.exports = {
 
       const masterChefSavedPools = await cache.read(
         "stellaSwap",
+        network,
         "masterChefPools"
       );
 
@@ -281,6 +282,9 @@ module.exports = {
   automates: {
     contractsResolver: {
       default: contractsResolver(async (provider, options = {}) => {
+        const networkId = await provider
+          .getNetwork()
+          .then(({ chainId }) => chainId);
         const multicall = new ethersMulticall.Provider(provider);
         await multicall.init();
 
@@ -350,7 +354,7 @@ module.exports = {
               adapter: "stellaSwapDistributor",
               description: "",
               automate: {
-                autorestakeAdapter,
+                // autorestakeAdapter,
                 adapters: ["stellaSwapDistributor"],
                 lpTokensManager: isPair
                   ? {
@@ -368,6 +372,7 @@ module.exports = {
           cache.write(
             options.cacheAuth,
             "stellaSwap",
+            networkId,
             "masterChefPools",
             poolsV1.map(({ poolIndex, stakingToken }) => ({
               index: poolIndex,

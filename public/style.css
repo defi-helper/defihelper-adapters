@@ -1,0 +1,10 @@
+.error {
+  color: red;
+}
+
+.line {
+  display: flex;
+}
+.line > div {
+  margin-right: 5px;
+}

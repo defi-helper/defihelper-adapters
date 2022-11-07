@@ -5,6 +5,7 @@ import { ethers } from "ethers";
 import * as automatesGateway from "../common/automate";
 import * as adaptersGateway from "../common/adapter";
 import { useProvider } from "../common/ether";
+import { useQueryParams } from "../common/useQueryParams";
 import { AdapterModalSteps, AdapterModalComponent } from "../components";
 import { ReactJsonWrap } from "../components/ReactJsonWrap";
 import { Button } from "../components/Button";
@@ -92,15 +93,6 @@ function AutomateArtifactSelector({ chainId, automates, onReload }) {
   );
 }
 
-const adapterActions = {
-  migrate: "migrate",
-  deposit: "deposit",
-  refund: "refund",
-  run: "run",
-};
-
-const automateAdapterActions = Object.values(adapterActions);
-
 function getNetwork(chainId) {
   const networksId = Object.keys(networks);
   if (!networksId.includes(chainId.toString())) {
@@ -115,6 +107,7 @@ function getNetwork(chainId) {
 }
 
 export function EthereumAutomateProtocol(props) {
+  const searchParams = useQueryParams();
   const [automates, setAutomates] = React.useState(null);
   const [provider, signer] = useProvider();
   const [chainId, setChainId] = React.useState(null);
@@ -128,11 +121,13 @@ export function EthereumAutomateProtocol(props) {
   const [prototype, setPrototype] = React.useState("");
   const [deploySteps, setDeploySteps] = React.useState([]);
   const [deployProxyResult, setDeployProxyResult] = React.useState(null);
-  const [instance, setInstance] = React.useState("");
+  const [instance, setInstance] = React.useState(
+    searchParams.get("instance") ?? ""
+  );
+  const [adapterActions, setAdapterActions] = React.useState([]);
+  const [isAdapterActionsLoad, setAdapterActionsLoad] = React.useState(false);
   const [currentAction, setCurrentAction] = React.useState(adapterActions.run);
   const [actionReload, setActionReload] = React.useState(false);
-  const [actionResult, setActionResult] = React.useState(null);
-  const [actionSteps, setActionSteps] = React.useState([]);
   const [actionComponent, setActionComponent] = React.useState(null);
 
   React.useEffect(() => {
@@ -178,6 +173,25 @@ export function EthereumAutomateProtocol(props) {
 
     handler().catch(console.error);
   }, [automateArtifact, deploy]);
+
+  React.useEffect(() => {
+    if (adapters === null || !ethers.utils.isAddress(instance)) {
+      return setAdapterActions([]);
+    }
+
+    setAdapterActionsLoad(true);
+    adapters[automateArtifact.contractName](signer, instance)
+      .then((actions) => {
+        const actionsName = Object.keys(actions);
+        setAdapterActions(actionsName);
+        if (actionsName.length > 0) setCurrentAction(actionsName[0]);
+        setAdapterActionsLoad(false);
+      })
+      .catch((e) => {
+        console.error(e);
+        setAdapterActionsLoad(false);
+      });
+  }, [adapters, automateArtifact, instance]);
 
   const onAutomateReload = async ({ protocol }, artifact) => {
     setAutomateArtifact(artifact);
@@ -253,29 +267,15 @@ export function EthereumAutomateProtocol(props) {
     if (!instance || !currentAction) return;
 
     setActionReload(true);
-    setActionSteps([]);
-
     try {
       const actions = await adapters[automateArtifact.contractName](
         signer,
         instance
       );
-      if (currentAction === adapterActions.run) {
-        const actionResult = await actions.run();
-        setActionResult(
-          actionResult instanceof Error ? actionResult.toString() : actionResult
-        );
-      } else if (actions[currentAction].methods !== undefined) {
-        setActionComponent(actions[currentAction]);
-        setActionResult(null);
-      } else {
-        setActionSteps(actions[currentAction]);
-        setActionResult(null);
-      }
+      setActionComponent(actions[currentAction]);
     } catch (e) {
       console.error(e);
     }
-
     setActionReload(false);
   };
 
@@ -413,17 +413,23 @@ export function EthereumAutomateProtocol(props) {
               />
             </div>
             <div className="column column-45">
-              <label>Action: </label>
-              <select
-                value={currentAction}
-                onChange={(e) => setCurrentAction(e.target.value)}
-              >
-                {automateAdapterActions.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))}
-              </select>
+              <div>
+                <label>Action: </label>
+                {isAdapterActionsLoad ? (
+                  <div>Loading...</div>
+                ) : (
+                  <select
+                    value={currentAction}
+                    onChange={(e) => setCurrentAction(e.target.value)}
+                  >
+                    {adapterActions.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
             </div>
             <div className="column column-10">
               <Button onClick={onAction} loading={actionReload}>
@@ -433,26 +439,14 @@ export function EthereumAutomateProtocol(props) {
           </div>
         </div>
       )}
-      {!actionSteps.length || (
-        <div>
-          <h3>Action steps</h3>
-          <AdapterModalSteps steps={actionSteps} onAction={setActionResult} />
-        </div>
-      )}
       {!actionComponent || (
         <div>
           <h3>Action component</h3>
           <AdapterModalComponent
             blockchain={blockchainEnum.ethereum}
             component={actionComponent}
-            onAction={setActionResult}
           />
         </div>
-      )}
-      {actionResult !== null && (
-        <pre>
-          <code>{JSON.stringify(actionResult, null, 2)}</code>
-        </pre>
       )}
     </div>
   );

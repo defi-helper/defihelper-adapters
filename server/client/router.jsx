@@ -6,7 +6,7 @@ import {
   EthereumAutomateProtocol,
   WavesAutomateProtocol,
   ProtocolContractsResolver,
-  DFHAutomate,
+  DFH,
 } from "./pages";
 
 export function Router() {
@@ -43,7 +43,22 @@ export function Router() {
               <WavesAutomateProtocol protocol={match.params.protocol} />
             )}
           ></Route>
-          <Route path="/client/dfh" component={DFHAutomate}></Route>
+          <Route
+            path="/client/dfh/balance"
+            component={DFH.BalancePage}
+          ></Route>
+          <Route
+            path="/client/dfh/smart-trade"
+            component={DFH.SmartTradePage}
+          ></Route>
+          <Route
+            path="/client/dfh/zap"
+            component={DFH.LPTokensManagerPage}
+          ></Route>
+          <Route
+            path="/client/dfh/automate"
+            component={DFH.AutomatePage}
+          ></Route>
           <Route path="/client" component={Main}></Route>
         </Switch>
       </div>

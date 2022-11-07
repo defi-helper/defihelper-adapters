@@ -19,6 +19,25 @@
     {
       "inputs": [
         {
+          "internalType": "bool",
+          "name": "_isRegular",
+          "type": "bool"
+        }
+      ],
+      "name": "cakePerBlock",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "internalType": "uint256",
           "name": "pool",
           "type": "uint256"
@@ -104,7 +123,7 @@
           "components": [
             {
               "internalType": "uint256",
-              "name": "allocPoint",
+              "name": "accCakePerShare",
               "type": "uint256"
             },
             {
@@ -114,7 +133,12 @@
             },
             {
               "internalType": "uint256",
-              "name": "accCakePerShare",
+              "name": "allocPoint",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "totalBoostedShare",
               "type": "uint256"
             },
             {
@@ -126,6 +150,45 @@
           "internalType": "struct IMasterChef2.PoolInfo",
           "name": "",
           "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "poolLength",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "totalRegularAllocPoint",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "totalSpecialAllocPoint",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
         }
       ],
       "stateMutability": "view",
@@ -156,6 +219,11 @@
             {
               "internalType": "uint256",
               "name": "rewardDebt",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "boostMultiplier",
               "type": "uint256"
             }
           ],

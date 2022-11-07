@@ -1,12 +1,21 @@
-import type { Signer } from "ethers";
+import type {
+  Signer,
+  ContractTransaction,
+  BigNumber as EthersBigNumber,
+} from "ethers";
 import { bignumber as bn, ethers, dayjs, ethersMulticall } from "../lib";
 import { debug, debugo } from "../utils/base";
 import * as ethereum from "../utils/ethereum/base";
 import * as erc20 from "../utils/ethereum/erc20";
 import * as uniswap from "../utils/ethereum/uniswap";
-import LPTokensManagerABI from "./data/LPTokensManagerABI.json";
-import StoreABI from "./data/StoreV2ABI.json";
-import BalanceABI from "./data/BalanceABI.json";
+import { abi as BalanceABI } from "@defihelper/networks/abi/Balance.json";
+import { abi as StoreABI } from "@defihelper/networks/abi/StoreV2.json";
+import { abi as StorageABI } from "@defihelper/networks/abi/Storage.json";
+import { abi as LPTokensManagerABI } from "@defihelper/networks/abi/LPTokensManager.json";
+import { abi as SmartTradeRouterABI } from "@defihelper/networks/abi/SmartTradeRouter.json";
+import { abi as SmartTradeSwapHandlerABI } from "@defihelper/networks/abi/SmartTradeSwapHandler.json";
+
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 const routeTokens: Record<number, string[] | undefined> = {
   1: ["0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"],
@@ -83,7 +92,7 @@ module.exports = {
     return {
       name: "DFHBalance",
       balance: async () => {
-        const signerBalance = balance
+        const signerBalance = await balance
           .balanceOf(signerAddress)
           .then(ethereum.toBN);
         debugo({ _prefix: "balance", signerBalance });
@@ -91,7 +100,7 @@ module.exports = {
         return signerBalance.div("1e18").toString(10);
       },
       netBalance: async () => {
-        const signerNetBalance = balance
+        const signerNetBalance = await balance
           .netBalanceOf(signerAddress)
           .then(ethereum.toBN);
         debugo({ _prefix: "netBalance", signerNetBalance });
@@ -107,6 +116,9 @@ module.exports = {
           _prefix: "canDeposit",
           signerBalance,
         });
+        if (Number(amount) <= 0) {
+          return new Error("Invalid amount");
+        }
         if (
           signerBalance.lt(
             ethereum.toBN(amount).multipliedBy("1e18").toFixed(0)
@@ -139,6 +151,9 @@ module.exports = {
           _prefix: "canRefund",
           signerNetBalance,
         });
+        if (Number(amount) <= 0) {
+          return new Error("Invalid amount");
+        }
         if (
           signerNetBalance.lt(
             ethereum.toBN(amount).multipliedBy("1e18").toFixed(0)
@@ -166,7 +181,7 @@ module.exports = {
   },
   automates: {
     buyLiquidity: async (
-      signer: Signer,
+      ethSigner: Signer,
       contractAddress: string,
       { router, pair }: { router: string; pair: string }
     ) => {
@@ -176,95 +191,43 @@ module.exports = {
         router,
         pair,
       });
-      if (!signer.provider) throw new Error("Provider not found");
-      const provider = signer.provider;
-      const signerAddress = await signer.getAddress();
+      const signer = new ethereum.Signer(ethSigner);
+      const signerAddress = await signer.address;
       debug(`Signer address "${signerAddress}"`);
-      const network = await signer
-        .getChainId()
-        .then((v) => Number(v.toString()));
-      const automate = new ethers.Contract(
-        contractAddress,
-        LPTokensManagerABI
-      ).connect(signer);
-      const automateMulticall =
-        ethereum.multicallContract(LPTokensManagerABI)(contractAddress);
-      const multicall = new ethersMulticall.Provider(provider);
-      await multicall.init();
+      const network = await signer.chainId;
+      const multicall = await signer.multicall;
+      const automate = signer.contract(LPTokensManagerABI, contractAddress);
+      const storage = signer.contract(
+        StorageABI,
+        await automate.contract.info()
+      );
 
       return {
         name: "DFHBuyLiquidity",
         methods: {
-          balanceOf: async (tokenAddress: string) => {
-            debugo({ _prefix: "balanceOf", tokenAddress });
-            const token = erc20.multicallContract(tokenAddress);
-            const [balance, tokenDecimals] = await multicall.all([
-              token.balanceOf(signerAddress),
-              token.decimals(),
-            ]);
-            debugo({ _prefix: "balanceOf", balance, tokenDecimals });
+          fee: async () => {
+            const fee = await automate.contract.fee().then(ethereum.toBN);
+            debugo({ _prefix: "fee", fee });
 
-            return ethereum
-              .toBN(balance)
-              .div(`1e${tokenDecimals.toString()}`)
-              .toString(10);
+            return {
+              native: fee.div("1e18").toString(10),
+              usd: "1",
+            };
           },
-          isApproved: async (tokenAddress: string, amount: string) => {
-            debugo({ _prefix: "isApproved", tokenAddress, amount });
-            if (new bn(amount).lte(0)) return new Error("Invalid amount");
-
-            const token = erc20.multicallContract(tokenAddress);
-            const [allowance, tokenDecimals] = await multicall.all([
-              token.allowance(signerAddress, contractAddress),
-              token.decimals(),
-            ]);
-            debugo({ _prefix: "isApproved", allowance, tokenDecimals });
-
-            return new bn(amount)
-              .multipliedBy(`1e${tokenDecimals.toString()}`)
-              .lte(ethereum.toBN(allowance));
-          },
-          approve: async (tokenAddress: string, amount: string) => {
-            debugo({ _prefix: "approve", tokenAddress, amount });
-            const tokenMulticall = erc20.multicallContract(tokenAddress);
-            const token = erc20.contract(signer, tokenAddress);
-            const [allowance, tokenDecimals] = await multicall.all([
-              tokenMulticall.allowance(signerAddress, contractAddress),
-              tokenMulticall.decimals(),
-            ]);
-            debugo({ _prefix: "approve", allowance, tokenDecimals });
-
-            const amountInt = new bn(amount).multipliedBy(
-              `1e${tokenDecimals.toString()}`
-            );
-            if (amountInt.gt(allowance.toString())) {
-              if (ethereum.toBN(allowance).gt(0)) {
-                debug("approve: reset allowance value");
-                const resetApproveTx = await token.approve(contractAddress, 0);
-                await resetApproveTx.wait();
-                debugo({
-                  _prefix: "approve",
-                  resetApproveTx: JSON.stringify(resetApproveTx),
-                });
-              }
-
-              debug("approve: approve max allowance value");
-              const approveTx = await token.approve(
-                contractAddress,
-                new bn(2).pow(256).minus(1).toFixed(0)
-              );
-              debugo({
-                _prefix: "approve",
-                approveTx: JSON.stringify(approveTx),
-              });
-              return {
-                tx: approveTx,
-              };
-            }
-
-            debug("approve: skip approve");
-            return {};
-          },
+          balanceOf: erc20.useBalanceOf({
+            node: signer,
+            account: signerAddress,
+          }),
+          isApproved: erc20.useIsApproved({
+            node: signer,
+            spender: signerAddress,
+            recipient: automate.contract.address,
+          }),
+          approve: erc20.useApprove({
+            signer,
+            spender: signerAddress,
+            recipient: automate.contract.address,
+          }),
           canBuy: async (tokenAddress: string, amount: string) => {
             debugo({ _prefix: "canBuy", tokenAddress, amount });
             const token = erc20.multicallContract(tokenAddress);
@@ -273,9 +236,9 @@ module.exports = {
                 token.balanceOf(signerAddress),
                 token.allowance(signerAddress, contractAddress),
                 token.decimals(),
-                automateMulticall.fee(),
+                automate.multicall.fee(),
               ]);
-            const feeBalance = await provider
+            const feeBalance = await signer.provider
               .getBalance(signerAddress)
               .then(ethereum.toBN);
             debugo({
@@ -313,32 +276,28 @@ module.exports = {
               slippage,
               deadlineSeconds,
             });
-            const pairMulticall = uniswap.V2.pair.multicallContract(pair);
-            const [tokenDecimals, token0, token1, fee] = await multicall.all([
-              erc20.multicallContract(tokenAddress).decimals(),
-              pairMulticall.token0(),
-              pairMulticall.token1(),
-              automateMulticall.fee(),
+            const fee = await automate.contract.fee();
+            const [inToken, pairInfo] = await Promise.all([
+              erc20.SignedToken.fromAddress(signer, tokenAddress),
+              uniswap.V2.pair.ConnectedPair.fromAddress(signer, pair),
             ]);
+            const { token0, token1 } = await pairInfo.info;
             debugo({
               _prefix: "buy",
-              tokenDecimals,
-              token0,
-              token1,
+              token0: token0.address,
+              token1: token1.address,
               fee,
             });
 
-            const amountInt = new bn(amount).multipliedBy(
-              `1e${tokenDecimals.toString()}`
-            );
+            const amountInt = inToken.amountFloat(amount);
             const outMinPercent = new bn(1).minus(new bn(slippage).div(100));
-            let swap0 = { path: [tokenAddress, token0], outMin: "0" };
-            if (tokenAddress.toLowerCase() !== token0.toLowerCase()) {
+            let swap0 = { path: [tokenAddress, token0.address], outMin: "0" };
+            if (tokenAddress.toLowerCase() !== token0.address.toLowerCase()) {
               const { path, amountOut } = await uniswap.V2.router.autoRoute(
-                uniswap.V2.router.contract(provider, router),
-                amountInt.div(2).toFixed(0),
+                uniswap.V2.router.contract(signer.provider, router),
+                amountInt.int.div(2).toFixed(0),
                 tokenAddress,
-                token0,
+                token0.address,
                 routeTokens[network] ?? []
               );
               swap0 = {
@@ -352,13 +311,13 @@ module.exports = {
               _prefix: "buy",
               swap0: JSON.stringify(swap0),
             });
-            let swap1 = { path: [tokenAddress, token1], outMin: "0" };
-            if (tokenAddress.toLowerCase() !== token1.toLowerCase()) {
+            let swap1 = { path: [tokenAddress, token1.address], outMin: "0" };
+            if (tokenAddress.toLowerCase() !== token1.address.toLowerCase()) {
               const { path, amountOut } = await uniswap.V2.router.autoRoute(
-                uniswap.V2.router.contract(provider, router),
-                amountInt.minus(amountInt.div(2).toFixed(0)).toFixed(0),
+                uniswap.V2.router.contract(signer.provider, router),
+                amountInt.int.minus(amountInt.int.div(2).toFixed(0)).toFixed(0),
                 tokenAddress,
-                token1,
+                token1.address,
                 routeTokens[network] ?? []
               );
               swap1 = {
@@ -373,8 +332,30 @@ module.exports = {
               swap1: JSON.stringify(swap1),
             });
 
-            const buyTx = await automate.buyLiquidity(
-              amountInt.toFixed(0),
+            const estimateGas =
+              await automate.contract.estimateGas.buyLiquidity(
+                amountInt.toFixed(),
+                router,
+                swap0,
+                swap1,
+                pair,
+                dayjs().add(deadlineSeconds, "seconds").unix(),
+                {
+                  value: ethereum.toBN(fee).multipliedBy(1.05).toFixed(0),
+                }
+              );
+            const gasLimit = ethereum
+              .toBN(estimateGas)
+              .multipliedBy(1.1)
+              .toFixed(0);
+            debugo({
+              _prefix: "buy",
+              estimateGas,
+              gasLimit,
+            });
+
+            const buyTx = await automate.contract.buyLiquidity(
+              amountInt.toFixed(),
               router,
               swap0,
               swap1,
@@ -382,6 +363,7 @@ module.exports = {
               dayjs().add(deadlineSeconds, "seconds").unix(),
               {
                 value: ethereum.toBN(fee).multipliedBy(1.05).toFixed(0),
+                gasLimit,
               }
             );
             debugo({
@@ -392,11 +374,160 @@ module.exports = {
               tx: buyTx,
             };
           },
+          balanceETHOf: ethereum.useBalanceOf({
+            node: signer,
+            account: signerAddress,
+          }),
+          canBuyETH: async (amount: string) => {
+            debugo({ _prefix: "canBuyETH", amount });
+            const fee = await automate.contract.fee().then(ethereum.toBN);
+            const feeMultiplicator = 1.05;
+            const gasLimit = 700000;
+            const gasPrice = await signer.provider
+              .getGasPrice()
+              .then(ethereum.toBN);
+            const signerBalance = await signer.provider
+              .getBalance(signerAddress)
+              .then(ethereum.toBN);
+            const inToken = new erc20.Token("", "", 18); // Native token
+            const amountInt = inToken.amountFloat(amount);
+            const amountIntWithoutFees = amountInt
+              .minus(inToken.amountInt(fee.multipliedBy(feeMultiplicator)))
+              .minus(inToken.amountInt(gasPrice.multipliedBy(gasLimit)));
+            debugo({
+              _prefix: "canBuyETH",
+              signerBalance,
+              fee,
+              gasLimit,
+              gasPrice,
+              amountInt,
+              amountIntWithoutFees,
+            });
+
+            if (amountIntWithoutFees.int.lte(0)) {
+              return new Error("Too little amount for pay fees");
+            }
+            if (amountInt.int.gt(signerBalance)) {
+              return new Error("Insufficient funds on the balance");
+            }
+
+            return true;
+          },
+          buyETH: async (
+            amount: string,
+            slippage: number | string,
+            deadlineSeconds: number = 300
+          ) => {
+            debugo({
+              _prefix: "buyETH",
+              amount,
+              slippage,
+              deadlineSeconds,
+            });
+            const fee = await automate.contract.fee().then(ethereum.toBN);
+            const feeMultiplicator = 1.05;
+            const gasLimit = 700000;
+            const gasPrice = await signer.provider
+              .getGasPrice()
+              .then(ethereum.toBN);
+            const inToken = new erc20.Token("", "", 18); // Native token
+            const pairInfo = await uniswap.V2.pair.ConnectedPair.fromAddress(
+              signer,
+              pair
+            );
+            const wrapperAddress = await storage.contract.getAddress(
+              ethers.utils.keccak256(
+                ethers.utils.toUtf8Bytes("NativeWrapper:Contract")
+              )
+            );
+            const { token0, token1 } = await pairInfo.info;
+            const amountInt = inToken
+              .amountFloat(amount)
+              .minus(inToken.amountInt(fee.multipliedBy(feeMultiplicator)))
+              .minus(inToken.amountInt(gasPrice.multipliedBy(gasLimit)));
+            if (amountInt.int.lt(0)) {
+              throw new Error("Too little amount for pay fees");
+            }
+            debugo({
+              _prefix: "buyETH",
+              wrapperAddress,
+              token0: token0.address,
+              token1: token1.address,
+              fee,
+              gasLimit,
+              gasPrice,
+              amountInt,
+            });
+
+            const outMinPercent = new bn(1).minus(new bn(slippage).div(100));
+            let swap0 = { path: [wrapperAddress, token0.address], outMin: "0" };
+            if (wrapperAddress.toLowerCase() !== token0.address.toLowerCase()) {
+              const { path, amountOut } = await uniswap.V2.router.autoRoute(
+                uniswap.V2.router.contract(signer.provider, router),
+                amountInt.int.div(2).toFixed(0),
+                wrapperAddress,
+                token0.address,
+                routeTokens[network] ?? []
+              );
+              swap0 = {
+                path,
+                outMin: new bn(amountOut)
+                  .multipliedBy(outMinPercent)
+                  .toFixed(0),
+              };
+            }
+            debugo({
+              _prefix: "buyETH",
+              swap0: JSON.stringify(swap0),
+            });
+            let swap1 = { path: [wrapperAddress, token1.address], outMin: "0" };
+            if (wrapperAddress.toLowerCase() !== token1.address.toLowerCase()) {
+              const { path, amountOut } = await uniswap.V2.router.autoRoute(
+                uniswap.V2.router.contract(signer.provider, router),
+                amountInt.int.minus(amountInt.int.div(2).toFixed(0)).toFixed(0),
+                wrapperAddress,
+                token1.address,
+                routeTokens[network] ?? []
+              );
+              swap1 = {
+                path,
+                outMin: new bn(amountOut)
+                  .multipliedBy(outMinPercent)
+                  .toFixed(0),
+              };
+            }
+            debugo({
+              _prefix: "buyETH",
+              swap1: JSON.stringify(swap1),
+            });
+
+            const buyTx = await automate.contract.buyLiquidityETH(
+              router,
+              swap0,
+              swap1,
+              pair,
+              dayjs().add(deadlineSeconds, "seconds").unix(),
+              {
+                value: amountInt.value
+                  .plus(fee.multipliedBy(feeMultiplicator))
+                  .toFixed(0),
+                gasLimit,
+                gasPrice: gasPrice.toFixed(0),
+              }
+            );
+            debugo({
+              _prefix: "buyETH",
+              buyTx: JSON.stringify(buyTx),
+            });
+            return {
+              tx: buyTx,
+            };
+          },
         },
       };
     },
     sellLiquidity: async (
-      signer: Signer,
+      ethSigner: Signer,
       contractAddress: string,
       { router, pair }: { router: string; pair: string }
     ) => {
@@ -406,105 +537,123 @@ module.exports = {
         router,
         pair,
       });
-      if (!signer.provider) throw new Error("Provider not found");
-      const provider = signer.provider;
-      const signerAddress = await signer.getAddress();
+      const signer = new ethereum.Signer(ethSigner);
+      const signerAddress = await signer.address;
       debug(`Signer address "${signerAddress}"`);
-      const network = await signer
-        .getChainId()
-        .then((v) => Number(v.toString()));
-      const automate = new ethers.Contract(
-        contractAddress,
-        LPTokensManagerABI
-      ).connect(signer);
-      const automateMulticall =
-        ethereum.multicallContract(LPTokensManagerABI)(contractAddress);
-      const multicall = new ethersMulticall.Provider(provider);
-      await multicall.init();
+      const network = await signer.chainId;
+      const multicall = await signer.multicall;
+      const automate = signer.contract(LPTokensManagerABI, contractAddress);
+      const storage = signer.contract(
+        StorageABI,
+        await automate.contract.info()
+      );
 
       return {
         name: "DFHSellLiquidity",
         methods: {
-          balanceOf: async () => {
-            const token = erc20.multicallContract(pair);
-            const [balance, tokenDecimals] = await multicall.all([
-              token.balanceOf(signerAddress),
-              token.decimals(),
-            ]);
-            debugo({ _prefix: "balanceOf", balance, tokenDecimals });
+          fee: async () => {
+            const fee = await automate.contract.fee().then(ethereum.toBN);
+            debugo({ _prefix: "fee", fee });
 
-            return ethereum
-              .toBN(balance)
-              .div(`1e${tokenDecimals.toString()}`)
-              .toString(10);
+            return {
+              native: fee.div("1e18").toString(10),
+              usd: "1",
+            };
           },
-          isApproved: async (amount: string) => {
-            debugo({ _prefix: "isApproved", amount });
-            if (new bn(amount).lte(0)) return new Error("Invalid amount");
-
-            const token = erc20.multicallContract(pair);
-            const [allowance, tokenDecimals] = await multicall.all([
-              token.allowance(signerAddress, contractAddress),
-              token.decimals(),
-            ]);
-            debugo({ _prefix: "isApproved", allowance, tokenDecimals });
-
-            return new bn(amount)
-              .multipliedBy(`1e${tokenDecimals.toString()}`)
-              .lte(ethereum.toBN(allowance));
-          },
-          approve: async (amount: string) => {
-            debugo({ _prefix: "approve", amount });
-            const tokenMulticall = erc20.multicallContract(pair);
-            const token = erc20.contract(signer, pair);
-            const [allowance, tokenDecimals] = await multicall.all([
-              tokenMulticall.allowance(signerAddress, contractAddress),
-              tokenMulticall.decimals(),
-            ]);
-            debugo({ _prefix: "approve", allowance, tokenDecimals });
-
-            const amountInt = new bn(amount).multipliedBy(
-              `1e${tokenDecimals.toString()}`
-            );
-            if (amountInt.gt(allowance.toString())) {
-              if (ethereum.toBN(allowance).gt(0)) {
-                debug(`approve: reset allowance value`);
-                const resetApproveTx = await token.approve(contractAddress, 0);
-                await resetApproveTx.wait();
-                debugo({
-                  _prefix: "approve",
-                  resetApproveTx: JSON.stringify(resetApproveTx),
-                });
-              }
-
-              debug(`approve: approve max allowance value`);
-              const approveTx = await token.approve(
-                contractAddress,
-                new bn(2).pow(256).minus(1).toFixed(0)
+          balanceOf: erc20
+            .useBalanceOf({ node: signer, account: signerAddress })
+            .bind(null, pair),
+          amountOut: async (tokenAddress: string, amount: string) => {
+            if (tokenAddress === ZERO_ADDRESS) {
+              tokenAddress = await storage.contract.getAddress(
+                ethers.utils.keccak256(
+                  ethers.utils.toUtf8Bytes("NativeWrapper:Contract")
+                )
               );
-              debugo({
-                _prefix: "approve",
-                approveTx: JSON.stringify(approveTx),
-              });
-              return {
-                tx: approveTx,
-              };
             }
+            debugo({
+              _prefix: "amountOut",
+              tokenAddress,
+              amount,
+            });
+            const token = await erc20.ConnectedToken.fromAddress(
+              signer,
+              tokenAddress
+            );
+            const pairInfo = await uniswap.V2.pair.ConnectedPair.fromAddress(
+              signer,
+              pair
+            );
+            const { token0, token1 } = await pairInfo.info;
+            const balance = await pairInfo.expandBalance(
+              pairInfo.amountFloat(amount)
+            );
+            debugo({
+              _prefix: "amountOut",
+              token0: token0.address,
+              token1: token1.address,
+              token0Balance: balance.token0,
+              token1Balance: balance.token1,
+            });
 
-            debug("approve: skip approve");
-            return {};
+            let token0AmountOut = token.amountInt(balance.token0.int);
+            if (tokenAddress.toLowerCase() !== token0.address.toLowerCase()) {
+              const { amountOut } = await uniswap.V2.router.autoRoute(
+                uniswap.V2.router.contract(signer.provider, router),
+                balance.token0.toFixed(),
+                token0.address,
+                tokenAddress,
+                routeTokens[network] ?? []
+              );
+              token0AmountOut = token.amountInt(amountOut);
+            }
+            debugo({
+              _prefix: "amountOut",
+              token0AmountOut,
+            });
+            let token1AmountOut = token.amountInt(balance.token1.int);
+            if (tokenAddress.toLowerCase() !== token1.address.toLowerCase()) {
+              const { amountOut } = await uniswap.V2.router.autoRoute(
+                uniswap.V2.router.contract(signer.provider, router),
+                balance.token1.toFixed(),
+                token1.address,
+                tokenAddress,
+                routeTokens[network] ?? []
+              );
+              token1AmountOut = token.amountInt(amountOut);
+            }
+            debugo({
+              _prefix: "amountOut",
+              token1AmountOut,
+            });
+
+            return token0AmountOut.plus(token1AmountOut).toString();
           },
+          isApproved: erc20
+            .useIsApproved({
+              node: signer,
+              spender: signerAddress,
+              recipient: automate.contract.address,
+            })
+            .bind(null, pair),
+          approve: erc20
+            .useApprove({
+              signer,
+              spender: signerAddress,
+              recipient: automate.contract.address,
+            })
+            .bind(null, pair),
           canSell: async (amount: string) => {
             debugo({ _prefix: "canSell", amount });
             const token = erc20.multicallContract(pair);
             const [signerBalance, allowance, tokenDecimals, fee] =
               await multicall.all([
                 token.balanceOf(signerAddress),
-                token.allowance(signerAddress, contractAddress),
+                token.allowance(signerAddress, automate.contract.address),
                 token.decimals(),
-                automateMulticall.fee(),
+                automate.multicall.fee(),
               ]);
-            const feeBalance = await provider
+            const feeBalance = await signer.provider
               .getBalance(signerAddress)
               .then(ethereum.toBN);
             debugo({
@@ -542,42 +691,34 @@ module.exports = {
               slippage,
               deadlineSeconds,
             });
-            const [pairDecimals, fee] = await multicall.all([
-              uniswap.V2.pair.multicallContract(pair).decimals(),
-              automateMulticall.fee(),
-            ]);
-            const pairInfo = await uniswap.V2.pair.PairInfo.create(
-              multicall,
-              pair,
-              {
-                signer,
-                blockNumber: "latest",
-              }
+            const fee = await automate.contract.fee();
+            const pairInfo = await uniswap.V2.pair.ConnectedPair.fromAddress(
+              signer,
+              pair
             );
-            const { token0, token1 } = pairInfo;
+            const { token0, token1 } = await pairInfo.info;
             debugo({
               _prefix: "sell",
-              pairDecimals,
               fee,
-              token0,
-              token1,
+              token0: token0.address,
+              token1: token1.address,
             });
 
-            const balance = pairInfo.expandBalance(amount);
+            const balance = await pairInfo.expandBalance(
+              pairInfo.amountFloat(amount)
+            );
             debugo({
               _prefix: "sell",
               token0Balance: balance.token0,
               token1Balance: balance.token1,
             });
             const outMinPercent = new bn(1).minus(new bn(slippage).div(100));
-            let swap0 = { path: [token0, tokenAddress], outMin: "0" };
-            if (tokenAddress.toLowerCase() !== token0.toLowerCase()) {
+            let swap0 = { path: [token0.address, tokenAddress], outMin: "0" };
+            if (tokenAddress.toLowerCase() !== token0.address.toLowerCase()) {
               const { path, amountOut } = await uniswap.V2.router.autoRoute(
-                uniswap.V2.router.contract(provider, router),
-                new bn(balance.token0)
-                  .multipliedBy(`1e${pairInfo.token0Decimals}`)
-                  .toFixed(0),
-                token0,
+                uniswap.V2.router.contract(signer.provider, router),
+                balance.token0.toFixed(),
+                token0.address,
                 tokenAddress,
                 routeTokens[network] ?? []
               );
@@ -589,17 +730,15 @@ module.exports = {
               };
             }
             debugo({
-              _prefix: "buy",
+              _prefix: "sell",
               swap0: JSON.stringify(swap0),
             });
-            let swap1 = { path: [token1, tokenAddress], outMin: "0" };
-            if (tokenAddress.toLowerCase() !== token1.toLowerCase()) {
+            let swap1 = { path: [token1.address, tokenAddress], outMin: "0" };
+            if (tokenAddress.toLowerCase() !== token1.address.toLowerCase()) {
               const { path, amountOut } = await uniswap.V2.router.autoRoute(
-                uniswap.V2.router.contract(provider, router),
-                new bn(balance.token1)
-                  .multipliedBy(`1e${pairInfo.token1Decimals}`)
-                  .toFixed(0),
-                token1,
+                uniswap.V2.router.contract(signer.provider, router),
+                balance.token1.toFixed(),
+                token1.address,
                 tokenAddress,
                 routeTokens[network] ?? []
               );
@@ -611,14 +750,34 @@ module.exports = {
               };
             }
             debugo({
-              _prefix: "buy",
+              _prefix: "sell",
               swap1: JSON.stringify(swap1),
             });
 
-            const sellTx = await automate.sellLiquidity(
-              new bn(amount)
-                .multipliedBy(`1e${pairDecimals.toString()}`)
-                .toFixed(0),
+            const estimateGas =
+              await automate.contract.estimateGas.sellLiquidity(
+                pairInfo.amountFloat(amount).toFixed(),
+                router,
+                swap0,
+                swap1,
+                pair,
+                dayjs().add(deadlineSeconds, "seconds").unix(),
+                {
+                  value: ethereum.toBN(fee).multipliedBy(1.05).toFixed(0),
+                }
+              );
+            const gasLimit = ethereum
+              .toBN(estimateGas)
+              .multipliedBy(1.1)
+              .toFixed(0);
+            debugo({
+              _prefix: "sell",
+              estimateGas,
+              gasLimit,
+            });
+
+            const sellTx = await automate.contract.sellLiquidity(
+              pairInfo.amountFloat(amount).toFixed(),
               router,
               swap0,
               swap1,
@@ -626,6 +785,7 @@ module.exports = {
               dayjs().add(deadlineSeconds, "seconds").unix(),
               {
                 value: ethereum.toBN(fee).multipliedBy(1.05).toFixed(0),
+                gasLimit,
               }
             );
             debugo({
@@ -636,8 +796,610 @@ module.exports = {
               tx: sellTx,
             };
           },
+          sellETH: async (
+            amount: string,
+            slippage: number | string,
+            deadlineSeconds: number = 300
+          ) => {
+            debugo({
+              _prefix: "sellETH",
+              amount,
+              slippage,
+              deadlineSeconds,
+            });
+            const fee = await automate.contract.fee();
+            const pairInfo = await uniswap.V2.pair.ConnectedPair.fromAddress(
+              signer,
+              pair
+            );
+            const wrapperAddress = await storage.contract.getAddress(
+              ethers.utils.keccak256(
+                ethers.utils.toUtf8Bytes("NativeWrapper:Contract")
+              )
+            );
+            const { token0, token1 } = await pairInfo.info;
+            debugo({
+              _prefix: "sell",
+              fee,
+              wrapperAddress,
+              token0: token0.address,
+              token1: token1.address,
+            });
+
+            const balance = await pairInfo.expandBalance(
+              pairInfo.amountFloat(amount)
+            );
+            debugo({
+              _prefix: "sell",
+              token0Balance: balance.token0,
+              token1Balance: balance.token1,
+            });
+            const outMinPercent = new bn(1).minus(new bn(slippage).div(100));
+            let swap0 = { path: [token0.address, wrapperAddress], outMin: "0" };
+            if (wrapperAddress.toLowerCase() !== token0.address.toLowerCase()) {
+              const { path, amountOut } = await uniswap.V2.router.autoRoute(
+                uniswap.V2.router.contract(signer.provider, router),
+                balance.token0.toFixed(),
+                token0.address,
+                wrapperAddress,
+                routeTokens[network] ?? []
+              );
+              swap0 = {
+                path,
+                outMin: new bn(amountOut)
+                  .multipliedBy(outMinPercent)
+                  .toFixed(0),
+              };
+            }
+            debugo({
+              _prefix: "sell",
+              swap0: JSON.stringify(swap0),
+            });
+            let swap1 = { path: [token1.address, wrapperAddress], outMin: "0" };
+            if (wrapperAddress.toLowerCase() !== token1.address.toLowerCase()) {
+              const { path, amountOut } = await uniswap.V2.router.autoRoute(
+                uniswap.V2.router.contract(signer.provider, router),
+                balance.token1.toFixed(),
+                token1.address,
+                wrapperAddress,
+                routeTokens[network] ?? []
+              );
+              swap1 = {
+                path,
+                outMin: new bn(amountOut)
+                  .multipliedBy(outMinPercent)
+                  .toFixed(0),
+              };
+            }
+            debugo({
+              _prefix: "sellETH",
+              swap1: JSON.stringify(swap1),
+            });
+
+            const estimateGas =
+              await automate.contract.estimateGas.sellLiquidityETH(
+                pairInfo.amountFloat(amount).toFixed(),
+                router,
+                swap0,
+                swap1,
+                pair,
+                dayjs().add(deadlineSeconds, "seconds").unix(),
+                {
+                  value: ethereum.toBN(fee).multipliedBy(1.05).toFixed(0),
+                }
+              );
+            const gasLimit = ethereum
+              .toBN(estimateGas)
+              .multipliedBy(1.1)
+              .toFixed(0);
+            debugo({
+              _prefix: "sellETH",
+              estimateGas,
+              gasLimit,
+            });
+
+            const sellTx = await automate.contract.sellLiquidityETH(
+              pairInfo.amountFloat(amount).toFixed(),
+              router,
+              swap0,
+              swap1,
+              pair,
+              dayjs().add(deadlineSeconds, "seconds").unix(),
+              {
+                value: ethereum.toBN(fee).multipliedBy(1.05).toFixed(0),
+                gasLimit,
+              }
+            );
+            debugo({
+              _prefix: "sellETH",
+              sellTx: JSON.stringify(sellTx),
+            });
+            return {
+              tx: sellTx,
+            };
+          },
         },
       };
+    },
+    smartTrade: {
+      router: async (ethSigner: Signer, contractAddress: string) => {
+        debugo({
+          _prefix: "Adapter smartTradeRouter",
+          contractAddress,
+        });
+        const signer = new ethereum.Signer(ethSigner);
+        const signerAddress = await signer.address;
+        debug(`Signer address "${signerAddress}"`);
+        const multicall = await signer.multicall;
+        const router = signer.contract(SmartTradeRouterABI, contractAddress);
+
+        return {
+          name: "DFHSmartTradeRouter",
+          methods: {
+            fee: async () => {
+              const fee = await router.contract.fee().then(ethereum.toBN);
+              debugo({ _prefix: "fee", fee });
+
+              return fee.div("1e18").toString(10);
+            },
+            order: async (id: number | string) => {
+              const order = await router.contract.order(id);
+              debugo({ _prefix: "order", id, order });
+
+              return {
+                id: order.id.toString(),
+                owner: order.owner,
+                status: order.status.toString(),
+                handler: order.handler,
+                callData: order.callData,
+              };
+            },
+            balanceOf: erc20.useBalanceOf({
+              node: signer,
+              account: signerAddress,
+            }),
+            depositBalanceOf: async (tokenAddress: string) => {
+              debugo({ _prefix: "depositBalanceOf", tokenAddress });
+              const token = erc20.multicallContract(tokenAddress);
+              const [balance, tokenDecimals] = await multicall.all([
+                router.multicall.balanceOf(signerAddress, tokenAddress),
+                token.decimals(),
+              ]);
+              debugo({ _prefix: "depositBalanceOf", balance, tokenDecimals });
+
+              return ethereum
+                .toBN(balance)
+                .div(`1e${tokenDecimals.toString()}`)
+                .toString(10);
+            },
+            isApproved: erc20.useIsApproved({
+              node: signer,
+              spender: signerAddress,
+              recipient: router.contract.address,
+            }),
+            approve: erc20.useApprove({
+              signer,
+              spender: signerAddress,
+              recipient: router.contract.address,
+            }),
+            canDeposit: async (
+              orderId: string,
+              deposit: Array<{ token: string; amount: string }>
+            ) => {
+              debugo({
+                _prefix: "canDeposit",
+                deposit: JSON.stringify(deposit),
+              });
+              return deposit.reduce<Promise<true | Error>>(
+                async (prev, { token: tokenAddress, amount }) => {
+                  const res = await prev;
+                  if (res instanceof Error) return res;
+
+                  const token = erc20.multicallContract(tokenAddress);
+                  const [signerBalance, allowance, tokenDecimals, order] =
+                    await multicall.all([
+                      token.balanceOf(signerAddress),
+                      token.allowance(signerAddress, router.contract.address),
+                      token.decimals(),
+                      router.multicall.order(orderId),
+                    ]);
+                  debugo({
+                    _prefix: "canDeposit",
+                    signerBalance,
+                    allowance,
+                    tokenDecimals,
+                    order: JSON.stringify(order),
+                  });
+                  if (order.owner === ZERO_ADDRESS) {
+                    return new Error("Order not found");
+                  }
+                  const amountInt = new bn(amount).multipliedBy(
+                    `1e${tokenDecimals.toString()}`
+                  );
+                  if (amountInt.lte(0)) return new Error("Invalid amount");
+                  if (amountInt.gt(signerBalance.toString()))
+                    return new Error("Insufficient funds on the balance");
+                  if (amountInt.gt(allowance.toString()))
+                    return new Error("Not approved");
+
+                  return true;
+                },
+                Promise.resolve(true)
+              );
+            },
+            deposit: async (
+              orderId: string,
+              deposit: Array<{ token: string; amount: string }>
+            ) => {
+              debugo({
+                _prefix: "deposit",
+                orderId,
+                deposit: JSON.stringify(deposit),
+              });
+              const tokens = deposit.map(({ token }) => token);
+              const amounts = await Promise.all(
+                deposit.map(async ({ token: tokenAddress, amount }) => {
+                  const token = await erc20.ConnectedToken.fromAddress(
+                    signer,
+                    tokenAddress
+                  );
+                  return token.amountFloat(amount).toFixed();
+                })
+              );
+              debugo({
+                _prefix: "deposit",
+                tokens,
+                amounts,
+              });
+              const depositTx = await router.contract.deposit(
+                orderId,
+                tokens,
+                amounts
+              );
+              debugo({
+                _prefix: "deposit",
+                depositTx: JSON.stringify(depositTx),
+              });
+              return {
+                tx: depositTx,
+              };
+            },
+            canRefund: async (
+              orderId: string,
+              refund: Array<{ token: string; amount: string }>
+            ) => {
+              debugo({ _prefix: "canRefund", refund: JSON.stringify(refund) });
+              return refund.reduce<Promise<true | Error>>(
+                async (prev, { token: tokenAddress, amount }) => {
+                  const res = await prev;
+                  if (res instanceof Error) return res;
+
+                  const token = erc20.multicallContract(tokenAddress);
+                  const [depositBalance, tokenDecimals, order] =
+                    await multicall.all([
+                      router.multicall.balanceOf(signerAddress, tokenAddress),
+                      token.decimals(),
+                      router.multicall.order(orderId),
+                    ]);
+                  debugo({
+                    _prefix: "canRefund",
+                    depositBalance,
+                    tokenDecimals,
+                    order: JSON.stringify(order),
+                  });
+                  if (order.owner === ZERO_ADDRESS) {
+                    return new Error("Order not found");
+                  }
+                  if (
+                    ethereum
+                      .toBN(depositBalance)
+                      .lt(
+                        ethereum
+                          .toBN(amount)
+                          .multipliedBy(`1e${tokenDecimals.toString()}`)
+                          .toFixed(0)
+                      )
+                  ) {
+                    return new Error("Insufficient funds on balance");
+                  }
+
+                  return true;
+                },
+                Promise.resolve(true)
+              );
+            },
+            refund: async (
+              orderId: string,
+              refund: Array<{ token: string; amount: string }>
+            ) => {
+              debugo({
+                _prefix: "refund",
+                orderId,
+                refund: JSON.stringify(refund),
+              });
+              const tokens = refund.map(({ token }) => token);
+              const amounts = await Promise.all(
+                refund.map(async ({ token: tokenAddress, amount }) => {
+                  const token = await erc20.ConnectedToken.fromAddress(
+                    signer,
+                    tokenAddress
+                  );
+                  return amount === ""
+                    ? await router.contract
+                        .balanceOf(orderId, tokenAddress)
+                        .then((v: EthersBigNumber) => v.toString())
+                    : token.amountFloat(amount).toFixed();
+                })
+              );
+              debugo({
+                _prefix: "refund",
+                tokens,
+                amounts,
+              });
+              const refundTx = await router.contract.refund(
+                orderId,
+                tokens,
+                amounts,
+                signerAddress
+              );
+              debugo({
+                _prefix: "refund",
+                depositTx: JSON.stringify(refundTx),
+              });
+              return {
+                tx: refundTx,
+              };
+            },
+          },
+        };
+      },
+      swapHandler: async (ethSigner: Signer, contractAddress: string) => {
+        debugo({
+          _prefix: "Adapter smartTradeSwapHandler",
+          contractAddress,
+        });
+        const signer = new ethereum.Signer(ethSigner);
+        const signerAddress = await signer.address;
+        debug(`Signer address "${signerAddress}"`);
+        const handler = signer.contract(
+          SmartTradeSwapHandlerABI,
+          contractAddress
+        );
+        const router = signer.contract(
+          SmartTradeRouterABI,
+          await handler.contract.router()
+        );
+
+        return {
+          name: "DFHSmartTradeSwapHandler",
+          methods: {
+            amountOut: uniswap.V2.router.useAmountOut({ node: signer }),
+            createOrder: async (
+              exchangeAddress: string,
+              path: string[],
+              amountIn: string,
+              stopLoss: {
+                amountOut: string;
+                slippage: string | number;
+                moving: boolean;
+              } | null,
+              takeProfit: {
+                amountOut: string;
+                slippage: string | number;
+              } | null,
+              activate: {
+                amountOut: string;
+                direction: "gt" | "lt";
+              } | null,
+              deposit: {
+                native?: string;
+              } = {}
+            ) => {
+              debugo({
+                _prefix: "createOrder",
+                exchangeAddress,
+                path,
+                amountIn,
+                stopLoss,
+                takeProfit,
+              });
+              const [inToken, outToken] = await Promise.all([
+                erc20.ConnectedToken.fromAddress(signer, path[0]),
+                erc20.ConnectedToken.fromAddress(signer, path[path.length - 1]),
+              ]);
+              const pairAddress = await uniswap.V2.factory
+                .contract(
+                  signer.provider,
+                  await uniswap.V2.router
+                    .contract(signer.provider, exchangeAddress)
+                    .factory()
+                )
+                .getPair(inToken.address, outToken.address);
+              debugo({
+                _prefix: "createOrder",
+                inTokenDecimals: inToken.decimals,
+                outTokenDecimals: outToken.decimals,
+                pairAddress,
+              });
+
+              const createRoute = (
+                amountOut: string,
+                slippage: string | number,
+                moving: boolean,
+                direction: "gt" | "lt"
+              ) => ({
+                get amountOut() {
+                  return outToken.amountFloat(amountOut).toFixed();
+                },
+                get slippage() {
+                  return new bn(slippage).div(100).toString(10);
+                },
+                get amountOutMin() {
+                  return new bn(this.amountOut)
+                    .multipliedBy(new bn(1).minus(this.slippage))
+                    .toFixed(0);
+                },
+                moving,
+                direction,
+              });
+              const routes = [
+                stopLoss
+                  ? createRoute(
+                      stopLoss.amountOut,
+                      stopLoss.slippage,
+                      stopLoss.moving,
+                      "lt"
+                    )
+                  : null,
+                takeProfit
+                  ? createRoute(
+                      takeProfit.amountOut,
+                      takeProfit.slippage,
+                      false,
+                      "gt"
+                    )
+                  : null,
+              ];
+              debugo({
+                _prefix: "createOrder",
+                routes: JSON.stringify(routes),
+              });
+
+              const callData = await handler.contract.callDataEncode({
+                exchange: exchangeAddress,
+                amountIn: inToken.amountFloat(amountIn).toFixed(),
+                path,
+                amountOutMin: routes.map((route) => route?.amountOutMin ?? "0"),
+              });
+              debugo({
+                _prefix: "createOrder",
+                callData,
+              });
+
+              const depositToken: { tokens: string[]; amounts: string[] } = {
+                tokens: [],
+                amounts: [],
+              };
+              depositToken.tokens.push(path[0]);
+              depositToken.amounts.push(
+                inToken.amountFloat(amountIn).toFixed()
+              );
+              let nativeTokenValue = "0";
+              if (deposit.native !== undefined) {
+                nativeTokenValue = new bn(deposit.native)
+                  .multipliedBy("1e18")
+                  .toFixed(0);
+              }
+              debugo({
+                _prefix: "createOrder",
+                depositToken: JSON.stringify(depositToken),
+                nativeTokenValue,
+              });
+
+              const createOrderTx: ContractTransaction =
+                await router.contract.createOrder(
+                  handler.contract.address,
+                  callData,
+                  depositToken.tokens,
+                  depositToken.amounts,
+                  { value: nativeTokenValue }
+                );
+              const orderParam = {
+                exchange: exchangeAddress,
+                pair: pairAddress,
+                path,
+                tokenInDecimals: inToken.decimals,
+                tokenOutDecimals: outToken.decimals,
+                amountIn: inToken.amountFloat(amountIn).toFixed(),
+                amountOut: await uniswap.V2.router.getPrice(
+                  uniswap.V2.router.contract(signer.provider, exchangeAddress),
+                  inToken.amountFloat(amountIn).toFixed(),
+                  path
+                ),
+                stopLoss: routes[0],
+                takeProfit: routes[1],
+                activate: activate
+                  ? {
+                      amountOut: outToken
+                        .amountFloat(activate.amountOut)
+                        .toFixed(),
+                      direction: activate.direction,
+                    }
+                  : null,
+              };
+              debugo({
+                _prefix: "createOrder",
+                depositTx: JSON.stringify(createOrderTx),
+                orderParam: JSON.stringify(orderParam),
+              });
+              return {
+                tx: createOrderTx,
+                handler: handler.contract.address,
+                callDataRaw: callData,
+                callData: orderParam,
+                getOrderNumber: async () => {
+                  const receipt = await createOrderTx.wait();
+                  if (!receipt.events) return null;
+                  const event = receipt.events.find(
+                    (e) => e.event === "OrderCreated"
+                  );
+                  return event?.args?.id.toString() ?? null;
+                },
+              };
+            },
+            canCancelOrder: async (id: number | string) => {
+              debugo({ _prefix: "canCancelOrder", id });
+              const order = await router.contract.order(id);
+              debugo({
+                _prefix: "canCancelOrder",
+                id: order.id.toString(),
+                owner: order.owner,
+                status: order.status.toString(),
+                handler: order.handler,
+                callData: order.callData,
+              });
+              if (order.owner.toLowerCase() === ZERO_ADDRESS) {
+                return new Error("Order not found");
+              }
+              if (order.owner.toLowerCase() !== signerAddress.toLowerCase()) {
+                return new Error("Forbidden");
+              }
+              if (order.status.toString() !== "0") {
+                return new Error("Order already processed");
+              }
+
+              return true;
+            },
+            cancelOrder: async (id: number | string) => {
+              debugo({ _prefix: "cancelOrder", id });
+              const order = await router.contract.order(id);
+              const callDataEncodeInterface =
+                handler.contract.interface.functions[
+                  "callDataEncode((address,uint256,address[],uint256[]))"
+                ].inputs[0].components.map(
+                  ({ name, type }) => `${type} ${name}`
+                );
+              const [{ path }] = ethers.utils.defaultAbiCoder.decode(
+                [`tuple(${callDataEncodeInterface.join(", ")})`],
+                order.callData
+              );
+              debugo({
+                _prefix: "cancelOrder",
+                path,
+              });
+
+              const cancelOrderTx = await router.contract.cancelOrder(id, path);
+              debugo({
+                _prefix: "cancelOrder",
+                cancelOrderTx: JSON.stringify(cancelOrderTx),
+              });
+              return {
+                tx: cancelOrderTx,
+              };
+            },
+          },
+        };
+      },
     },
   },
 };
