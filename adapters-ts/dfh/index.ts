@@ -1183,6 +1183,11 @@ module.exports = {
                 slippage: string | number;
                 moving: boolean;
               } | null,
+              stopLoss2: {
+                amountOut: string;
+                slippage: string | number;
+                moving: boolean;
+              } | null,
               takeProfit: {
                 amountOut: string;
                 slippage: string | number;
@@ -1259,6 +1264,14 @@ module.exports = {
                       "gt"
                     )
                   : null,
+                stopLoss2
+                  ? createRoute(
+                      stopLoss2.amountOut,
+                      stopLoss2.slippage,
+                      stopLoss2.moving,
+                      "lt"
+                    )
+                  : null,
               ];
               debugo({
                 _prefix: "createOrder",
@@ -1318,6 +1331,7 @@ module.exports = {
                 ),
                 stopLoss: routes[0],
                 takeProfit: routes[1],
+                stopLoss2: routes[2],
                 activate: activate
                   ? {
                       amountOut: outToken
