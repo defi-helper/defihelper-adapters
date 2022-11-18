@@ -44,6 +44,12 @@ export function SwapHandler({ signer, routerAdapter, adapters, searchParams }) {
   const [stopLossSlippage, setStopLossSlippage] = useState("1");
   const [stopLossAmountOutMin, setStopLossAmountOutMin] = useState("0");
   const [stopLossPrice, setStopLossPrice] = useState("0");
+  const [stopLoss2, setStopLoss2] = useState(false);
+  const [stopLoss2AmountOut, setStopLoss2AmountOut] = useState("0");
+  const [stopLoss2Moving, setStopLoss2Moving] = useState(false);
+  const [stopLoss2Slippage, setStopLoss2Slippage] = useState("1");
+  const [stopLoss2AmountOutMin, setStopLoss2AmountOutMin] = useState("0");
+  const [stopLoss2Price, setStopLoss2Price] = useState("0");
   const [activate, setActivate] = useState(false);
   const [activateAmountOut, setActivateAmountOut] = useState("0");
   const [activateDirection, setActivateDirection] = useState("gt");
@@ -101,6 +107,9 @@ export function SwapHandler({ signer, routerAdapter, adapters, searchParams }) {
     if (stopLoss && Number.isNaN(Number(stopLossAmountOut))) {
       return setError(`Invalid stop loss amount out: "${stopLossAmountOut}"`);
     }
+    if (stopLoss2 && Number.isNaN(Number(stopLoss2AmountOut))) {
+      return setError(`Invalid stop loss 2 amount out: "${stopLoss2AmountOut}"`);
+    }
     if (takeProfit && Number.isNaN(Number(takeProfitAmountOut))) {
       return setError(
         `Invalid take profit amount out: "${takeProfitAmountOut}"`
@@ -108,6 +117,9 @@ export function SwapHandler({ signer, routerAdapter, adapters, searchParams }) {
     }
     if (stopLoss && Number.isNaN(Number(stopLossSlippage))) {
       return setError(`Invalid stop loss slippage: "${stopLossSlippage}"`);
+    }
+    if (stopLoss2 && Number.isNaN(Number(stopLoss2Slippage))) {
+      return setError(`Invalid stop loss 2 slippage: "${stopLoss2Slippage}"`);
     }
     if (takeProfit && Number.isNaN(Number(takeProfitSlippage))) {
       return setError(`Invalid take profit slippage: "${takeProfitSlippage}"`);
@@ -140,6 +152,13 @@ export function SwapHandler({ signer, routerAdapter, adapters, searchParams }) {
             amountOut: stopLossAmountOut,
             moving: stopLossMoving,
             slippage: stopLossSlippage,
+          }
+        : null,
+      stopLoss2
+        ? {
+            amountOut: stopLoss2AmountOut,
+            moving: stopLoss2Moving,
+            slippage: stopLoss2Slippage,
           }
         : null,
       takeProfit
@@ -206,6 +225,14 @@ export function SwapHandler({ signer, routerAdapter, adapters, searchParams }) {
 
   useEffect(
     () =>
+      setStopLoss2AmountOutMin(
+        calcSlippage(stopLoss2AmountOut, stopLoss2Slippage).toString(10)
+      ),
+    [stopLoss2AmountOut, stopLoss2Slippage]
+  );
+
+  useEffect(
+    () =>
       setTakeProfitPrice(
         new BN(takeProfitAmountOut).div(amountIn).toString(10)
       ),
@@ -216,6 +243,12 @@ export function SwapHandler({ signer, routerAdapter, adapters, searchParams }) {
     () =>
       setStopLossPrice(new BN(stopLossAmountOut).div(amountIn).toString(10)),
     [amountIn, stopLossAmountOut]
+  );
+
+  useEffect(
+    () =>
+      setStopLoss2Price(new BN(stopLoss2AmountOut).div(amountIn).toString(10)),
+    [amountIn, stopLoss2AmountOut]
   );
 
   return (
@@ -378,6 +411,62 @@ export function SwapHandler({ signer, routerAdapter, adapters, searchParams }) {
                     </div>
                     <div>Amount out min: {stopLossAmountOutMin}</div>
                     <div>Price: {stopLossPrice}</div>
+                  </div>
+                </>
+              )}
+            </div>
+            <div>
+              <div>
+                <label htmlFor="stopLoss2">Stop-loss 2:</label>
+                <input
+                  id="stopLoss2"
+                  type="checkbox"
+                  checked={stopLoss2}
+                  onChange={(e) => setStopLoss2(e.target.checked)}
+                />
+              </div>
+              {stopLoss2 && (
+                <>
+                  <div>
+                    <div>
+                      <label>Amount out:</label>
+                    </div>
+                    <div>
+                      <input
+                        type="text"
+                        value={stopLoss2AmountOut}
+                        onChange={(e) => setStopLoss2AmountOut(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <div>
+                      <label htmlFor="stopLoss2Moving">Moving:</label>
+                    </div>
+                    <div>
+                      <input
+                        type="checkbox"
+                        id="stopLoss2Moving"
+                        value={stopLoss2Moving}
+                        onChange={(e) => setStopLoss2Moving(e.target.checked)}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <div>
+                      <label>Slippage (%):</label>
+                    </div>
+                    <div>
+                      <input
+                        type="text"
+                        value={stopLoss2Slippage}
+                        onChange={(e) =>
+                          setStopLoss2Slippage(percent(e.target.value))
+                        }
+                      />
+                    </div>
+                    <div>Amount out min: {stopLoss2AmountOutMin}</div>
+                    <div>Price: {stopLoss2Price}</div>
                   </div>
                 </>
               )}
