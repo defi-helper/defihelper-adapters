@@ -1432,7 +1432,7 @@ module.exports = {
                 callOptions,
               });
 
-              const handleTx = router.contract.handleOrder(id, callOptions, 0);
+              const handleTx = await router.contract.handleOrder(id, callOptions, 0);
               debugo({
                 _prefix: "emergencyHandleOrder",
                 handleTx: JSON.stringify(handleTx),
