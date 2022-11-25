@@ -4,6 +4,7 @@ import { useDebounce } from "react-use";
 import { ethers } from "ethers";
 import { BigNumber as BN } from "bignumber.js";
 import { ReactJsonWrap } from "../../../../components/ReactJsonWrap";
+import dayjs from "dayjs";
 
 function isNaN(value) {
   return Number.isNaN(Number(value));
@@ -53,12 +54,13 @@ export function SwapHandler({ signer, routerAdapter, adapters, searchParams }) {
   const [activate, setActivate] = useState(false);
   const [activateAmountOut, setActivateAmountOut] = useState("0");
   const [activateDirection, setActivateDirection] = useState("gt");
-  const [depositTokenAmount, setDepositTokenAmount] = useState("");
   const [depositBalanceAmount, setDepositBalanceAmount] = useState("");
   const [createOrderTx, setCreateOrderTx] = useState(null);
   const [createOrderCallData, setCreateOrderCallData] = useState(null);
   const [cancelOrderId, setCancelOrderId] = useState("");
   const [cancelOrderTx, setCancelOrderTx] = useState(null);
+  const [emergencyHandleOrderId, setEmergencyHandleOrderId] = useState("");
+  const [emergencyHandleOrderTx, setEmergencyHandleOrderTx] = useState(null);
 
   const onHandlerReload = async () => {
     if (!ethers.utils.isAddress(handlerAddress)) {
@@ -108,7 +110,9 @@ export function SwapHandler({ signer, routerAdapter, adapters, searchParams }) {
       return setError(`Invalid stop loss amount out: "${stopLossAmountOut}"`);
     }
     if (stopLoss2 && Number.isNaN(Number(stopLoss2AmountOut))) {
-      return setError(`Invalid stop loss 2 amount out: "${stopLoss2AmountOut}"`);
+      return setError(
+        `Invalid stop loss 2 amount out: "${stopLoss2AmountOut}"`
+      );
     }
     if (takeProfit && Number.isNaN(Number(takeProfitAmountOut))) {
       return setError(
@@ -205,6 +209,25 @@ export function SwapHandler({ signer, routerAdapter, adapters, searchParams }) {
 
     const { tx } = await handlerAdapter.methods.cancelOrder(orderId);
     setCancelOrderTx(tx);
+  };
+
+  const onEmergencyHandleOrder = async () => {
+    if (Number.isNaN(Number(emergencyHandleOrderId))) return;
+
+    setError("");
+    setEmergencyHandleOrderTx(null);
+    if (!handlerAdapter) return;
+
+    const orderId = Number(emergencyHandleOrderId);
+    if (Number.isNaN(orderId)) {
+      return setError(`Invalid order id: "${orderId}"`);
+    }
+
+    const { tx } = await handlerAdapter.methods.emergencyHandleOrder(
+      orderId,
+      dayjs().add(300, "seconds").toDate()
+    );
+    setEmergencyHandleOrderTx(tx);
   };
 
   useEffect(
@@ -537,19 +560,6 @@ export function SwapHandler({ signer, routerAdapter, adapters, searchParams }) {
             </div>
             <div>
               <div>
-                <label>Deposit token:</label>
-              </div>
-              <div>
-                <input
-                  type="text"
-                  placeholder="amount"
-                  value={depositTokenAmount}
-                  onChange={(e) => setDepositTokenAmount(e.target.value)}
-                />
-              </div>
-            </div>
-            <div>
-              <div>
                 <label>Deposit balance:</label>
               </div>
               <div>
@@ -607,6 +617,38 @@ export function SwapHandler({ signer, routerAdapter, adapters, searchParams }) {
               <ReactJsonWrap>
                 <ReactJson
                   src={JSON.parse(JSON.stringify(cancelOrderTx))}
+                  collapsed={1}
+                />
+              </ReactJsonWrap>
+            )}
+          </div>
+          <div>
+            <h3>Emergency swap</h3>
+            <div>
+              <div>
+                <label>Order id:</label>
+              </div>
+              <div>
+                <input
+                  type="text"
+                  placeholder="..."
+                  value={emergencyHandleOrderId}
+                  onChange={(e) => setEmergencyHandleOrderId(e.target.value)}
+                />
+              </div>
+            </div>
+            <div>
+              <button
+                onClick={onEmergencyHandleOrder}
+                disabled={emergencyHandleOrderId === ""}
+              >
+                Send
+              </button>
+            </div>
+            {emergencyHandleOrderTx !== null && (
+              <ReactJsonWrap>
+                <ReactJson
+                  src={JSON.parse(JSON.stringify(emergencyHandleOrderTx))}
                   collapsed={1}
                 />
               </ReactJsonWrap>

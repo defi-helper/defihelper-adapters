@@ -1411,6 +1411,37 @@ module.exports = {
                 tx: cancelOrderTx,
               };
             },
+            emergencyHandleOrder: async (
+              id: number | string,
+              deadline: Date
+            ) => {
+              debugo({
+                _prefix: "emergencyHandleOrder",
+                id,
+                deadline,
+              });
+
+              const callOptions = await handler.contract.callOptionsEncode({
+                route: 0,
+                amountOutMin: 0,
+                deadline: dayjs(deadline).unix(),
+                emergency: true,
+              });
+              debugo({
+                _prefix: "emergencyHandleOrder",
+                callOptions,
+              });
+
+              const handleTx = router.contract.handleOrder(id, callOptions, 0);
+              debugo({
+                _prefix: "emergencyHandleOrder",
+                handleTx: JSON.stringify(handleTx),
+              });
+
+              return {
+                tx: handleTx,
+              };
+            },
           },
         };
       },
