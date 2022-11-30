@@ -1169,6 +1169,28 @@ module.exports = {
           SmartTradeRouterABI,
           await handler.contract.router()
         );
+        const useCreateRoute =
+          (outToken: erc20.ConnectedToken) =>
+          (
+            amountOut: string,
+            slippage: string | number,
+            moving: boolean,
+            direction: "gt" | "lt"
+          ) => ({
+            get amountOut() {
+              return outToken.amountFloat(amountOut).toFixed();
+            },
+            get slippage() {
+              return new bn(slippage).div(100).toString(10);
+            },
+            get amountOutMin() {
+              return new bn(this.amountOut)
+                .multipliedBy(new bn(1).minus(this.slippage))
+                .toFixed(0);
+            },
+            moving,
+            direction,
+          });
 
         return {
           name: "DFHSmartTradeSwapHandler",
@@ -1227,26 +1249,7 @@ module.exports = {
                 pairAddress,
               });
 
-              const createRoute = (
-                amountOut: string,
-                slippage: string | number,
-                moving: boolean,
-                direction: "gt" | "lt"
-              ) => ({
-                get amountOut() {
-                  return outToken.amountFloat(amountOut).toFixed();
-                },
-                get slippage() {
-                  return new bn(slippage).div(100).toString(10);
-                },
-                get amountOutMin() {
-                  return new bn(this.amountOut)
-                    .multipliedBy(new bn(1).minus(this.slippage))
-                    .toFixed(0);
-                },
-                moving,
-                direction,
-              });
+              const createRoute = useCreateRoute(outToken);
               const routes = [
                 stopLoss
                   ? createRoute(
@@ -1343,7 +1346,7 @@ module.exports = {
               };
               debugo({
                 _prefix: "createOrder",
-                depositTx: JSON.stringify(createOrderTx),
+                createOrderTx: JSON.stringify(createOrderTx),
                 orderParam: JSON.stringify(orderParam),
               });
               return {
@@ -1359,6 +1362,142 @@ module.exports = {
                   );
                   return event?.args?.id.toString() ?? null;
                 },
+              };
+            },
+            updateOrder: async (
+              orderId: string,
+              stopLoss: {
+                amountOut: string;
+                slippage: string | number;
+                moving: boolean;
+              } | null,
+              stopLoss2: {
+                amountOut: string;
+                slippage: string | number;
+                moving: boolean;
+              } | null,
+              takeProfit: {
+                amountOut: string;
+                slippage: string | number;
+              } | null,
+              activate: {
+                amountOut: string;
+                direction: "gt" | "lt";
+              } | null
+            ) => {
+              debugo({
+                _prefix: "updateOrder",
+                orderId,
+                stopLoss: JSON.stringify(stopLoss),
+                takeProfit: JSON.stringify(takeProfit),
+                activate: JSON.stringify(activate),
+              });
+
+              const callDataInterface = new ethers.utils.Interface(
+                SmartTradeSwapHandlerABI
+              ).functions[
+                "callDataEncode((address,uint256,address[],uint256[]))"
+              ];
+              const params = callDataInterface.inputs[0].components
+                .map(({ name, type }) => `${type} ${name}`)
+                .join(", ");
+              const orderState = await router.contract.order(orderId);
+              const [state] = ethers.utils.defaultAbiCoder.decode(
+                [`tuple(${params})`],
+                orderState.callData
+              );
+              const { exchange, amountIn, path, amountOutMin } = state;
+              debugo({
+                _prefix: "updateOrder",
+                exchange,
+                amountIn: amountIn.toString(),
+                path,
+                amountOutMin: amountOutMin.map((v: EthersBigNumber) =>
+                  v.toString()
+                ),
+              });
+
+              const outToken = await erc20.ConnectedToken.fromAddress(
+                signer,
+                path[path.length - 1]
+              );
+              debugo({
+                _prefix: "updateOrder",
+                outTokenDecimals: outToken.decimals,
+              });
+
+              const createRoute = useCreateRoute(outToken);
+              const routes = [
+                stopLoss
+                  ? createRoute(
+                      stopLoss.amountOut,
+                      stopLoss.slippage,
+                      stopLoss.moving,
+                      "lt"
+                    )
+                  : null,
+                takeProfit
+                  ? createRoute(
+                      takeProfit.amountOut,
+                      takeProfit.slippage,
+                      false,
+                      "gt"
+                    )
+                  : null,
+                stopLoss2
+                  ? createRoute(
+                      stopLoss2.amountOut,
+                      stopLoss2.slippage,
+                      stopLoss2.moving,
+                      "lt"
+                    )
+                  : null,
+              ];
+              debugo({
+                _prefix: "updateOrder",
+                routes: JSON.stringify(routes),
+              });
+
+              const callData = await handler.contract.callDataEncode({
+                exchange,
+                amountIn: amountIn.toString(),
+                path,
+                amountOutMin: routes.map((route) => route?.amountOutMin ?? "0"),
+              });
+              debugo({
+                _prefix: "updateOrder",
+                callData,
+              });
+              const updateOrderTx: ContractTransaction =
+                await router.contract.updateOrder(orderId, callData);
+
+              const orderParam = {
+                amountOut: await uniswap.V2.router.getPrice(
+                  uniswap.V2.router.contract(signer.provider, exchange),
+                  amountIn,
+                  path
+                ),
+                stopLoss: routes[0],
+                takeProfit: routes[1],
+                stopLoss2: routes[2],
+                activate: activate
+                  ? {
+                      amountOut: outToken
+                        .amountFloat(activate.amountOut)
+                        .toFixed(),
+                      direction: activate.direction,
+                    }
+                  : null,
+              };
+              debugo({
+                _prefix: "createOrder",
+                updateOrderTx: JSON.stringify(updateOrderTx),
+                orderParam: JSON.stringify(orderParam),
+              });
+              return {
+                tx: updateOrderTx,
+                callDataRaw: callData,
+                callData: orderParam,
               };
             },
             canCancelOrder: async (id: number | string) => {
@@ -1409,6 +1548,41 @@ module.exports = {
               });
               return {
                 tx: cancelOrderTx,
+              };
+            },
+            emergencyHandleOrder: async (
+              id: number | string,
+              deadline: Date
+            ) => {
+              debugo({
+                _prefix: "emergencyHandleOrder",
+                id,
+                deadline,
+              });
+
+              const callOptions = await handler.contract.callOptionsEncode({
+                route: 0,
+                amountOutMin: 0,
+                deadline: dayjs(deadline).unix(),
+                emergency: true,
+              });
+              debugo({
+                _prefix: "emergencyHandleOrder",
+                callOptions,
+              });
+
+              const handleTx = await router.contract.handleOrder(
+                id,
+                callOptions,
+                0
+              );
+              debugo({
+                _prefix: "emergencyHandleOrder",
+                handleTx: JSON.stringify(handleTx),
+              });
+
+              return {
+                tx: handleTx,
               };
             },
           },
