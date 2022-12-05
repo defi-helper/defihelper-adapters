@@ -1228,6 +1228,7 @@ module.exports = {
                 path,
                 amountIn,
                 stopLoss,
+                stopLoss2,
                 takeProfit,
               });
               const [inToken, outToken] = await Promise.all([
