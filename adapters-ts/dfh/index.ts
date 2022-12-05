@@ -1230,6 +1230,7 @@ module.exports = {
                 stopLoss,
                 stopLoss2,
                 takeProfit,
+                activate,
               });
               const [inToken, outToken] = await Promise.all([
                 erc20.ConnectedToken.fromAddress(signer, path[0]),
