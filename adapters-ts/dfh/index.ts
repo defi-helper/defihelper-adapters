@@ -1169,14 +1169,41 @@ module.exports = {
           SmartTradeRouterABI,
           await handler.contract.router()
         );
+
+        type Direction = "gt" | "lt";
+        type RouteActivation = {
+          amountOut: string;
+          direction: Direction;
+        };
+        type Route = {
+          amountOut: string;
+          slippage: string;
+          amountOutMin: string;
+          moving: string | null;
+          direction: Direction;
+          activation: RouteActivation | null;
+        }
+        type StopLoss = {
+          amountOut: string;
+          slippage: string | number;
+          moving: string | null;
+          activation: RouteActivation | null;
+        };
+        type TakeProfit = {
+          amountOut: string;
+          slippage: string | number;
+          activation: RouteActivation | null;
+        };
+
         const useCreateRoute =
           (outToken: erc20.ConnectedToken) =>
           (
             amountOut: string,
             slippage: string | number,
-            moving: boolean,
-            direction: "gt" | "lt"
-          ) => ({
+            direction: Direction,
+            moving: string | null,
+            activation: RouteActivation | null
+          ): Route => ({
             get amountOut() {
               return outToken.amountFloat(amountOut).toFixed();
             },
@@ -1188,8 +1215,16 @@ module.exports = {
                 .multipliedBy(new bn(1).minus(this.slippage))
                 .toFixed(0);
             },
-            moving,
+            moving: moving ? outToken.amountFloat(moving).toFixed() : null,
             direction,
+            activation: activation
+              ? {
+                  ...activation,
+                  amountOut: outToken
+                    .amountFloat(activation.amountOut)
+                    .toFixed(),
+                }
+              : null,
           });
 
         return {
@@ -1200,27 +1235,10 @@ module.exports = {
               exchangeAddress: string,
               path: string[],
               amountIn: string,
-              stopLoss: {
-                amountOut: string;
-                slippage: string | number;
-                moving: boolean;
-              } | null,
-              stopLoss2: {
-                amountOut: string;
-                slippage: string | number;
-                moving: boolean;
-              } | null,
-              takeProfit: {
-                amountOut: string;
-                slippage: string | number;
-              } | null,
-              activate: {
-                amountOut: string;
-                direction: "gt" | "lt";
-              } | null,
-              deposit: {
-                native?: string;
-              } = {}
+              stopLoss: StopLoss | null,
+              stopLoss2: StopLoss | null,
+              takeProfit: TakeProfit | null,
+              deposit: { native?: string } = {}
             ) => {
               debugo({
                 _prefix: "createOrder",
@@ -1230,7 +1248,6 @@ module.exports = {
                 stopLoss,
                 stopLoss2,
                 takeProfit,
-                activate,
               });
               const [inToken, outToken] = await Promise.all([
                 erc20.ConnectedToken.fromAddress(signer, path[0]),
@@ -1257,24 +1274,27 @@ module.exports = {
                   ? createRoute(
                       stopLoss.amountOut,
                       stopLoss.slippage,
+                      "lt",
                       stopLoss.moving,
-                      "lt"
+                      stopLoss.activation
                     )
                   : null,
                 takeProfit
                   ? createRoute(
                       takeProfit.amountOut,
                       takeProfit.slippage,
-                      false,
-                      "gt"
+                      "gt",
+                      null,
+                      takeProfit.activation
                     )
                   : null,
                 stopLoss2
                   ? createRoute(
                       stopLoss2.amountOut,
                       stopLoss2.slippage,
+                      "lt",
                       stopLoss2.moving,
-                      "lt"
+                      stopLoss2.activation
                     )
                   : null,
               ];
@@ -1329,22 +1349,9 @@ module.exports = {
                 tokenInDecimals: inToken.decimals,
                 tokenOutDecimals: outToken.decimals,
                 amountIn: inToken.amountFloat(amountIn).toFixed(),
-                amountOut: await uniswap.V2.router.getPrice(
-                  uniswap.V2.router.contract(signer.provider, exchangeAddress),
-                  inToken.amountFloat(amountIn).toFixed(),
-                  path
-                ),
                 stopLoss: routes[0],
                 takeProfit: routes[1],
                 stopLoss2: routes[2],
-                activate: activate
-                  ? {
-                      amountOut: outToken
-                        .amountFloat(activate.amountOut)
-                        .toFixed(),
-                      direction: activate.direction,
-                    }
-                  : null,
               };
               debugo({
                 _prefix: "createOrder",
@@ -1368,31 +1375,16 @@ module.exports = {
             },
             updateOrder: async (
               orderId: string,
-              stopLoss: {
-                amountOut: string;
-                slippage: string | number;
-                moving: boolean;
-              } | null,
-              stopLoss2: {
-                amountOut: string;
-                slippage: string | number;
-                moving: boolean;
-              } | null,
-              takeProfit: {
-                amountOut: string;
-                slippage: string | number;
-              } | null,
-              activate: {
-                amountOut: string;
-                direction: "gt" | "lt";
-              } | null
+              stopLoss: StopLoss | null,
+              stopLoss2: StopLoss | null,
+              takeProfit: TakeProfit | null
             ) => {
               debugo({
                 _prefix: "updateOrder",
                 orderId,
                 stopLoss: JSON.stringify(stopLoss),
+                stopLoss2: JSON.stringify(stopLoss2),
                 takeProfit: JSON.stringify(takeProfit),
-                activate: JSON.stringify(activate),
               });
 
               const callDataInterface = new ethers.utils.Interface(
@@ -1434,24 +1426,27 @@ module.exports = {
                   ? createRoute(
                       stopLoss.amountOut,
                       stopLoss.slippage,
+                      "lt",
                       stopLoss.moving,
-                      "lt"
+                      stopLoss.activation
                     )
                   : null,
                 takeProfit
                   ? createRoute(
                       takeProfit.amountOut,
                       takeProfit.slippage,
-                      false,
-                      "gt"
+                      "gt",
+                      null,
+                      takeProfit.activation
                     )
                   : null,
                 stopLoss2
                   ? createRoute(
                       stopLoss2.amountOut,
                       stopLoss2.slippage,
+                      "lt",
                       stopLoss2.moving,
-                      "lt"
+                      stopLoss2.activation
                     )
                   : null,
               ];
@@ -1474,22 +1469,9 @@ module.exports = {
                 await router.contract.updateOrder(orderId, callData);
 
               const orderParam = {
-                amountOut: await uniswap.V2.router.getPrice(
-                  uniswap.V2.router.contract(signer.provider, exchange),
-                  amountIn,
-                  path
-                ),
                 stopLoss: routes[0],
                 takeProfit: routes[1],
                 stopLoss2: routes[2],
-                activate: activate
-                  ? {
-                      amountOut: outToken
-                        .amountFloat(activate.amountOut)
-                        .toFixed(),
-                      direction: activate.direction,
-                    }
-                  : null,
               };
               debugo({
                 _prefix: "createOrder",

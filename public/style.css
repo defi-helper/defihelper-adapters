@@ -8,3 +8,12 @@
 .line > div {
   margin-right: 5px;
 }
+
+.checkbox label {
+  display: inline;
+}
+
+.block {
+  padding-left: 30px;
+  border-left: 1px solid #d1d1d1;
+}
