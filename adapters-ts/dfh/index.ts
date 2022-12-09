@@ -1182,28 +1182,23 @@ module.exports = {
           moving: string | null;
           direction: Direction;
           activation: RouteActivation | null;
-        }
-        type StopLoss = {
+        };
+        type RouteInput = {
           amountOut: string;
           slippage: string | number;
           moving: string | null;
           activation: RouteActivation | null;
         };
-        type TakeProfit = {
-          amountOut: string;
-          slippage: string | number;
-          activation: RouteActivation | null;
-        };
 
         const useCreateRoute =
           (outToken: erc20.ConnectedToken) =>
-          (
-            amountOut: string,
-            slippage: string | number,
-            direction: Direction,
-            moving: string | null,
-            activation: RouteActivation | null
-          ): Route => ({
+          ({
+            amountOut,
+            slippage,
+            direction,
+            moving,
+            activation,
+          }: RouteInput & { direction: Direction }): Route => ({
             get amountOut() {
               return outToken.amountFloat(amountOut).toFixed();
             },
@@ -1235,9 +1230,9 @@ module.exports = {
               exchangeAddress: string,
               path: string[],
               amountIn: string,
-              stopLoss: StopLoss | null,
-              stopLoss2: StopLoss | null,
-              takeProfit: TakeProfit | null,
+              stopLoss: RouteInput | null,
+              stopLoss2: RouteInput | null,
+              takeProfit: RouteInput | null,
               deposit: { native?: string } = {}
             ) => {
               debugo({
@@ -1270,32 +1265,12 @@ module.exports = {
 
               const createRoute = useCreateRoute(outToken);
               const routes = [
-                stopLoss
-                  ? createRoute(
-                      stopLoss.amountOut,
-                      stopLoss.slippage,
-                      "lt",
-                      stopLoss.moving,
-                      stopLoss.activation
-                    )
-                  : null,
+                stopLoss ? createRoute({ ...stopLoss, direction: "lt" }) : null,
                 takeProfit
-                  ? createRoute(
-                      takeProfit.amountOut,
-                      takeProfit.slippage,
-                      "gt",
-                      null,
-                      takeProfit.activation
-                    )
+                  ? createRoute({ ...takeProfit, direction: "gt" })
                   : null,
                 stopLoss2
-                  ? createRoute(
-                      stopLoss2.amountOut,
-                      stopLoss2.slippage,
-                      "lt",
-                      stopLoss2.moving,
-                      stopLoss2.activation
-                    )
+                  ? createRoute({ ...stopLoss2, direction: "lt" })
                   : null,
               ];
               debugo({
@@ -1375,9 +1350,9 @@ module.exports = {
             },
             updateOrder: async (
               orderId: string,
-              stopLoss: StopLoss | null,
-              stopLoss2: StopLoss | null,
-              takeProfit: TakeProfit | null
+              stopLoss: RouteInput | null,
+              stopLoss2: RouteInput | null,
+              takeProfit: RouteInput | null
             ) => {
               debugo({
                 _prefix: "updateOrder",
@@ -1422,32 +1397,12 @@ module.exports = {
 
               const createRoute = useCreateRoute(outToken);
               const routes = [
-                stopLoss
-                  ? createRoute(
-                      stopLoss.amountOut,
-                      stopLoss.slippage,
-                      "lt",
-                      stopLoss.moving,
-                      stopLoss.activation
-                    )
-                  : null,
+                stopLoss ? createRoute({ ...stopLoss, direction: "lt" }) : null,
                 takeProfit
-                  ? createRoute(
-                      takeProfit.amountOut,
-                      takeProfit.slippage,
-                      "gt",
-                      null,
-                      takeProfit.activation
-                    )
+                  ? createRoute({ ...takeProfit, direction: "gt" })
                   : null,
                 stopLoss2
-                  ? createRoute(
-                      stopLoss2.amountOut,
-                      stopLoss2.slippage,
-                      "lt",
-                      stopLoss2.moving,
-                      stopLoss2.activation
-                    )
+                  ? createRoute({ ...stopLoss2, direction: "lt" })
                   : null,
               ];
               debugo({
