@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useReducer, useState } from "react";
 import ReactJson from "react-json-view";
 import { useDebounce } from "react-use";
 import { ethers } from "ethers";
@@ -25,31 +25,272 @@ function calcSlippage(value, slippage) {
   );
 }
 
+function routeReducer(state, action) {
+  switch (action.type) {
+    case "changeAmountOut":
+      return {
+        ...state,
+        amountOut: action.value,
+        price: new BN(action.value).div(action.amountIn).toString(10),
+      };
+    case "changeMoving":
+      return { ...state, moving: action.value };
+    case "changeSlippage":
+      return {
+        ...state,
+        slippage: action.value,
+        amountOutMin: calcSlippage(state.amountOut, action.value).toString(10),
+      };
+    case "changeActivationEnabled":
+      return { ...state, activationEnabled: action.value };
+    case "changeActivationAmountOut":
+      return { ...state, activationAmountOut: action.value };
+    case "changeActivationDirection":
+      return { ...state, activationDirection: action.value };
+  }
+}
+
+function ActivationInput({ id, state: [state, dispatch] }) {
+  return (
+    <div className="block">
+      <div>
+        <div>
+          <label
+            htmlFor={`${id}-activation-directionGt`}
+            style={{ display: "inline" }}
+          >
+            Great
+          </label>{" "}
+          <input
+            type="radio"
+            name={`${id}-activation-directionGt`}
+            id={`${id}-activation-directionGt`}
+            checked={state.activationDirection === "gt"}
+            onChange={() =>
+              dispatch({
+                type: "changeActivationDirection",
+                value: "gt",
+              })
+            }
+          />
+        </div>
+        <div>
+          <label
+            htmlFor={`${id}-activation-directionLt`}
+            style={{ display: "inline" }}
+          >
+            Less
+          </label>{" "}
+          <input
+            type="radio"
+            name={`${id}-activation-directionLt`}
+            id={`${id}-activation-directionLt`}
+            checked={state.activationDirection === "lt"}
+            onChange={() =>
+              dispatch({
+                type: "changeActivationDirection",
+                value: "lt",
+              })
+            }
+          />
+        </div>
+      </div>
+      <div>
+        <div>
+          <label>Amount out:</label>
+        </div>
+        <div>
+          <input
+            type="text"
+            value={state.activationAmountOut}
+            onChange={(e) =>
+              dispatch({
+                type: "changeActivationAmountOut",
+                value: e.target.value,
+              })
+            }
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StopLossInput({ id, amountIn, state: [state, dispatch] }) {
+  return (
+    <div className="block">
+      <div>
+        <div>
+          <label>Amount out:</label>
+        </div>
+        <div>
+          <input
+            type="text"
+            value={state.amountOut}
+            onChange={(e) =>
+              dispatch({
+                type: "changeAmountOut",
+                value: e.target.value,
+                amountIn,
+              })
+            }
+          />
+        </div>
+      </div>
+      <div>
+        <div>
+          <label>Moving:</label>
+        </div>
+        <div>
+          <input
+            type="text"
+            value={state.moving}
+            onChange={(e) =>
+              dispatch({
+                type: "changeMoving",
+                value: e.target.value,
+                amountIn,
+              })
+            }
+          />
+        </div>
+      </div>
+      <div>
+        <div>
+          <label>Slippage (%):</label>
+        </div>
+        <div>
+          <input
+            type="text"
+            value={state.slippage}
+            onChange={(e) =>
+              dispatch({
+                type: "changeSlippage",
+                value: percent(e.target.value),
+              })
+            }
+          />
+        </div>
+        <div>Amount out min: {state.amountOutMin}</div>
+        {amountIn !== "0" && <div>Price: {state.price}</div>}
+      </div>
+      <div className="checkbox">
+        <label htmlFor={`${id}-activationEnable`}>Activation:</label>{" "}
+        <input
+          id={`${id}-activationEnable`}
+          type="checkbox"
+          checked={state.activationEnabled}
+          onChange={(e) =>
+            dispatch({
+              type: "changeActivationEnabled",
+              value: e.target.checked,
+            })
+          }
+        />
+      </div>
+      {state.activationEnabled && (
+        <ActivationInput id={id} state={[state, dispatch]} />
+      )}
+    </div>
+  );
+}
+
+function TakeProfitInput({ id, amountIn, state: [state, dispatch] }) {
+  return (
+    <div className="block">
+      <div>
+        <div>
+          <label>Amount out:</label>
+        </div>
+        <div>
+          <input
+            type="text"
+            value={state.amountOut}
+            onChange={(e) =>
+              dispatch({
+                type: "changeAmountOut",
+                value: e.target.value,
+                amountIn,
+              })
+            }
+          />
+        </div>
+      </div>
+      <div>
+        <div>
+          <label>Slippage (%):</label>
+        </div>
+        <div>
+          <input
+            type="text"
+            value={state.slippage}
+            onChange={(e) =>
+              dispatch({
+                type: "changeSlippage",
+                value: percent(e.target.value),
+              })
+            }
+          />
+        </div>
+        <div>Amount out min: {state.amountOutMin}</div>
+        {amountIn !== "0" && <div>Price: {state.price}</div>}
+      </div>
+      <div className="checkbox">
+        <label htmlFor={`${id}-activationEnable`}>Activation:</label>{" "}
+        <input
+          id={`${id}-activationEnable`}
+          type="checkbox"
+          checked={state.activationEnabled}
+          onChange={(e) =>
+            dispatch({
+              type: "changeActivationEnabled",
+              value: e.target.checked,
+            })
+          }
+        />
+      </div>
+      {state.activationEnabled && (
+        <ActivationInput id={id} state={[state, dispatch]} />
+      )}
+    </div>
+  );
+}
+
 export function CreateOrder({ routerAdapter, handlerAdapter }) {
   const [error, setError] = useState("");
   const [exchangeAddress, setExchangeAddress] = useState("");
   const [path, setPath] = useState([]);
   const [amountIn, setAmountIn] = useState("100");
-  const [takeProfit, setTakeProfit] = useState(false);
-  const [takeProfitAmountOut, setTakeProfitAmountOut] = useState("0");
-  const [takeProfitSlippage, setTakeProfitSlippage] = useState("1");
-  const [takeProfitAmountOutMin, setTakeProfitAmountOutMin] = useState("0");
-  const [takeProfitPrice, setTakeProfitPrice] = useState("0");
-  const [stopLoss, setStopLoss] = useState(false);
-  const [stopLossAmountOut, setStopLossAmountOut] = useState("0");
-  const [stopLossMoving, setStopLossMoving] = useState(false);
-  const [stopLossSlippage, setStopLossSlippage] = useState("1");
-  const [stopLossAmountOutMin, setStopLossAmountOutMin] = useState("0");
-  const [stopLossPrice, setStopLossPrice] = useState("0");
-  const [stopLoss2, setStopLoss2] = useState(false);
-  const [stopLoss2AmountOut, setStopLoss2AmountOut] = useState("0");
-  const [stopLoss2Moving, setStopLoss2Moving] = useState(false);
-  const [stopLoss2Slippage, setStopLoss2Slippage] = useState("1");
-  const [stopLoss2AmountOutMin, setStopLoss2AmountOutMin] = useState("0");
-  const [stopLoss2Price, setStopLoss2Price] = useState("0");
-  const [activate, setActivate] = useState(false);
-  const [activateAmountOut, setActivateAmountOut] = useState("0");
-  const [activateDirection, setActivateDirection] = useState("gt");
+  const [isTakeProfitEnabled, setTakeProfitEnabled] = useState(false);
+  const [takeProfit, takeProfitDispatch] = useReducer(routeReducer, {
+    amountOut: "0",
+    moving: false,
+    slippage: "1",
+    amountOutMin: "0",
+    price: "0",
+    activationAmountOut: "0",
+    activationDirection: "gt",
+  });
+  const [isStopLossEnabled, setStopLossEnable] = useState(false);
+  const [stopLoss, stopLossDispatch] = useReducer(routeReducer, {
+    amountOut: "0",
+    moving: "",
+    slippage: "1",
+    amountOutMin: "0",
+    price: "0",
+    activationAmountOut: "0",
+    activationDirection: "gt",
+  });
+  const [isStopLoss2Enabled, setStopLoss2Enable] = useState(false);
+  const [stopLoss2, stopLoss2Dispatch] = useReducer(routeReducer, {
+    amountOut: "0",
+    moving: "",
+    slippage: "1",
+    amountOutMin: "0",
+    price: "0",
+    activationAmountOut: "0",
+    activationDirection: "gt",
+  });
   const [depositBalanceAmount, setDepositBalanceAmount] = useState("");
   const [createOrderTx, setCreateOrderTx] = useState(null);
   const [createOrderCallData, setCreateOrderCallData] = useState(null);
@@ -65,27 +306,39 @@ export function CreateOrder({ routerAdapter, handlerAdapter }) {
     if (Number.isNaN(Number(amountIn))) {
       return setError(`Invalid amount: "${amountIn}"`);
     }
-    if (stopLoss && Number.isNaN(Number(stopLossAmountOut))) {
-      return setError(`Invalid stop loss amount out: "${stopLossAmountOut}"`);
+    if (isStopLossEnabled) {
+      if (Number.isNaN(Number(stopLoss.amountOut))) {
+        return setError(
+          `Invalid stop loss amount out: "${stopLoss.amountOut}"`
+        );
+      }
+      if (Number.isNaN(Number(stopLoss.slippage))) {
+        return setError(`Invalid stop loss slippage: "${stopLoss.slippage}"`);
+      }
     }
-    if (stopLoss2 && Number.isNaN(Number(stopLoss2AmountOut))) {
-      return setError(
-        `Invalid stop loss 2 amount out: "${stopLoss2AmountOut}"`
-      );
+    if (isStopLoss2Enabled) {
+      if (Number.isNaN(Number(stopLoss2.amountOut))) {
+        return setError(
+          `Invalid stop loss 2 amount out: "${stopLoss2.amountOut}"`
+        );
+      }
+      if (Number.isNaN(Number(stopLoss2.slippage))) {
+        return setError(
+          `Invalid stop loss 2 slippage: "${stopLoss2.slippage}"`
+        );
+      }
     }
-    if (takeProfit && Number.isNaN(Number(takeProfitAmountOut))) {
-      return setError(
-        `Invalid take profit amount out: "${takeProfitAmountOut}"`
-      );
-    }
-    if (stopLoss && Number.isNaN(Number(stopLossSlippage))) {
-      return setError(`Invalid stop loss slippage: "${stopLossSlippage}"`);
-    }
-    if (stopLoss2 && Number.isNaN(Number(stopLoss2Slippage))) {
-      return setError(`Invalid stop loss 2 slippage: "${stopLoss2Slippage}"`);
-    }
-    if (takeProfit && Number.isNaN(Number(takeProfitSlippage))) {
-      return setError(`Invalid take profit slippage: "${takeProfitSlippage}"`);
+    if (isTakeProfitEnabled) {
+      if (Number.isNaN(Number(takeProfit.amountOut))) {
+        return setError(
+          `Invalid take profit amount out: "${takeProfit.amountOut}"`
+        );
+      }
+      if (Number.isNaN(Number(takeProfit.slippage))) {
+        return setError(
+          `Invalid take profit slippage: "${takeProfit.slippage}"`
+        );
+      }
     }
     if (
       depositBalanceAmount !== "" &&
@@ -110,30 +363,42 @@ export function CreateOrder({ routerAdapter, handlerAdapter }) {
       exchangeAddress,
       path,
       amountIn,
-      stopLoss
+      isStopLossEnabled
         ? {
-            amountOut: stopLossAmountOut,
-            moving: stopLossMoving,
-            slippage: stopLossSlippage,
+            amountOut: stopLoss.amountOut,
+            moving: stopLoss.moving !== "" ? stopLoss.moving : null,
+            slippage: stopLoss.slippage,
+            activation: stopLoss.activationEnabled
+              ? {
+                  amountOut: stopLoss.activationAmountOut,
+                  direction: stopLoss.activationDirection,
+                }
+              : null,
           }
         : null,
-      stopLoss2
+      isStopLoss2Enabled
         ? {
-            amountOut: stopLoss2AmountOut,
-            moving: stopLoss2Moving,
-            slippage: stopLoss2Slippage,
+            amountOut: stopLoss2.amountOut,
+            moving: stopLoss2.moving !== "" ? stopLoss2.moving : null,
+            slippage: stopLoss2.slippage,
+            activation: stopLoss2.activationEnabled
+              ? {
+                  amountOut: stopLoss2.activationAmountOut,
+                  direction: stopLoss2.activationDirection,
+                }
+              : null,
           }
         : null,
-      takeProfit
+      isTakeProfitEnabled
         ? {
-            amountOut: takeProfitAmountOut,
-            slippage: takeProfitSlippage,
-          }
-        : null,
-      activate
-        ? {
-            amountOut: activateAmountOut,
-            direction: activateDirection,
+            amountOut: takeProfit.amountOut,
+            slippage: takeProfit.slippage,
+            activation: takeProfit.activationEnabled
+              ? {
+                  amountOut: takeProfit.activationAmountOut,
+                  direction: takeProfit.activationDirection,
+                }
+              : null,
           }
         : null,
       {
@@ -148,50 +413,6 @@ export function CreateOrder({ routerAdapter, handlerAdapter }) {
       number: await data.getOrderNumber(),
     });
   };
-
-  useEffect(
-    () =>
-      setTakeProfitAmountOutMin(
-        calcSlippage(takeProfitAmountOut, takeProfitSlippage).toString(10)
-      ),
-    [takeProfitAmountOut, takeProfitSlippage]
-  );
-
-  useEffect(
-    () =>
-      setStopLossAmountOutMin(
-        calcSlippage(stopLossAmountOut, stopLossSlippage).toString(10)
-      ),
-    [stopLossAmountOut, stopLossSlippage]
-  );
-
-  useEffect(
-    () =>
-      setStopLoss2AmountOutMin(
-        calcSlippage(stopLoss2AmountOut, stopLoss2Slippage).toString(10)
-      ),
-    [stopLoss2AmountOut, stopLoss2Slippage]
-  );
-
-  useEffect(
-    () =>
-      setTakeProfitPrice(
-        new BN(takeProfitAmountOut).div(amountIn).toString(10)
-      ),
-    [amountIn, takeProfitAmountOut]
-  );
-
-  useEffect(
-    () =>
-      setStopLossPrice(new BN(stopLossAmountOut).div(amountIn).toString(10)),
-    [amountIn, stopLossAmountOut]
-  );
-
-  useEffect(
-    () =>
-      setStopLoss2Price(new BN(stopLoss2AmountOut).div(amountIn).toString(10)),
-    [amountIn, stopLoss2AmountOut]
-  );
 
   useDebounce(
     () => {
@@ -257,214 +478,57 @@ export function CreateOrder({ routerAdapter, handlerAdapter }) {
         </div>
       </div>
       <div>
-        <div>
-          <label htmlFor="takeProfit">Take profit:</label>
+        <div className="checkbox">
+          <label htmlFor="takeProfit">Take profit:</label>{" "}
           <input
             id="takeProfit"
             type="checkbox"
-            checked={takeProfit}
-            onChange={(e) => setTakeProfit(e.target.checked)}
+            checked={isTakeProfitEnabled}
+            onChange={(e) => setTakeProfitEnabled(e.target.checked)}
           />
         </div>
-        {takeProfit && (
-          <>
-            <div>
-              <div>
-                <label>Amount out:</label>
-              </div>
-              <div>
-                <input
-                  type="text"
-                  value={takeProfitAmountOut}
-                  onChange={(e) => setTakeProfitAmountOut(e.target.value)}
-                />
-              </div>
-            </div>
-            <div>
-              <div>
-                <label>Slippage (%):</label>
-              </div>
-              <div>
-                <input
-                  type="text"
-                  value={takeProfitSlippage}
-                  onChange={(e) =>
-                    setTakeProfitSlippage(percent(e.target.value))
-                  }
-                />
-              </div>
-              <div>Amount out min: {takeProfitAmountOutMin}</div>
-              <div>Price: {takeProfitPrice}</div>
-            </div>
-          </>
+        {isTakeProfitEnabled && (
+          <TakeProfitInput
+            id="takeProfit"
+            amountIn={amountIn}
+            state={[takeProfit, takeProfitDispatch]}
+          />
         )}
       </div>
       <div>
-        <div>
-          <label htmlFor="stopLoss">Stop-loss:</label>
+        <div className="checkbox">
+          <label htmlFor="stopLoss">Stop-loss:</label>{" "}
           <input
             id="stopLoss"
             type="checkbox"
-            checked={stopLoss}
-            onChange={(e) => setStopLoss(e.target.checked)}
+            checked={isStopLossEnabled}
+            onChange={(e) => setStopLossEnable(e.target.checked)}
           />
         </div>
-        {stopLoss && (
-          <>
-            <div>
-              <div>
-                <label>Amount out:</label>
-              </div>
-              <div>
-                <input
-                  type="text"
-                  value={stopLossAmountOut}
-                  onChange={(e) => setStopLossAmountOut(e.target.value)}
-                />
-              </div>
-            </div>
-            <div>
-              <div>
-                <label htmlFor="stopLossMoving">Moving:</label>
-              </div>
-              <div>
-                <input
-                  type="checkbox"
-                  id="stopLossMoving"
-                  value={stopLossMoving}
-                  onChange={(e) => setStopLossMoving(e.target.checked)}
-                />
-              </div>
-            </div>
-            <div>
-              <div>
-                <label>Slippage (%):</label>
-              </div>
-              <div>
-                <input
-                  type="text"
-                  value={stopLossSlippage}
-                  onChange={(e) => setStopLossSlippage(percent(e.target.value))}
-                />
-              </div>
-              <div>Amount out min: {stopLossAmountOutMin}</div>
-              <div>Price: {stopLossPrice}</div>
-            </div>
-          </>
+        {isStopLossEnabled && (
+          <StopLossInput
+            id="stopLoss"
+            amountIn={amountIn}
+            state={[stopLoss, stopLossDispatch]}
+          />
         )}
       </div>
       <div>
-        <div>
-          <label htmlFor="stopLoss2">Stop-loss 2:</label>
+        <div className="checkbox">
+          <label htmlFor="stopLoss2">Stop-loss 2:</label>{" "}
           <input
             id="stopLoss2"
             type="checkbox"
-            checked={stopLoss2}
-            onChange={(e) => setStopLoss2(e.target.checked)}
+            checked={isStopLoss2Enabled}
+            onChange={(e) => setStopLoss2Enable(e.target.checked)}
           />
         </div>
-        {stopLoss2 && (
-          <>
-            <div>
-              <div>
-                <label>Amount out:</label>
-              </div>
-              <div>
-                <input
-                  type="text"
-                  value={stopLoss2AmountOut}
-                  onChange={(e) => setStopLoss2AmountOut(e.target.value)}
-                />
-              </div>
-            </div>
-            <div>
-              <div>
-                <label htmlFor="stopLoss2Moving">Moving:</label>
-              </div>
-              <div>
-                <input
-                  type="checkbox"
-                  id="stopLoss2Moving"
-                  value={stopLoss2Moving}
-                  onChange={(e) => setStopLoss2Moving(e.target.checked)}
-                />
-              </div>
-            </div>
-            <div>
-              <div>
-                <label>Slippage (%):</label>
-              </div>
-              <div>
-                <input
-                  type="text"
-                  value={stopLoss2Slippage}
-                  onChange={(e) =>
-                    setStopLoss2Slippage(percent(e.target.value))
-                  }
-                />
-              </div>
-              <div>Amount out min: {stopLoss2AmountOutMin}</div>
-              <div>Price: {stopLoss2Price}</div>
-            </div>
-          </>
-        )}
-      </div>
-      <div>
-        <div>
-          <label htmlFor="activate">Activate:</label>
-          <input
-            id="activate"
-            type="checkbox"
-            checked={activate}
-            onChange={(e) => setActivate(e.target.checked)}
+        {isStopLoss2Enabled && (
+          <StopLossInput
+            id="stopLoss2"
+            amountIn={amountIn}
+            state={[stopLoss2, stopLoss2Dispatch]}
           />
-        </div>
-        {activate && (
-          <>
-            <div>
-              <div>
-                <label>Amount out:</label>
-              </div>
-              <div>
-                <input
-                  type="text"
-                  value={activateAmountOut}
-                  onChange={(e) => setActivateAmountOut(e.target.value)}
-                />
-              </div>
-            </div>
-            <div>
-              <div>
-                <label>Direction:</label>
-              </div>
-              <div>
-                <div>
-                  <label htmlFor="directionGt" style={{ display: "inline" }}>
-                    Great
-                  </label>{" "}
-                  <input
-                    type="radio"
-                    name="direction"
-                    id="directionGt"
-                    checked={activateDirection === "gt"}
-                    onChange={(e) => setActivateDirection("gt")}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="directionLt" style={{ display: "inline" }}>
-                    Less
-                  </label>{" "}
-                  <input
-                    type="radio"
-                    name="direction"
-                    id="directionLt"
-                    checked={activateDirection === "lt"}
-                    onChange={(e) => setActivateDirection("lt")}
-                  />
-                </div>
-              </div>
-            </div>
-          </>
         )}
       </div>
       <div>
@@ -481,7 +545,10 @@ export function CreateOrder({ routerAdapter, handlerAdapter }) {
         </div>
       </div>
       <div>
-        <button onClick={onCreate} disabled={!stopLoss && !takeProfit}>
+        <button
+          onClick={onCreate}
+          disabled={!isStopLossEnabled && !isTakeProfitEnabled}
+        >
           Send
         </button>
       </div>
@@ -506,23 +573,36 @@ export function CreateOrder({ routerAdapter, handlerAdapter }) {
 export function UpdateOrder({ handlerAdapter }) {
   const [error, setError] = useState("");
   const [orderId, setOrderId] = useState("");
-  const [takeProfit, setTakeProfit] = useState(false);
-  const [takeProfitAmountOut, setTakeProfitAmountOut] = useState("0");
-  const [takeProfitSlippage, setTakeProfitSlippage] = useState("1");
-  const [takeProfitAmountOutMin, setTakeProfitAmountOutMin] = useState("0");
-  const [stopLoss, setStopLoss] = useState(false);
-  const [stopLossAmountOut, setStopLossAmountOut] = useState("0");
-  const [stopLossMoving, setStopLossMoving] = useState(false);
-  const [stopLossSlippage, setStopLossSlippage] = useState("1");
-  const [stopLossAmountOutMin, setStopLossAmountOutMin] = useState("0");
-  const [stopLoss2, setStopLoss2] = useState(false);
-  const [stopLoss2AmountOut, setStopLoss2AmountOut] = useState("0");
-  const [stopLoss2Moving, setStopLoss2Moving] = useState(false);
-  const [stopLoss2Slippage, setStopLoss2Slippage] = useState("1");
-  const [stopLoss2AmountOutMin, setStopLoss2AmountOutMin] = useState("0");
-  const [activate, setActivate] = useState(false);
-  const [activateAmountOut, setActivateAmountOut] = useState("0");
-  const [activateDirection, setActivateDirection] = useState("gt");
+  const [isTakeProfitEnabled, setTakeProfitEnable] = useState(false);
+  const [takeProfit, takeProfitDispatch] = useReducer(routeReducer, {
+    amountOut: "0",
+    moving: false,
+    slippage: "1",
+    amountOutMin: "0",
+    price: "0",
+    activationAmountOut: "0",
+    activationDirection: "gt",
+  });
+  const [isStopLossEnabled, setStopLossEnable] = useState(false);
+  const [stopLoss, stopLossDispatch] = useReducer(routeReducer, {
+    amountOut: "0",
+    moving: "",
+    slippage: "1",
+    amountOutMin: "0",
+    price: "0",
+    activationAmountOut: "0",
+    activationDirection: "gt",
+  });
+  const [isStopLoss2Enabled, setStopLoss2Enable] = useState(false);
+  const [stopLoss2, stopLoss2Dispatch] = useReducer(routeReducer, {
+    amountOut: "0",
+    moving: "",
+    slippage: "1",
+    amountOutMin: "0",
+    price: "0",
+    activationAmountOut: "0",
+    activationDirection: "gt",
+  });
   const [updateOrderTx, setUpdateOrderTx] = useState(null);
   const [updateOrderCallData, setUpdateOrderCallData] = useState(null);
 
@@ -532,55 +612,79 @@ export function UpdateOrder({ handlerAdapter }) {
     }
 
     setError("");
-    if (stopLoss && Number.isNaN(Number(stopLossAmountOut))) {
-      return setError(`Invalid stop loss amount out: "${stopLossAmountOut}"`);
+    if (isStopLossEnabled) {
+      if (Number.isNaN(Number(stopLoss.amountOut))) {
+        return setError(
+          `Invalid stop loss amount out: "${stopLoss.amountOut}"`
+        );
+      }
+      if (Number.isNaN(Number(stopLoss.slippage))) {
+        return setError(`Invalid stop loss slippage: "${stopLoss.slippage}"`);
+      }
     }
-    if (stopLoss2 && Number.isNaN(Number(stopLoss2AmountOut))) {
-      return setError(
-        `Invalid stop loss 2 amount out: "${stopLoss2AmountOut}"`
-      );
+    if (isStopLoss2Enabled) {
+      if (Number.isNaN(Number(stopLoss2.amountOut))) {
+        return setError(
+          `Invalid stop loss 2 amount out: "${stopLoss2.amountOut}"`
+        );
+      }
+      if (Number.isNaN(Number(stopLoss2.slippage))) {
+        return setError(
+          `Invalid stop loss 2 slippage: "${stopLoss2.slippage}"`
+        );
+      }
     }
-    if (takeProfit && Number.isNaN(Number(takeProfitAmountOut))) {
-      return setError(
-        `Invalid take profit amount out: "${takeProfitAmountOut}"`
-      );
-    }
-    if (stopLoss && Number.isNaN(Number(stopLossSlippage))) {
-      return setError(`Invalid stop loss slippage: "${stopLossSlippage}"`);
-    }
-    if (stopLoss2 && Number.isNaN(Number(stopLoss2Slippage))) {
-      return setError(`Invalid stop loss 2 slippage: "${stopLoss2Slippage}"`);
-    }
-    if (takeProfit && Number.isNaN(Number(takeProfitSlippage))) {
-      return setError(`Invalid take profit slippage: "${takeProfitSlippage}"`);
+    if (isTakeProfitEnabled) {
+      if (Number.isNaN(Number(takeProfit.amountOut))) {
+        return setError(
+          `Invalid take profit amount out: "${takeProfit.amountOut}"`
+        );
+      }
+      if (Number.isNaN(Number(takeProfit.slippage))) {
+        return setError(
+          `Invalid take profit slippage: "${takeProfit.slippage}"`
+        );
+      }
     }
 
     const data = await handlerAdapter.methods.updateOrder(
       orderId,
-      stopLoss
+      isStopLossEnabled
         ? {
-            amountOut: stopLossAmountOut,
-            moving: stopLossMoving,
-            slippage: stopLossSlippage,
+            amountOut: stopLoss.amountOut,
+            moving: stopLoss.moving,
+            slippage: stopLoss.slippage,
+            activation: stopLoss.activationEnabled
+              ? {
+                  amountOut: stopLoss.activationAmountOut,
+                  direction: stopLoss.activationDirection,
+                }
+              : null,
           }
         : null,
-      stopLoss2
+      isStopLoss2Enabled
         ? {
-            amountOut: stopLoss2AmountOut,
-            moving: stopLoss2Moving,
-            slippage: stopLoss2Slippage,
+            amountOut: stopLoss2.amountOut,
+            moving: stopLoss2.moving,
+            slippage: stopLoss2.slippage,
+            activation: stopLoss2.activationEnabled
+              ? {
+                  amountOut: stopLoss2.activationAmountOut,
+                  direction: stopLoss2.activationDirection,
+                }
+              : null,
           }
         : null,
-      takeProfit
+      isTakeProfitEnabled
         ? {
-            amountOut: takeProfitAmountOut,
-            slippage: takeProfitSlippage,
-          }
-        : null,
-      activate
-        ? {
-            amountOut: activateAmountOut,
-            direction: activateDirection,
+            amountOut: takeProfit.amountOut,
+            slippage: takeProfit.slippage,
+            activation: takeProfit.activationEnabled
+              ? {
+                  amountOut: takeProfit.activationAmountOut,
+                  direction: takeProfit.activationDirection,
+                }
+              : null,
           }
         : null
     );
@@ -590,30 +694,6 @@ export function UpdateOrder({ handlerAdapter }) {
       callData: data.callData,
     });
   };
-
-  useEffect(
-    () =>
-      setTakeProfitAmountOutMin(
-        calcSlippage(takeProfitAmountOut, takeProfitSlippage).toString(10)
-      ),
-    [takeProfitAmountOut, takeProfitSlippage]
-  );
-
-  useEffect(
-    () =>
-      setStopLossAmountOutMin(
-        calcSlippage(stopLossAmountOut, stopLossSlippage).toString(10)
-      ),
-    [stopLossAmountOut, stopLossSlippage]
-  );
-
-  useEffect(
-    () =>
-      setStopLoss2AmountOutMin(
-        calcSlippage(stopLoss2AmountOut, stopLoss2Slippage).toString(10)
-      ),
-    [stopLoss2AmountOut, stopLoss2Slippage]
-  );
 
   return (
     <div>
@@ -636,40 +716,16 @@ export function UpdateOrder({ handlerAdapter }) {
           <input
             id="takeProfit"
             type="checkbox"
-            checked={takeProfit}
-            onChange={(e) => setTakeProfit(e.target.checked)}
+            checked={isTakeProfitEnabled}
+            onChange={(e) => setTakeProfitEnable(e.target.checked)}
           />
         </div>
-        {takeProfit && (
-          <>
-            <div>
-              <div>
-                <label>Amount out:</label>
-              </div>
-              <div>
-                <input
-                  type="text"
-                  value={takeProfitAmountOut}
-                  onChange={(e) => setTakeProfitAmountOut(e.target.value)}
-                />
-              </div>
-            </div>
-            <div>
-              <div>
-                <label>Slippage (%):</label>
-              </div>
-              <div>
-                <input
-                  type="text"
-                  value={takeProfitSlippage}
-                  onChange={(e) =>
-                    setTakeProfitSlippage(percent(e.target.value))
-                  }
-                />
-              </div>
-              <div>Amount out min: {takeProfitAmountOutMin}</div>
-            </div>
-          </>
+        {isTakeProfitEnabled && (
+          <TakeProfitInput
+            id="takeProfit"
+            amountIn="0"
+            state={[takeProfit, takeProfitDispatch]}
+          />
         )}
       </div>
       <div>
@@ -678,51 +734,16 @@ export function UpdateOrder({ handlerAdapter }) {
           <input
             id="stopLoss"
             type="checkbox"
-            checked={stopLoss}
-            onChange={(e) => setStopLoss(e.target.checked)}
+            checked={isStopLossEnabled}
+            onChange={(e) => setStopLossEnable(e.target.checked)}
           />
         </div>
-        {stopLoss && (
-          <>
-            <div>
-              <div>
-                <label>Amount out:</label>
-              </div>
-              <div>
-                <input
-                  type="text"
-                  value={stopLossAmountOut}
-                  onChange={(e) => setStopLossAmountOut(e.target.value)}
-                />
-              </div>
-            </div>
-            <div>
-              <div>
-                <label htmlFor="stopLossMoving">Moving:</label>
-              </div>
-              <div>
-                <input
-                  type="checkbox"
-                  id="stopLossMoving"
-                  value={stopLossMoving}
-                  onChange={(e) => setStopLossMoving(e.target.checked)}
-                />
-              </div>
-            </div>
-            <div>
-              <div>
-                <label>Slippage (%):</label>
-              </div>
-              <div>
-                <input
-                  type="text"
-                  value={stopLossSlippage}
-                  onChange={(e) => setStopLossSlippage(percent(e.target.value))}
-                />
-              </div>
-              <div>Amount out min: {stopLossAmountOutMin}</div>
-            </div>
-          </>
+        {isStopLossEnabled && (
+          <StopLossInput
+            id="stopLoss"
+            amountIn="0"
+            state={[stopLoss, stopLossDispatch]}
+          />
         )}
       </div>
       <div>
@@ -731,117 +752,22 @@ export function UpdateOrder({ handlerAdapter }) {
           <input
             id="stopLoss2"
             type="checkbox"
-            checked={stopLoss2}
-            onChange={(e) => setStopLoss2(e.target.checked)}
+            checked={isStopLoss2Enabled}
+            onChange={(e) => setStopLoss2Enable(e.target.checked)}
           />
         </div>
-        {stopLoss2 && (
-          <>
-            <div>
-              <div>
-                <label>Amount out:</label>
-              </div>
-              <div>
-                <input
-                  type="text"
-                  value={stopLoss2AmountOut}
-                  onChange={(e) => setStopLoss2AmountOut(e.target.value)}
-                />
-              </div>
-            </div>
-            <div>
-              <div>
-                <label htmlFor="stopLoss2Moving">Moving:</label>
-              </div>
-              <div>
-                <input
-                  type="checkbox"
-                  id="stopLoss2Moving"
-                  value={stopLoss2Moving}
-                  onChange={(e) => setStopLoss2Moving(e.target.checked)}
-                />
-              </div>
-            </div>
-            <div>
-              <div>
-                <label>Slippage (%):</label>
-              </div>
-              <div>
-                <input
-                  type="text"
-                  value={stopLoss2Slippage}
-                  onChange={(e) =>
-                    setStopLoss2Slippage(percent(e.target.value))
-                  }
-                />
-              </div>
-              <div>Amount out min: {stopLoss2AmountOutMin}</div>
-            </div>
-          </>
-        )}
-      </div>
-      <div>
-        <div>
-          <label htmlFor="activate">Activate:</label>
-          <input
-            id="activate"
-            type="checkbox"
-            checked={activate}
-            onChange={(e) => setActivate(e.target.checked)}
+        {isStopLoss2Enabled && (
+          <StopLossInput
+            id="stopLoss2"
+            amountIn="0"
+            state={[stopLoss2, stopLoss2Dispatch]}
           />
-        </div>
-        {activate && (
-          <>
-            <div>
-              <div>
-                <label>Amount out:</label>
-              </div>
-              <div>
-                <input
-                  type="text"
-                  value={activateAmountOut}
-                  onChange={(e) => setActivateAmountOut(e.target.value)}
-                />
-              </div>
-            </div>
-            <div>
-              <div>
-                <label>Direction:</label>
-              </div>
-              <div>
-                <div>
-                  <label htmlFor="directionGt" style={{ display: "inline" }}>
-                    Great
-                  </label>{" "}
-                  <input
-                    type="radio"
-                    name="direction"
-                    id="directionGt"
-                    checked={activateDirection === "gt"}
-                    onChange={(e) => setActivateDirection("gt")}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="directionLt" style={{ display: "inline" }}>
-                    Less
-                  </label>{" "}
-                  <input
-                    type="radio"
-                    name="direction"
-                    id="directionLt"
-                    checked={activateDirection === "lt"}
-                    onChange={(e) => setActivateDirection("lt")}
-                  />
-                </div>
-              </div>
-            </div>
-          </>
         )}
       </div>
       <div>
         <button
           onClick={onUpdate}
-          disabled={!orderId || (!stopLoss && !takeProfit)}
+          disabled={!orderId || (!isStopLossEnabled && !isTakeProfitEnabled)}
         >
           Send
         </button>
