@@ -31,6 +31,7 @@ function routeReducer(state, action) {
       return {
         ...state,
         amountOut: action.value,
+        amountOutMin: calcSlippage(action.value, state.slippage).toString(10),
         price: new BN(action.value).div(action.amountIn).toString(10),
       };
     case "changeMoving":
@@ -49,6 +50,36 @@ function routeReducer(state, action) {
       return { ...state, activationDirection: action.value };
   }
 }
+
+const routeInitState = {
+  amountOut: "0",
+  moving: "",
+  slippage: "1",
+  amountOutMin: "0",
+  price: "0",
+  activationEnabled: false,
+  activationAmountOut: "0",
+  activationDirection: "gt",
+};
+
+const routeToAdapterInput = ({
+  amountOut,
+  moving,
+  slippage,
+  activationEnabled,
+  activationAmountOut,
+  activationDirection,
+}) => ({
+  amountOut,
+  moving,
+  slippage,
+  activation: activationEnabled
+    ? {
+        amountOut: activationAmountOut,
+        direction: activationDirection,
+      }
+    : null,
+});
 
 function ActivationInput({ id, state: [state, dispatch] }) {
   return (
@@ -116,7 +147,7 @@ function ActivationInput({ id, state: [state, dispatch] }) {
   );
 }
 
-function StopLossInput({ id, amountIn, state: [state, dispatch] }) {
+function RouteInput({ id, amountIn, state: [state, dispatch] }) {
   return (
     <div className="block">
       <div>
@@ -195,102 +226,23 @@ function StopLossInput({ id, amountIn, state: [state, dispatch] }) {
   );
 }
 
-function TakeProfitInput({ id, amountIn, state: [state, dispatch] }) {
-  return (
-    <div className="block">
-      <div>
-        <div>
-          <label>Amount out:</label>
-        </div>
-        <div>
-          <input
-            type="text"
-            value={state.amountOut}
-            onChange={(e) =>
-              dispatch({
-                type: "changeAmountOut",
-                value: e.target.value,
-                amountIn,
-              })
-            }
-          />
-        </div>
-      </div>
-      <div>
-        <div>
-          <label>Slippage (%):</label>
-        </div>
-        <div>
-          <input
-            type="text"
-            value={state.slippage}
-            onChange={(e) =>
-              dispatch({
-                type: "changeSlippage",
-                value: percent(e.target.value),
-              })
-            }
-          />
-        </div>
-        <div>Amount out min: {state.amountOutMin}</div>
-        {amountIn !== "0" && <div>Price: {state.price}</div>}
-      </div>
-      <div className="checkbox">
-        <label htmlFor={`${id}-activationEnable`}>Activation:</label>{" "}
-        <input
-          id={`${id}-activationEnable`}
-          type="checkbox"
-          checked={state.activationEnabled}
-          onChange={(e) =>
-            dispatch({
-              type: "changeActivationEnabled",
-              value: e.target.checked,
-            })
-          }
-        />
-      </div>
-      {state.activationEnabled && (
-        <ActivationInput id={id} state={[state, dispatch]} />
-      )}
-    </div>
-  );
-}
-
 export function CreateOrder({ routerAdapter, handlerAdapter }) {
   const [error, setError] = useState("");
   const [exchangeAddress, setExchangeAddress] = useState("");
   const [path, setPath] = useState([]);
   const [amountIn, setAmountIn] = useState("100");
   const [isTakeProfitEnabled, setTakeProfitEnabled] = useState(false);
-  const [takeProfit, takeProfitDispatch] = useReducer(routeReducer, {
-    amountOut: "0",
-    moving: false,
-    slippage: "1",
-    amountOutMin: "0",
-    price: "0",
-    activationAmountOut: "0",
-    activationDirection: "gt",
-  });
+  const [takeProfit, takeProfitDispatch] = useReducer(
+    routeReducer,
+    routeInitState
+  );
   const [isStopLossEnabled, setStopLossEnable] = useState(false);
-  const [stopLoss, stopLossDispatch] = useReducer(routeReducer, {
-    amountOut: "0",
-    moving: "",
-    slippage: "1",
-    amountOutMin: "0",
-    price: "0",
-    activationAmountOut: "0",
-    activationDirection: "gt",
-  });
+  const [stopLoss, stopLossDispatch] = useReducer(routeReducer, routeInitState);
   const [isStopLoss2Enabled, setStopLoss2Enable] = useState(false);
-  const [stopLoss2, stopLoss2Dispatch] = useReducer(routeReducer, {
-    amountOut: "0",
-    moving: "",
-    slippage: "1",
-    amountOutMin: "0",
-    price: "0",
-    activationAmountOut: "0",
-    activationDirection: "gt",
-  });
+  const [stopLoss2, stopLoss2Dispatch] = useReducer(
+    routeReducer,
+    routeInitState
+  );
   const [depositBalanceAmount, setDepositBalanceAmount] = useState("");
   const [createOrderTx, setCreateOrderTx] = useState(null);
   const [createOrderCallData, setCreateOrderCallData] = useState(null);
@@ -363,44 +315,9 @@ export function CreateOrder({ routerAdapter, handlerAdapter }) {
       exchangeAddress,
       path,
       amountIn,
-      isStopLossEnabled
-        ? {
-            amountOut: stopLoss.amountOut,
-            moving: stopLoss.moving !== "" ? stopLoss.moving : null,
-            slippage: stopLoss.slippage,
-            activation: stopLoss.activationEnabled
-              ? {
-                  amountOut: stopLoss.activationAmountOut,
-                  direction: stopLoss.activationDirection,
-                }
-              : null,
-          }
-        : null,
-      isStopLoss2Enabled
-        ? {
-            amountOut: stopLoss2.amountOut,
-            moving: stopLoss2.moving !== "" ? stopLoss2.moving : null,
-            slippage: stopLoss2.slippage,
-            activation: stopLoss2.activationEnabled
-              ? {
-                  amountOut: stopLoss2.activationAmountOut,
-                  direction: stopLoss2.activationDirection,
-                }
-              : null,
-          }
-        : null,
-      isTakeProfitEnabled
-        ? {
-            amountOut: takeProfit.amountOut,
-            slippage: takeProfit.slippage,
-            activation: takeProfit.activationEnabled
-              ? {
-                  amountOut: takeProfit.activationAmountOut,
-                  direction: takeProfit.activationDirection,
-                }
-              : null,
-          }
-        : null,
+      isStopLossEnabled ? routeToAdapterInput(stopLoss) : null,
+      isStopLoss2Enabled ? routeToAdapterInput(stopLoss2) : null,
+      isTakeProfitEnabled ? routeToAdapterInput(takeProfit) : null,
       {
         native: depositBalanceAmount !== "" ? depositBalanceAmount : undefined,
       }
@@ -488,7 +405,7 @@ export function CreateOrder({ routerAdapter, handlerAdapter }) {
           />
         </div>
         {isTakeProfitEnabled && (
-          <TakeProfitInput
+          <RouteInput
             id="takeProfit"
             amountIn={amountIn}
             state={[takeProfit, takeProfitDispatch]}
@@ -506,7 +423,7 @@ export function CreateOrder({ routerAdapter, handlerAdapter }) {
           />
         </div>
         {isStopLossEnabled && (
-          <StopLossInput
+          <RouteInput
             id="stopLoss"
             amountIn={amountIn}
             state={[stopLoss, stopLossDispatch]}
@@ -524,7 +441,7 @@ export function CreateOrder({ routerAdapter, handlerAdapter }) {
           />
         </div>
         {isStopLoss2Enabled && (
-          <StopLossInput
+          <RouteInput
             id="stopLoss2"
             amountIn={amountIn}
             state={[stopLoss2, stopLoss2Dispatch]}
@@ -574,35 +491,17 @@ export function UpdateOrder({ handlerAdapter }) {
   const [error, setError] = useState("");
   const [orderId, setOrderId] = useState("");
   const [isTakeProfitEnabled, setTakeProfitEnable] = useState(false);
-  const [takeProfit, takeProfitDispatch] = useReducer(routeReducer, {
-    amountOut: "0",
-    moving: false,
-    slippage: "1",
-    amountOutMin: "0",
-    price: "0",
-    activationAmountOut: "0",
-    activationDirection: "gt",
-  });
+  const [takeProfit, takeProfitDispatch] = useReducer(
+    routeReducer,
+    routeInitState
+  );
   const [isStopLossEnabled, setStopLossEnable] = useState(false);
-  const [stopLoss, stopLossDispatch] = useReducer(routeReducer, {
-    amountOut: "0",
-    moving: "",
-    slippage: "1",
-    amountOutMin: "0",
-    price: "0",
-    activationAmountOut: "0",
-    activationDirection: "gt",
-  });
+  const [stopLoss, stopLossDispatch] = useReducer(routeReducer, routeInitState);
   const [isStopLoss2Enabled, setStopLoss2Enable] = useState(false);
-  const [stopLoss2, stopLoss2Dispatch] = useReducer(routeReducer, {
-    amountOut: "0",
-    moving: "",
-    slippage: "1",
-    amountOutMin: "0",
-    price: "0",
-    activationAmountOut: "0",
-    activationDirection: "gt",
-  });
+  const [stopLoss2, stopLoss2Dispatch] = useReducer(
+    routeReducer,
+    routeInitState
+  );
   const [updateOrderTx, setUpdateOrderTx] = useState(null);
   const [updateOrderCallData, setUpdateOrderCallData] = useState(null);
 
@@ -649,44 +548,9 @@ export function UpdateOrder({ handlerAdapter }) {
 
     const data = await handlerAdapter.methods.updateOrder(
       orderId,
-      isStopLossEnabled
-        ? {
-            amountOut: stopLoss.amountOut,
-            moving: stopLoss.moving,
-            slippage: stopLoss.slippage,
-            activation: stopLoss.activationEnabled
-              ? {
-                  amountOut: stopLoss.activationAmountOut,
-                  direction: stopLoss.activationDirection,
-                }
-              : null,
-          }
-        : null,
-      isStopLoss2Enabled
-        ? {
-            amountOut: stopLoss2.amountOut,
-            moving: stopLoss2.moving,
-            slippage: stopLoss2.slippage,
-            activation: stopLoss2.activationEnabled
-              ? {
-                  amountOut: stopLoss2.activationAmountOut,
-                  direction: stopLoss2.activationDirection,
-                }
-              : null,
-          }
-        : null,
-      isTakeProfitEnabled
-        ? {
-            amountOut: takeProfit.amountOut,
-            slippage: takeProfit.slippage,
-            activation: takeProfit.activationEnabled
-              ? {
-                  amountOut: takeProfit.activationAmountOut,
-                  direction: takeProfit.activationDirection,
-                }
-              : null,
-          }
-        : null
+      isStopLossEnabled ? routeToAdapterInput(stopLoss) : null,
+      isStopLoss2Enabled ? routeToAdapterInput(stopLoss2) : null,
+      isTakeProfitEnabled ? routeToAdapterInput(takeProfit) : null
     );
     setUpdateOrderTx(data.tx);
     setUpdateOrderCallData({
@@ -721,7 +585,7 @@ export function UpdateOrder({ handlerAdapter }) {
           />
         </div>
         {isTakeProfitEnabled && (
-          <TakeProfitInput
+          <RouteInput
             id="takeProfit"
             amountIn="0"
             state={[takeProfit, takeProfitDispatch]}
@@ -739,7 +603,7 @@ export function UpdateOrder({ handlerAdapter }) {
           />
         </div>
         {isStopLossEnabled && (
-          <StopLossInput
+          <RouteInput
             id="stopLoss"
             amountIn="0"
             state={[stopLoss, stopLossDispatch]}
@@ -757,7 +621,7 @@ export function UpdateOrder({ handlerAdapter }) {
           />
         </div>
         {isStopLoss2Enabled && (
-          <StopLossInput
+          <RouteInput
             id="stopLoss2"
             amountIn="0"
             state={[stopLoss2, stopLoss2Dispatch]}
