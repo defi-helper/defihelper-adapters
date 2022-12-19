@@ -1175,6 +1175,9 @@ module.exports = {
           amountOut: string;
           direction: Direction;
         };
+        type RouteTimeout = {
+          duration: number;
+        };
         type Route = {
           amountOut: string;
           slippage: string;
@@ -1182,12 +1185,14 @@ module.exports = {
           moving: string | null;
           direction: Direction;
           activation: RouteActivation | null;
+          timeout: RouteTimeout | null;
         };
         type RouteInput = {
           amountOut: string;
           slippage: string | number;
           moving: string | null;
           activation: RouteActivation | null;
+          timeout: RouteTimeout | null;
         };
 
         const useCreateRoute =
@@ -1198,6 +1203,7 @@ module.exports = {
             direction,
             moving,
             activation,
+            timeout,
           }: RouteInput & { direction: Direction }): Route => ({
             get amountOut() {
               return outToken.amountFloat(amountOut).toFixed();
@@ -1220,6 +1226,7 @@ module.exports = {
                     .toFixed(),
                 }
               : null,
+            timeout,
           });
 
         return {

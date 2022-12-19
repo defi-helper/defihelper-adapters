@@ -48,6 +48,8 @@ function routeReducer(state, action) {
       return { ...state, activationAmountOut: action.value };
     case "changeActivationDirection":
       return { ...state, activationDirection: action.value };
+    case "changeTimeoutDuration":
+      return { ...state, timeoutDuration: action.value };
   }
 }
 
@@ -60,6 +62,7 @@ const routeInitState = {
   activationEnabled: false,
   activationAmountOut: "0",
   activationDirection: "gt",
+  timeoutDuration: "",
 };
 
 const routeToAdapterInput = ({
@@ -69,6 +72,7 @@ const routeToAdapterInput = ({
   activationEnabled,
   activationAmountOut,
   activationDirection,
+  timeoutDuration,
 }) => ({
   amountOut,
   moving,
@@ -79,73 +83,9 @@ const routeToAdapterInput = ({
         direction: activationDirection,
       }
     : null,
+  timeout:
+    timeoutDuration !== "" ? { duration: Number(timeoutDuration) } : null,
 });
-
-function ActivationInput({ id, state: [state, dispatch] }) {
-  return (
-    <div className="block">
-      <div>
-        <div>
-          <label
-            htmlFor={`${id}-activation-directionGt`}
-            style={{ display: "inline" }}
-          >
-            Great
-          </label>{" "}
-          <input
-            type="radio"
-            name={`${id}-activation-directionGt`}
-            id={`${id}-activation-directionGt`}
-            checked={state.activationDirection === "gt"}
-            onChange={() =>
-              dispatch({
-                type: "changeActivationDirection",
-                value: "gt",
-              })
-            }
-          />
-        </div>
-        <div>
-          <label
-            htmlFor={`${id}-activation-directionLt`}
-            style={{ display: "inline" }}
-          >
-            Less
-          </label>{" "}
-          <input
-            type="radio"
-            name={`${id}-activation-directionLt`}
-            id={`${id}-activation-directionLt`}
-            checked={state.activationDirection === "lt"}
-            onChange={() =>
-              dispatch({
-                type: "changeActivationDirection",
-                value: "lt",
-              })
-            }
-          />
-        </div>
-      </div>
-      <div>
-        <div>
-          <label>Amount out:</label>
-        </div>
-        <div>
-          <input
-            type="text"
-            value={state.activationAmountOut}
-            onChange={(e) =>
-              dispatch({
-                type: "changeActivationAmountOut",
-                value: e.target.value,
-              })
-            }
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function RouteInput({ id, amountIn, state: [state, dispatch] }) {
   return (
@@ -188,6 +128,23 @@ function RouteInput({ id, amountIn, state: [state, dispatch] }) {
       </div>
       <div>
         <div>
+          <label>Timeout (seconds):</label>
+        </div>
+        <div>
+          <input
+            type="text"
+            value={state.timeout}
+            onChange={(e) =>
+              dispatch({
+                type: "changeTimeoutDuration",
+                value: e.target.value,
+              })
+            }
+          />
+        </div>
+      </div>
+      <div>
+        <div>
           <label>Slippage (%):</label>
         </div>
         <div>
@@ -220,7 +177,67 @@ function RouteInput({ id, amountIn, state: [state, dispatch] }) {
         />
       </div>
       {state.activationEnabled && (
-        <ActivationInput id={id} state={[state, dispatch]} />
+        <div className="block">
+          <div>
+            <div>
+              <label
+                htmlFor={`${id}-activation-directionGt`}
+                style={{ display: "inline" }}
+              >
+                Great
+              </label>{" "}
+              <input
+                type="radio"
+                name={`${id}-activation-directionGt`}
+                id={`${id}-activation-directionGt`}
+                checked={state.activationDirection === "gt"}
+                onChange={() =>
+                  dispatch({
+                    type: "changeActivationDirection",
+                    value: "gt",
+                  })
+                }
+              />
+            </div>
+            <div>
+              <label
+                htmlFor={`${id}-activation-directionLt`}
+                style={{ display: "inline" }}
+              >
+                Less
+              </label>{" "}
+              <input
+                type="radio"
+                name={`${id}-activation-directionLt`}
+                id={`${id}-activation-directionLt`}
+                checked={state.activationDirection === "lt"}
+                onChange={() =>
+                  dispatch({
+                    type: "changeActivationDirection",
+                    value: "lt",
+                  })
+                }
+              />
+            </div>
+          </div>
+          <div>
+            <div>
+              <label>Amount out:</label>
+            </div>
+            <div>
+              <input
+                type="text"
+                value={state.activationAmountOut}
+                onChange={(e) =>
+                  dispatch({
+                    type: "changeActivationAmountOut",
+                    value: e.target.value,
+                  })
+                }
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
