@@ -393,7 +393,7 @@ module.exports = {
         blockTag,
         block,
         network,
-        provider,
+        provider
       );
 
       const pool = masterChefSavedPools.find(
@@ -541,9 +541,8 @@ module.exports = {
         await dfh.getPriceFeeds(networkId),
         blockTag,
         block,
-        network,
-        provider,
-        networkId
+        networkId,
+        provider
       );
       const multicall = new ethersMulticall.Provider(provider);
       await multicall.init();
@@ -735,9 +734,8 @@ module.exports = {
         await dfh.getPriceFeeds(networkId),
         blockTag,
         block,
-        network,
-        provider,
-        networkId
+        networkId,
+        provider
       );
 
       const pool = masterChefSavedPools.find(
@@ -883,7 +881,7 @@ module.exports = {
         blockTag,
         block,
         network,
-        provider,
+        provider
       );
       const avgBlockTime = await ethereum.getAvgBlockTime(
         provider,
