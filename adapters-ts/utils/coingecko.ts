@@ -2,6 +2,10 @@ import type BigNumber from "bignumber.js";
 import { AxiosError } from "axios";
 import * as base from "./ethereum/base";
 import { bignumber as bn, dayjs, axios } from "../lib";
+import { V2 as uniswap } from "../utils/ethereum/uniswap";
+import * as ethereum from "../utils/ethereum/base";
+import type ethersType from "ethers";
+import * as erc20 from "../utils/ethereum/erc20";
 
 export class PriceNotResolvedError extends Error {
   constructor(
@@ -25,6 +29,19 @@ export function isAvailablePlatform(
 const errorHandler = (e: AxiosError) => {
   const { method, url } = e.config;
   throw new Error(`coingecko ${method} ${url}: ${e}`);
+};
+
+const uniswapRouterV2ResolveTokenPrice = async (
+  provider: ethersType.ethers.providers.Provider,
+  { route, routerAddress, inputDecimals, outputDecimals }: UniswapRouterV2Alias
+) => {
+  const tokensConversionPath = await uniswap.router
+    .contract(provider, routerAddress)
+    .getAmountsOut(new bn(`1e${inputDecimals}`).toFixed(0), route);
+
+  return ethereum
+    .toBN(tokensConversionPath[tokensConversionPath.length - 1])
+    .div(`1e${outputDecimals}`);
 };
 
 export class CoingeckoProvider {
@@ -125,6 +142,12 @@ export class CoingeckoProvider {
 }
 
 export type IdAlias = { id: string };
+export type UniswapRouterV2Alias = {
+  route: string[];
+  routerAddress: string;
+  inputDecimals: number;
+  outputDecimals: number;
+};
 export type NetworkAlias = {
   network: number;
   address: string;
@@ -134,7 +157,11 @@ export type PlatformAlias = {
   address: string;
 };
 
-export type Alias = IdAlias | NetworkAlias | PlatformAlias;
+export type Alias =
+  | IdAlias
+  | NetworkAlias
+  | PlatformAlias
+  | UniswapRouterV2Alias;
 
 function isIdAlias(alias: Alias): alias is IdAlias {
   return Object.hasOwnProperty.call(alias, "id");
@@ -144,19 +171,28 @@ function isNetworkAlias(alias: Alias): alias is NetworkAlias {
   return Object.hasOwnProperty.call(alias, "network");
 }
 
+function isUniswapRouterV2Alias(alias: Alias): alias is UniswapRouterV2Alias {
+  return (
+    Object.hasOwnProperty.call(alias, "route") &&
+    Object.hasOwnProperty.call(alias, "routerAddress") &&
+    Object.hasOwnProperty.call(alias, "inputDecimals") &&
+    Object.hasOwnProperty.call(alias, "outputDecimals")
+  );
+}
+
 export function bridgeWrapperBuild(
   aliases: { [address: string]: Alias },
   blockTag: base.BlockNumber,
   block: { timestamp: number },
-  network: number
+  network: number,
+  provider?: ethersType.ethers.providers.Provider
 ): PriceFeed {
   return (address: string) => {
     const alias =
       aliases[address] ??
       aliases[address.toLowerCase()] ??
       Object.entries(aliases).find(
-        ([aliasAddress]) =>
-          aliasAddress.toLowerCase() === address.toLowerCase()
+        ([aliasAddress]) => aliasAddress.toLowerCase() === address.toLowerCase()
       )?.[1] ??
       null;
 
@@ -170,6 +206,12 @@ export function bridgeWrapperBuild(
         })
           .initPlatform(alias.network)
           .contractPrice(alias.address);
+      } else if (isUniswapRouterV2Alias(alias)) {
+        if (!provider) {
+          throw new Error("You have to pass a provider before");
+        }
+
+        return uniswapRouterV2ResolveTokenPrice(provider, alias);
       } else {
         return new CoingeckoProvider({
           block,
