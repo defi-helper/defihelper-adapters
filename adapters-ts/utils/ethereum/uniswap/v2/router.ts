@@ -84,10 +84,9 @@ export const useAmountOut =
     ]);
 
     return getPrice(
-        contract(node.provider, exchangeAddress),
-        inToken.amountFloat(amountIn).toFixed(),
-        path,
-        { blockNumber: "latest", signer: null }
-      )
-      .then((amountOut) => outToken.amountInt(amountOut).toString());
+      contract(node.provider, exchangeAddress),
+      inToken.amountFloat(amountIn).toFixed(),
+      path,
+      { blockNumber: "latest", signer: null }
+    ).then((amountOut) => outToken.amountInt(amountOut).toString());
   };

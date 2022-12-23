@@ -2,10 +2,9 @@ import type BigNumber from "bignumber.js";
 import { AxiosError } from "axios";
 import * as base from "./ethereum/base";
 import { bignumber as bn, dayjs, axios } from "../lib";
-import { V2 as uniswap } from "../utils/ethereum/uniswap";
+import * as uniswapRouter from "../utils/ethereum/uniswap/v2/router";
 import * as ethereum from "../utils/ethereum/base";
 import type ethersType from "ethers";
-import * as erc20 from "../utils/ethereum/erc20";
 
 export class PriceNotResolvedError extends Error {
   constructor(
@@ -35,7 +34,7 @@ const uniswapRouterV2ResolveTokenPrice = async (
   provider: ethersType.ethers.providers.Provider,
   { route, routerAddress, inputDecimals, outputDecimals }: UniswapRouterV2Alias
 ) => {
-  const tokensConversionPath = await uniswap.router
+  const tokensConversionPath = await uniswapRouter
     .contract(provider, routerAddress)
     .getAmountsOut(new bn(`1e${inputDecimals}`).toFixed(0), route);
 

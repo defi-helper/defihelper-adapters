@@ -2,11 +2,9 @@ import type {
   Provider as MulticallProvider,
   Contract as MulticallContract,
 } from "@defihelper/ethers-multicall";
-import BN from "bignumber.js";
-import { ethers, uniswap3 } from "../../../../lib";
+import { uniswap3 } from "../../../../lib";
 import * as ethereum from "../../../ethereum/base";
 import * as erc20 from "../../../ethereum/erc20";
-import { toBN } from "../../base";
 import poolABI from "./abi/pool.json";
 
 export async function getPoolInfo(
@@ -60,7 +58,7 @@ export async function getPool(
   multicall: MulticallProvider,
   pool: MulticallContract | string
 ) {
-  const [info] = await Promise.all([getPoolInfo(multicall, pool)]);
+  const info = await getPoolInfo(multicall, pool);
   const token0 = erc20.multicallContract(info.token0);
   const token1 = erc20.multicallContract(info.token1);
   const [
