@@ -1,17 +1,13 @@
 import type ethersType from "ethers";
-import type uniswap3Type from "@uniswap/v3-sdk";
-import type {
-  Provider as MulticallProvider,
-  Contract as MulticallContract,
-} from "@defihelper/ethers-multicall";
-import BN from "bignumber.js";
-import { ethers, uniswap3 } from "../../../../lib";
+import uniswap3Type from "@uniswap/v3-sdk";
+import { uniswap3 } from "../../../../lib";
 import * as ethereum from "../../../ethereum/base";
 import * as erc20 from "../../../ethereum/erc20";
-import { toBN } from "../../base";
 import positionManagerABI from "./abi/nonfungiblePositionManager.json";
 import factoryABI from "./abi/factory.json";
 import { getPool } from "./pool";
+
+export { positionManagerABI };
 
 export interface PositionResponse {
   nonce: ethersType.BigNumber;
@@ -28,10 +24,20 @@ export interface PositionResponse {
   tokensOwed1: ethersType.BigNumber;
 }
 
+const MAX_UINT128 = "340282366920938463463374607431768211455";
+
 export class Position {
-  static fromResponse(id: number, r: PositionResponse) {
+  static fromResponse(
+    manager: ethereum.Contract,
+    id: number,
+    poolAddress: string,
+    owner: string,
+    r: PositionResponse
+  ) {
     return new Position(
       id,
+      poolAddress,
+      owner,
       Number(r.nonce.toString()),
       r.operator,
       r.token0,
@@ -43,16 +49,56 @@ export class Position {
       r.feeGrowthInside0LastX128.toString(),
       r.feeGrowthInside1LastX128.toString(),
       r.tokensOwed0.toString(),
-      r.tokensOwed1.toString()
+      r.tokensOwed1.toString(),
+      manager
     );
   }
 
+  public readonly poolSDK = new Promise<uniswap3Type.Pool>((resolve) => {
+    Promise.all([this.manager.node.chainId, this.manager.node.multicall])
+      .then(([chainId, multicall]) =>
+        getPool(chainId, multicall, this.poolAddress)
+      )
+      .then(resolve);
+  });
+
+  public readonly positionSDK = new Promise<uniswap3Type.Position>(
+    (resolve) => {
+      this.poolSDK.then((pool) =>
+        resolve(
+          new uniswap3.sdk.Position({
+            pool,
+            liquidity: this.liquidity,
+            tickLower: this.tickLower,
+            tickUpper: this.tickUpper,
+          })
+        )
+      );
+    }
+  );
+
+  public readonly token0 = new Promise<erc20.ConnectedToken>((resolve) =>
+    erc20.ConnectedToken.fromAddress(
+      this.manager.node,
+      this.token0Address
+    ).then(resolve)
+  );
+
+  public readonly token1 = new Promise<erc20.ConnectedToken>((resolve) =>
+    erc20.ConnectedToken.fromAddress(
+      this.manager.node,
+      this.token1Address
+    ).then(resolve)
+  );
+
   constructor(
     public readonly id: number,
+    public readonly poolAddress: string,
+    public readonly owner: string,
     public readonly nonce: number,
     public readonly operator: string,
-    public readonly token0: string,
-    public readonly token1: string,
+    public readonly token0Address: string,
+    public readonly token1Address: string,
     public readonly fee: number,
     public readonly tickLower: number,
     public readonly tickUpper: number,
@@ -60,95 +106,47 @@ export class Position {
     public readonly feeGrowthInside0LastX128: string,
     public readonly feeGrowthInside1LastX128: string,
     public readonly tokensOwed0: string,
-    public readonly tokensOwed1: string
+    public readonly tokensOwed1: string,
+    public readonly manager: ethereum.Contract
   ) {}
 
-  connect(manager: ethereum.Contract) {
-    return ConnectedPosition.fromPosition(this, manager);
-  }
-}
-
-export class ConnectedPosition extends Position {
-  static fromPosition(
-    {
-      id,
-      nonce,
-      operator,
-      token0,
-      token1,
-      fee,
-      tickLower,
-      tickUpper,
-      liquidity,
-      feeGrowthInside0LastX128,
-      feeGrowthInside1LastX128,
-      tokensOwed0,
-      tokensOwed1,
-    }: Position,
-    manager: ethereum.Contract
-  ) {
-    return new ConnectedPosition(
-      id,
-      nonce,
-      operator,
-      token0,
-      token1,
-      fee,
-      tickLower,
-      tickUpper,
-      liquidity,
-      feeGrowthInside0LastX128,
-      feeGrowthInside1LastX128,
-      tokensOwed0,
-      tokensOwed1,
-      manager
+  inPool({ token0, token1, fee }: uniswap3Type.Pool) {
+    return (
+      this.token0Address === token0.address &&
+      this.token1Address === token1.address &&
+      this.fee === Number(fee.toFixed())
     );
   }
 
-  constructor(
-    id: number,
-    nonce: number,
-    operator: string,
-    token0: string,
-    token1: string,
-    fee: number,
-    tickLower: number,
-    tickUpper: number,
-    liquidity: string,
-    feeGrowthInside0LastX128: string,
-    feeGrowthInside1LastX128: string,
-    tokensOwed0: string,
-    tokensOwed1: string,
-    public readonly manager: ethereum.Contract
-  ) {
-    super(
-      id,
-      nonce,
-      operator,
-      token0,
-      token1,
-      fee,
-      tickLower,
-      tickUpper,
-      liquidity,
-      feeGrowthInside0LastX128,
-      feeGrowthInside1LastX128,
-      tokensOwed0,
-      tokensOwed1
-    );
+  async staked() {
+    const [token0, token1, { amount0, amount1 }] = await Promise.all([
+      this.token0,
+      this.token1,
+      this.positionSDK,
+    ]);
+
+    return {
+      amount0: token0.amountFloat(amount0.toFixed()),
+      amount1: token1.amountFloat(amount1.toFixed()),
+    };
   }
-}
 
-export function isPoolPosition(position: Position, pool: uniswap3Type.Pool) {
-  return (
-    position.token0 === pool.token0.address &&
-    position.token1 === pool.token1.address &&
-    position.fee === Number(pool.fee.toFixed())
-  );
-}
+  async earned() {
+    const [token0, token1] = await Promise.all([this.token0, this.token1]);
+    const { amount0, amount1 } = await this.manager.contract.callStatic.collect(
+      {
+        tokenId: this.id,
+        recipient: this.owner,
+        amount0Max: MAX_UINT128,
+        amount1Max: MAX_UINT128,
+      }
+    );
 
-export interface PositionsListOptions {
-  pool?: uniswap3Type.Pool;
+    return {
+      amount0: token0.amountInt(amount0.toString()),
+      amount1: token1.amountInt(amount1.toString()),
+    };
+  }
 }
 
 export class PositionManager {
@@ -191,60 +189,32 @@ export class PositionManager {
     return tokensId.map((tokenId) => Number(tokenId.toString()));
   }
 
-  async positionsInfo(owner: string, options?: PositionsListOptions) {
-    const _options = {
-      pool: undefined,
-      ...options,
-    };
-
+  async positions(owner: string) {
     const [tokensId, multicall] = await Promise.all([
       this.tokensIdList(owner),
       this.contract.node.multicall,
     ]);
-
     const positions: PositionResponse[] = await multicall.all(
       tokensId.map((tokenId) => this.contract.multicall.positions(tokenId))
     );
-
-    return positions.reduce<Position[]>((res, positionResponse, i) => {
-      const position = Position.fromResponse(tokensId[i], positionResponse);
-      if (_options.pool) {
-        if (!isPoolPosition(position, _options.pool)) {
-          return res;
-        }
-      }
-
-      return [...res, position];
-    }, []);
-  }
-
-  async positions(owner: string, options?: PositionsListOptions) {
-    const [positionsInfo, multicall] = await Promise.all([
-      this.positionsInfo(owner, options),
-      this.contract.node.multicall,
-    ]);
-
     const pools: string[] = await multicall.all(
-      positionsInfo.map(({ token0, token1, fee }) =>
-        this.factory.multicall.getPool(token0, token1, fee)
+      positions.map(({ token0, token1, fee }) =>
+        this.factory.multicall.getPool(token0, token1, fee.toString())
       )
     );
 
-    return Promise.all(
-      pools.map(async (poolAddress, i) => {
-        const pool = await getPool(
-          await this.contract.node.chainId,
-          multicall,
-          poolAddress
-        );
-
-        return new uniswap3.sdk.Position({
-          pool,
-          liquidity: positionsInfo[i].liquidity,
-          tickLower: positionsInfo[i].tickLower,
-          tickUpper: positionsInfo[i].tickUpper,
-        });
-      })
+    return positions.reduce<Position[]>(
+      (res, positionResponse, i) => [
+        ...res,
+        Position.fromResponse(
+          this.contract,
+          tokensId[i],
+          pools[i],
+          owner,
+          positionResponse
+        ),
+      ],
+      []
     );
   }
 }

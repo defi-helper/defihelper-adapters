@@ -7,6 +7,8 @@ import * as ethereum from "../../../ethereum/base";
 import * as erc20 from "../../../ethereum/erc20";
 import poolABI from "./abi/pool.json";
 
+export { poolABI };
+
 export async function getPoolInfo(
   multicall: MulticallProvider,
   pool: MulticallContract | string
