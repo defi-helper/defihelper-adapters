@@ -176,8 +176,8 @@ function getPoolDayData(graphURL: string, poolId: string) {
     )
     .then(
       (res: {
-        data: { data: { pool: { poolDayData: Array<{ feesUSD: string }> } } };
-      }) => res.data.data.pool.poolDayData
+        data: { data: { pool: { poolDayData?: Array<{ feesUSD: string }> } } };
+      }) => res.data.data.pool?.poolDayData
     );
 }
 
@@ -238,8 +238,10 @@ module.exports = {
         contractAddress.toLowerCase()
       );
       const avgFeesUSD = poolDayData
-        .reduce((sum, { feesUSD }) => sum.plus(feesUSD), new bn(0))
-        .div(7); // average fees by last 7 days
+        ? poolDayData
+            .reduce((sum, { feesUSD }) => sum.plus(feesUSD), new bn(0))
+            .div(7) // average fees by last 7 days
+        : new bn(0);
       const aprDay = avgFeesUSD.div(tvl);
       const aprWeek = aprDay.multipliedBy(7);
       const aprMonth = aprDay.multipliedBy(30);
