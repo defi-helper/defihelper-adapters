@@ -442,6 +442,7 @@ module.exports = {
           description: "",
           automate: {
             adapters: ["pool"],
+            autorestakeAdapter: "Restake",
           },
           link: `https://app.uniswap.org/#/add/${token0.id}/${token1.id}/${feeTier}`,
         }));
