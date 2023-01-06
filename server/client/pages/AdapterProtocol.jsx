@@ -88,11 +88,13 @@ export function AdapterProtocol(props) {
     try {
       const [metrics, actions] = await Promise.all([
         contractMetrics.wallet(wallet),
-        contractMetrics.actions(wallet),
+        typeof contractMetrics.actions === "function"
+          ? contractMetrics.actions(wallet)
+          : null,
       ]);
       setWalletMetrics(metrics);
       setActions(actions);
-      setCurrentAction(Object.keys(actions)[0]);
+      actions !== null && setCurrentAction(Object.keys(actions)[0]);
     } catch (e) {
       console.error(e);
     }

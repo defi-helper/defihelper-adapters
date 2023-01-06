@@ -1,24 +1,18 @@
 import type ethersType from "ethers";
-import { bignumber as bn, dayjs, ethers, ethersMulticall, axios } from "../lib";
+import type BigNumber from "bignumber.js";
+import { bignumber as bn, dayjs, ethers, axios } from "../lib";
 import { bridgeWrapperBuild } from "../utils/coingecko";
 import * as ethereum from "../utils/ethereum/base";
 import * as erc20 from "../utils/ethereum/erc20";
 import * as uniswap from "../utils/ethereum/uniswap";
 import * as dfh from "../utils/dfh";
-import {
-  Position,
-  PositionResponse,
-} from "../utils/ethereum/uniswap/v3/positionManager";
+import { Position } from "../utils/ethereum/uniswap/v3/positionManager";
 import {
   stakingAdapter,
   contractsResolver,
-  deployAdapter,
-  automateAdapter,
   Deploy,
-  Automate,
-  mixComponent,
 } from "../utils/ethereum/adapter/base";
-import { debug, debugo } from "../utils/base";
+import { debugo } from "../utils/base";
 import { Action } from "../utils/adapter/base";
 import RestakeABI from "./data/RestakeABI.json";
 
@@ -80,8 +74,13 @@ const getENV = (network: number) => {
   return env;
 };
 
-const positionView = async (position: Position) => {
-  const [staked, token0, token1] = await Promise.all([
+const positionView = async (
+  position: Position,
+  token0PriceUSD: BigNumber,
+  token1PriceUSD: BigNumber
+) => {
+  const [positionsSDK, staked, token0, token1] = await Promise.all([
+    position.positionSDK,
     position.staked(),
     position.token0,
     position.token1,
@@ -93,13 +92,29 @@ const positionView = async (position: Position) => {
       address: token0.address,
       name: token0.name,
       symbol: token0.symbol,
-      aomunt: staked.amount0.toString(),
+      amount: staked.amount0.toString(),
+      amountUSD: staked.amount0.float.multipliedBy(token0PriceUSD).toString(10),
+      price: {
+        USD: token0PriceUSD.toString(10),
+        lower: positionsSDK.token0PriceLower.toFixed(),
+        upper: positionsSDK.token0PriceUpper.toFixed(),
+      },
     },
     token1: {
       address: token1.address,
       name: token1.name,
       symbol: token1.symbol,
-      aomunt: staked.amount1.toString(),
+      amount: staked.amount1.toString(),
+      amountUSD: staked.amount1.float.multipliedBy(token1PriceUSD).toString(10),
+      price: {
+        USD: token1PriceUSD.toString(),
+        lower: token1
+          .amountFloat(new bn(1).div(positionsSDK.token0PriceLower.toFixed()))
+          .toString(),
+        upper: token1
+          .amountFloat(new bn(1).div(positionsSDK.token0PriceUpper.toFixed()))
+          .toString(),
+      },
     },
   };
 };
@@ -206,8 +221,10 @@ module.exports = {
         token0.contract.multicall.balanceOf(contractAddress),
         token1.contract.multicall.balanceOf(contractAddress),
       ]);
-      const token0PriceUSD = await priceFeed(pool.token0.address);
-      const token1PriceUSD = await priceFeed(pool.token1.address);
+      const [token0PriceUSD, token1PriceUSD] = await Promise.all([
+        priceFeed(pool.token0.address),
+        priceFeed(pool.token1.address),
+      ]);
       const token0LockedUSD = token0
         .amountInt(token0Locked.toString())
         .float.multipliedBy(token0PriceUSD);
@@ -381,7 +398,11 @@ module.exports = {
                   .toString(10),
               },
             },
-            positions: await Promise.all(positions.map(positionView)),
+            positions: await Promise.all(
+              positions.map((position) =>
+                positionView(position, token0PriceUSD, token1PriceUSD)
+              )
+            ),
           };
         },
       };
@@ -520,6 +541,18 @@ module.exports = {
         multicall,
         poolAddress
       );
+      const priceFeed = bridgeWrapperBuild(
+        await dfh.getPriceFeeds(network),
+        "latest",
+        await signer.provider.getBlock("latest"),
+        network,
+        signer.provider
+      );
+      const [token0PriceUSD, token1PriceUSD] = await Promise.all([
+        priceFeed(pool.token0.address),
+        priceFeed(pool.token1.address),
+      ]);
+
       const runParams = async () => {
         const deadline = dayjs()
           .add(await automate.contract.deadline(), "seconds")
@@ -559,7 +592,13 @@ module.exports = {
                       new bn(position.liquidity).isGreaterThan(0)
                   )
                 )
-                .then((positions) => Promise.all(positions.map(positionView)));
+                .then((positions) =>
+                  Promise.all(
+                    positions.map((position) =>
+                      positionView(position, token0PriceUSD, token1PriceUSD)
+                    )
+                  )
+                );
             },
             isApproved: async (tokenId: string) => {
               const approved: string = await pm.contract.contract.getApproved(
@@ -624,7 +663,9 @@ module.exports = {
                   pool,
                   automate.contract.address,
                   await pm.contract.contract.positions(tokenId.toString())
-                )
+                ),
+                token0PriceUSD,
+                token1PriceUSD
               );
             },
             can: async () => {
