@@ -263,7 +263,7 @@ export function EthereumAutomateProtocol(props) {
     setDeployProxyResult(data);
   };
 
-  const onAction = async () => {
+  const onActionComponent = async () => {
     if (!instance || !currentAction) return;
 
     setActionReload(true);
@@ -273,6 +273,24 @@ export function EthereumAutomateProtocol(props) {
         instance
       );
       setActionComponent(actions[currentAction]);
+    } catch (e) {
+      console.error(e);
+    }
+    setActionReload(false);
+  };
+
+  const onActionConsole = async () => {
+    if (!instance || !currentAction) return;
+
+    setActionReload(true);
+    try {
+      const actions = await adapters[automateArtifact.contractName](
+        signer,
+        instance
+      );
+      console.info('Use console command: methods.methodName(params)')
+      console.info(`Methods list: ${Object.keys(actions[currentAction].methods).join(', ')}`)
+      window.methods = actions[currentAction].methods;
     } catch (e) {
       console.error(e);
     }
@@ -402,40 +420,41 @@ export function EthereumAutomateProtocol(props) {
       {!adapters || (
         <div>
           <h3>Action</h3>
-          <div className="row">
-            <div className="column column-45">
-              <label>Automate:</label>
-              <input
-                type="text"
-                placeholder="0x"
-                value={instance}
-                onChange={(e) => setInstance(e.target.value)}
-              />
+          <div>
+            <label>Automate:</label>
+            <input
+              type="text"
+              placeholder="0x"
+              value={instance}
+              onChange={(e) => setInstance(e.target.value)}
+            />
+          </div>
+          <div>
+            <div>
+              <label>Action: </label>
+              {isAdapterActionsLoad ? (
+                <div>Loading...</div>
+              ) : (
+                <select
+                  value={currentAction}
+                  onChange={(e) => setCurrentAction(e.target.value)}
+                >
+                  {adapterActions.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
-            <div className="column column-45">
-              <div>
-                <label>Action: </label>
-                {isAdapterActionsLoad ? (
-                  <div>Loading...</div>
-                ) : (
-                  <select
-                    value={currentAction}
-                    onChange={(e) => setCurrentAction(e.target.value)}
-                  >
-                    {adapterActions.map((name) => (
-                      <option key={name} value={name}>
-                        {name}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-            </div>
-            <div className="column column-10">
-              <Button onClick={onAction} loading={actionReload}>
-                Call
-              </Button>
-            </div>
+          </div>
+          <div>
+            <Button onClick={onActionComponent} loading={actionReload}>
+              Component
+            </Button>
+            <Button onClick={onActionConsole} loading={actionReload}>
+              Console
+            </Button>
           </div>
         </div>
       )}
