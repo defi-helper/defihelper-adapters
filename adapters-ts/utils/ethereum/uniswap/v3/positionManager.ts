@@ -139,7 +139,8 @@ export class Position {
         recipient: this.owner,
         amount0Max: MAX_UINT128,
         amount1Max: MAX_UINT128,
-      }
+      },
+      { from: this.owner }
     );
 
     return {
