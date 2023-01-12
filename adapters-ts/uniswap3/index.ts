@@ -711,13 +711,15 @@ module.exports = {
               if (params instanceof Error) return params;
 
               const { gasPrice, gasLimit, calldata } = params;
-              return automate.contract.run.apply(automate, [
-                ...calldata,
-                {
-                  gasPrice,
-                  gasLimit,
-                },
-              ]);
+              return {
+                tx: await automate.contract.run.apply(automate, [
+                  ...calldata,
+                  {
+                    gasPrice,
+                    gasLimit,
+                  },
+                ]),
+              };
             },
           },
         },
