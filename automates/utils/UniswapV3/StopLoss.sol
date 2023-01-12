@@ -15,6 +15,8 @@ library StopLoss {
     uint256 amountOutMin;
   }
 
+  event StopLossOrderCompleted(uint256 amountOut);
+
   function run(
     Order storage order,
     address liquidityRouter,
@@ -46,12 +48,13 @@ library StopLoss {
     for (uint256 i = 1; i < order.path.length; i++) {
         pathBytes = bytes.concat(pathBytes, abi.encodePacked(uint24(order.fee), order.path[i]));
     }
-    ISwapRouter(liquidityRouter).exactInput(ISwapRouter.ExactInputParams({
+    uint256 amountOut = ISwapRouter(liquidityRouter).exactInput(ISwapRouter.ExactInputParams({
         path: pathBytes,
         recipient: address(this),
         deadline: _deadline,
         amountIn: baseBalance,
         amountOutMinimum: order.amountOutMin 
     }));
+    emit StopLossOrderCompleted(amountOut);
   }
 }
