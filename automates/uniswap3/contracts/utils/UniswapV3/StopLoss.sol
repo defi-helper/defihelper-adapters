@@ -42,19 +42,26 @@ library StopLoss {
 
     address baseToken = order.path[0];
     uint256 baseBalance = IERC20(baseToken).balanceOf(address(this));
-    require(baseBalance > 0, "StopLoss::run: insufficient balance of base token");
-    IERC20(baseToken).safeApprove(liquidityRouter, baseBalance);
-    bytes memory pathBytes = abi.encodePacked(order.path[0]);
-    for (uint256 i = 1; i < order.path.length; i++) {
-        pathBytes = bytes.concat(pathBytes, abi.encodePacked(uint24(order.fee), order.path[i]));
+    uint256 amountOut;
+    if (baseToken != order.path[order.path.length - 1]) {
+      require(baseBalance > 0, "StopLoss::run: insufficient balance of base token");
+      IERC20(baseToken).safeApprove(liquidityRouter, baseBalance);
+      bytes memory pathBytes = abi.encodePacked(order.path[0]);
+      for (uint256 i = 1; i < order.path.length; i++) {
+          pathBytes = bytes.concat(pathBytes, abi.encodePacked(uint24(order.fee), order.path[i]));
+      }
+      amountOut = ISwapRouter(liquidityRouter).exactInput(ISwapRouter.ExactInputParams({
+          path: pathBytes,
+          recipient: address(this),
+          deadline: _deadline,
+          amountIn: baseBalance,
+          amountOutMinimum: order.amountOutMin 
+      }));
+      require(amountOut <= order.amountOut, "StopLoss::run: invalid output amount");
+    } else {
+      amountOut = baseBalance;
+      require(amountOut <= order.amountOut, "StopLoss::run: invalid output amount");
     }
-    uint256 amountOut = ISwapRouter(liquidityRouter).exactInput(ISwapRouter.ExactInputParams({
-        path: pathBytes,
-        recipient: address(this),
-        deadline: _deadline,
-        amountIn: baseBalance,
-        amountOutMinimum: order.amountOutMin 
-    }));
     emit StopLossOrderCompleted(amountOut);
   }
 }
