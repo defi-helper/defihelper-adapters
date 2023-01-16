@@ -61,7 +61,7 @@ export namespace Staking {
       rewardToken: adapter.Staking.ContractTokenInfo;
       metrics: adapter.Staking.ContractMetrics;
       wallet: adapter.Staking.WalletAdapter;
-      actions: Actions;
+      actions?: Actions;
     }>;
   }
 }
@@ -156,6 +156,10 @@ export namespace Deploy {
       deploy: adapter.Action.Tab<ContractTransaction>[];
     }>;
   }
+
+  export const adapter = (adapter: Adapter) => adapter;
+
+  export const adapters = (adapters: Record<string, Adapter>) => adapters;
 }
 
 export namespace Automate {
