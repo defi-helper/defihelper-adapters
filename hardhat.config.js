@@ -46,7 +46,7 @@ module.exports = {
     main: {
       url: process.env.ETH_MAIN_NODE || 'http://127.0.0.1:8545',
       chainId: 1,
-      gasPrice: 60_000_000_000,
+      gasPrice: 35_000_000_000,
       blockGasLimit: 2_000_000,
       accounts: [...maybeAccount(process.env.ETH_MAIN_DEPLOYER)],
     },
@@ -119,6 +119,13 @@ module.exports = {
       gasPrice: 50_000_000_000,
       blockGasLimit: 6_000_000,
       accounts: [...maybeAccount(process.env.POLYGON_DEPLOYER)],
+    },
+    optimistic: {
+      url: process.env.OPTIMISTIC_NODE || 'http://127.0.0.1:8545',
+      chainId: 10,
+      gasPrice: 1_000_000_000,
+      blockGasLimit: 6_000_000,
+      accounts: [...maybeAccount(process.env.OPTIMISTIC_DEPLOYER)],
     },
   },
   namedAccounts: {
