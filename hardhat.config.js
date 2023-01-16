@@ -113,6 +113,13 @@ module.exports = {
       blockGasLimit: 6_000_000,
       accounts: [...maybeAccount(process.env.OPTIMISTIC_DEPLOYER)],
     },
+    polygon: {
+      url: process.env.POLYGON_NODE || 'http://127.0.0.1:8545',
+      chainId: 137,
+      gasPrice: 50_000_000_000,
+      blockGasLimit: 6_000_000,
+      accounts: [...maybeAccount(process.env.POLYGON_DEPLOYER)],
+    },
   },
   namedAccounts: {
     deployer: {
