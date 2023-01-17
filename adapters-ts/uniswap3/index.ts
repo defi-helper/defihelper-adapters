@@ -758,8 +758,11 @@ module.exports = {
                 amount1: amount1.toString(),
               });
 
-              const amountIn =
+              let amountIn;
+              if (
                 position.token0Address.toLowerCase() === path[0].toLowerCase()
+              ) {
+                amountIn = amount1.int.gt(0)
                   ? await router
                       .amountOut(
                         uniswap.V3.swapRouter.pathWithFees(
@@ -771,7 +774,10 @@ module.exports = {
                       .then((amountPlus) =>
                         amount0.plus(amount1.token.amountInt(amountPlus))
                       )
-                  : await router
+                  : amount0;
+              } else {
+                amountIn = amount0.int.gt(0)
+                  ? await router
                       .amountOut(
                         uniswap.V3.swapRouter.pathWithFees(
                           [position.token0Address, position.token1Address],
@@ -781,11 +787,16 @@ module.exports = {
                       )
                       .then((amountPlus) =>
                         amount1.plus(amount1.token.amountInt(amountPlus))
-                      );
+                      )
+                  : amount1;
+              }
               debugo({
                 _prefix: "restakeStopLossAmountOut",
-                amountIn: amountIn.toString(),
+                amountIn: amountIn ? amountIn.toString() : "0",
               });
+              if (!amountIn) {
+                return "0";
+              }
 
               const amountOut =
                 path[0] === path[path.length - 1]
