@@ -34,7 +34,10 @@ const database = knex({
 });
 
 const app = Express();
-app.use(Express.static(path.resolve(__dirname, '../adapters-public-ts')));
+app.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'max-age=3600');
+  next();
+}, Express.static(path.resolve(__dirname, '../adapters-public-ts')));
 app.get('/cache', async (req, res) => {
   const { protocol, network, key } = req.query;
   if (!protocol || !network || !key) {
