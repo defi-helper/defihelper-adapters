@@ -76,6 +76,7 @@ const getENV = (network: number) => {
 
 const positionView = async (
   position: Position,
+  token0Price: erc20.TokenAmount,
   token0PriceUSD: BigNumber,
   token1PriceUSD: BigNumber
 ) => {
@@ -95,6 +96,7 @@ const positionView = async (
       amount: staked.amount0.toString(),
       amountUSD: staked.amount0.float.multipliedBy(token0PriceUSD).toString(10),
       price: {
+        value: token0Price.toString(),
         USD: token0PriceUSD.toString(10),
         lower: positionsSDK.token0PriceLower.toFixed(),
         upper: positionsSDK.token0PriceUpper.toFixed(),
@@ -107,12 +109,15 @@ const positionView = async (
       amount: staked.amount1.toString(),
       amountUSD: staked.amount1.float.multipliedBy(token1PriceUSD).toString(10),
       price: {
+        value: token1
+          .amountFloat(new bn(1).div(token0Price.toString()))
+          .toString(),
         USD: token1PriceUSD.toString(),
         lower: token1
-          .amountFloat(new bn(1).div(positionsSDK.token0PriceLower.toFixed()))
+          .amountFloat(new bn(1).div(positionsSDK.token0PriceUpper.toFixed()))
           .toString(),
         upper: token1
-          .amountFloat(new bn(1).div(positionsSDK.token0PriceUpper.toFixed()))
+          .amountFloat(new bn(1).div(positionsSDK.token0PriceLower.toFixed()))
           .toString(),
       },
     },
@@ -213,17 +218,16 @@ module.exports = {
         multicall,
         contractAddress
       );
-      const [token0, token1] = await Promise.all([
-        erc20.ConnectedToken.fromAddress(node, pool.token0.address),
-        erc20.ConnectedToken.fromAddress(node, pool.token1.address),
-      ]);
+      const [token0, token1, token0PriceUSD, token1PriceUSD] =
+        await Promise.all([
+          erc20.ConnectedToken.fromAddress(node, pool.token0.address),
+          erc20.ConnectedToken.fromAddress(node, pool.token1.address),
+          priceFeed(pool.token0.address),
+          priceFeed(pool.token1.address),
+        ]);
       const [token0Locked, token1Locked] = await multicall.all([
         token0.contract.multicall.balanceOf(contractAddress),
         token1.contract.multicall.balanceOf(contractAddress),
-      ]);
-      const [token0PriceUSD, token1PriceUSD] = await Promise.all([
-        priceFeed(pool.token0.address),
-        priceFeed(pool.token1.address),
       ]);
       const token0LockedUSD = token0
         .amountInt(token0Locked.toString())
@@ -295,6 +299,11 @@ module.exports = {
               node,
               env.pm
             );
+          const router = uniswap.V3.swapRouter.SwapRouter.fromAddress(
+            node,
+            env.router,
+            env.quoter
+          );
           const positions = await pm
             .positions(walletAddress)
             .then((positions) =>
@@ -350,6 +359,15 @@ module.exports = {
               },
             ])
           );
+          const token0Price = await router
+            .amountOut(
+              uniswap.V3.swapRouter.pathWithFees(
+                [token0.address, token1.address],
+                pool.fee
+              ),
+              token0.amountFloat(1).toFixed()
+            )
+            .then((value) => token1.amountInt(value));
 
           return {
             staked: {
@@ -402,7 +420,12 @@ module.exports = {
             },
             positions: await Promise.all(
               positions.map((position) =>
-                positionView(position, token0PriceUSD, token1PriceUSD)
+                positionView(
+                  position,
+                  token0Price,
+                  token0PriceUSD,
+                  token1PriceUSD
+                )
               )
             ),
           };
@@ -551,10 +574,13 @@ module.exports = {
         network,
         signer.provider
       );
-      const [token0PriceUSD, token1PriceUSD] = await Promise.all([
-        priceFeed(pool.token0.address),
-        priceFeed(pool.token1.address),
-      ]);
+      const [token0, token1, token0PriceUSD, token1PriceUSD] =
+        await Promise.all([
+          erc20.ConnectedToken.fromAddress(signer, pool.token0.address),
+          erc20.ConnectedToken.fromAddress(signer, pool.token1.address),
+          priceFeed(pool.token0.address),
+          priceFeed(pool.token1.address),
+        ]);
 
       const runParams = async () => {
         const deadline = dayjs()
@@ -586,6 +612,16 @@ module.exports = {
           name: "automateRestake-deposit",
           methods: {
             positions: async () => {
+              const token0Price = await router
+                .amountOut(
+                  uniswap.V3.swapRouter.pathWithFees(
+                    [token0.address, token1.address],
+                    pool.fee
+                  ),
+                  token0.amountFloat(1).toFixed()
+                )
+                .then((value) => token1.amountInt(value));
+
               return pm
                 .positions(await signer.address)
                 .then((positions) =>
@@ -598,7 +634,12 @@ module.exports = {
                 .then((positions) =>
                   Promise.all(
                     positions.map((position) =>
-                      positionView(position, token0PriceUSD, token1PriceUSD)
+                      positionView(
+                        position,
+                        token0Price,
+                        token0PriceUSD,
+                        token1PriceUSD
+                      )
                     )
                   )
                 );
@@ -658,6 +699,15 @@ module.exports = {
               if (tokenId.toString() === "0") {
                 return null;
               }
+              const token0Price = await router
+                .amountOut(
+                  uniswap.V3.swapRouter.pathWithFees(
+                    [token0.address, token1.address],
+                    pool.fee
+                  ),
+                  token0.amountFloat(1).toFixed()
+                )
+                .then((value) => token1.amountInt(value));
 
               return positionView(
                 Position.fromResponse(
@@ -667,6 +717,7 @@ module.exports = {
                   automate.contract.address,
                   await pm.contract.contract.positions(tokenId.toString())
                 ),
+                token0Price,
                 token0PriceUSD,
                 token1PriceUSD
               );
