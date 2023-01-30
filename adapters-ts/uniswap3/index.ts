@@ -254,8 +254,10 @@ module.exports = {
       return {
         stakeToken: {
           address: contractAddress,
-          decimals: 0,
-          priceUSD: "0",
+          decimals: 18,
+          priceUSD: new bn(tvl)
+            .div(new bn(pool.liquidity.toString()).div("1e18"))
+            .toString(10),
           parts: [
             {
               address: pool.token0.address,
