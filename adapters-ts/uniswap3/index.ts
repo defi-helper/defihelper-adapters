@@ -694,10 +694,7 @@ module.exports = {
           name: "automateRestake-refund",
           methods: {
             position: async () => {
-              const [tokenId, pool] = await multicall.all([
-                automate.multicall.tokenId(),
-                automate.multicall.pool(),
-              ]);
+              const tokenId = await automate.contract.tokenId();
               if (tokenId.toString() === "0") {
                 return null;
               }
@@ -715,7 +712,7 @@ module.exports = {
                 Position.fromResponse(
                   pm.contract,
                   tokenId.toNumber(),
-                  pool,
+                  poolAddress,
                   automate.contract.address,
                   await pm.contract.contract.positions(tokenId.toString())
                 ),
@@ -742,17 +739,9 @@ module.exports = {
 
               return true;
             },
-            refund: async () => {
-              const tokenId = await automate.contract
-                .tokenId()
-                .then((tokenId: ethersType.BigNumber) => tokenId.toString());
-
-              return {
-                tx: await pm.contract.contract[
-                  "safeTransferFrom(address,address,uint256)"
-                ](automate.contract.address, await signer.address, tokenId),
-              };
-            },
+            refund: async () => ({
+              tx: await automate.contract.refund(),
+            }),
           },
         },
         run: {

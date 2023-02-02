@@ -14,6 +14,19 @@
     "anonymous": false,
     "inputs": [
       {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "tokenId",
+        "type": "uint256"
+      }
+    ],
+    "name": "Deposit",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
         "indexed": true,
         "internalType": "address",
         "name": "previousOwner",
@@ -40,6 +53,19 @@
       }
     ],
     "name": "ProtocolFeeChanged",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "tokenId",
+        "type": "uint256"
+      }
+    ],
+    "name": "Refund",
     "type": "event"
   },
   {
@@ -166,7 +192,7 @@
         "type": "bytes4"
       }
     ],
-    "stateMutability": "nonpayable",
+    "stateMutability": "pure",
     "type": "function"
   },
   {
@@ -239,6 +265,13 @@
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "refund",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
