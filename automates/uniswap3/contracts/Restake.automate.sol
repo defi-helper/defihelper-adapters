@@ -25,6 +25,10 @@ contract Restake is Automate {
   uint16 public deadline;
 
   StopLoss.Order public stopLoss;
+  
+  event Deposit(uint256 tokenId);
+
+  event Refund(uint256 tokenId);
 
   // solhint-disable-next-line no-empty-blocks
   constructor(address _info) Automate(_info) {}
@@ -79,6 +83,32 @@ contract Restake is Automate {
     require(tokenPool == pool, "Restake::deposit: invalid pool address");
     pm.safeTransferFrom(msg.sender, address(this), tokenId);
     pm.approve(msg.sender, tokenId);
+
+    emit Deposit(_tokenId);
+  }
+
+  function refund() external onlyOwner {
+    uint256 _tokenId = tokenId;
+    require(_tokenId > 0, "Restake::refund: token already refunded");
+    address _owner = owner();
+
+    INonfungiblePositionManager pm = INonfungiblePositionManager(positionManager);
+    pm.safeTransferFrom(address(this), _owner, _tokenId);
+
+    (, , address token0, address token1, , , , , , , , ) = pm.positions(_tokenId);
+    require(token0 != address(0), "Restake::refund: invalid token0 address");
+    require(token1 != address(0), "Restake::refund: invalid token1 address");
+    uint256 balance0 = IERC20(token0).balanceOf(address(this));
+    uint256 balance1 = IERC20(token1).balanceOf(address(this));
+    if (balance0 > 0) {
+      IERC20(token0).safeTransfer(_owner, balance0);
+    }
+    if (balance1 > 0) {
+      IERC20(token1).safeTransfer(_owner, balance1);
+    }
+    tokenId = 0;
+
+    emit Refund(_tokenId);
   }
 
   function run(uint256 gasFee, uint256 _deadline) external tokenDeposited bill(gasFee, "UniswapV3Restake") {
@@ -120,7 +150,11 @@ contract Restake is Automate {
     stopLoss = StopLoss.Order({path: path, fee: fee, amountOut: amountOut, amountOutMin: amountOutMin});
   }
 
-  function runStopLoss(uint256 gasFee, uint256 _deadline) external tokenDeposited bill(gasFee, "UniswapV3RestakeStopLoss") {
+  function runStopLoss(uint256 gasFee, uint256 _deadline)
+    external
+    tokenDeposited
+    bill(gasFee, "UniswapV3RestakeStopLoss")
+  {
     uint256 _tokenId = tokenId;
     INonfungiblePositionManager pm = INonfungiblePositionManager(positionManager);
     (, , address token0, address token1, , , , uint128 liquidity, , , , ) = pm.positions(_tokenId);
