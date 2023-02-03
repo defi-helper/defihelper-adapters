@@ -116,7 +116,7 @@ module.exports = {
     polygon: {
       url: process.env.POLYGON_NODE || 'http://127.0.0.1:8545',
       chainId: 137,
-      gasPrice: 60_000_000_000,
+      gasPrice: 200_000_000_000,
       blockGasLimit: 6_000_000,
       accounts: [...maybeAccount(process.env.POLYGON_DEPLOYER)],
     },
