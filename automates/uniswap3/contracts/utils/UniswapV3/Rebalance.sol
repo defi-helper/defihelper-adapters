@@ -17,6 +17,8 @@ library Rebalance {
     uint256 tokenId;
   }
 
+  event RebalanceCompleted(uint256 tokenId);
+
   function swap(
     address liquidityRouter,
     uint24 fee,
@@ -92,5 +94,6 @@ library Rebalance {
     );
     IERC20(token0).safeApprove(address(pm), 0);
     IERC20(token1).safeApprove(address(pm), 0);
+    emit RebalanceCompleted(newTokenId);
   }
 }
