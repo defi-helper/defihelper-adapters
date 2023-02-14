@@ -9,10 +9,12 @@ import "./utils/UniswapV3/INonfungiblePositionManager.sol";
 import "./utils/UniswapV3/ISwapRouter.sol";
 import "./utils/UniswapV3/IFactory.sol";
 import "./utils/UniswapV3/StopLoss.sol";
+import "./utils/UniswapV3/Rebalance.sol";
 
 contract Restake is Automate {
   using SafeERC20 for IERC20;
   using StopLoss for StopLoss.Order;
+  using Rebalance for Rebalance.Interval;
 
   address public positionManager;
 
@@ -25,7 +27,7 @@ contract Restake is Automate {
   uint16 public deadline;
 
   StopLoss.Order public stopLoss;
-  
+
   event Deposit(uint256 tokenId);
 
   event Refund(uint256 tokenId);
@@ -184,5 +186,25 @@ contract Restake is Automate {
     stopLoss.run(liquidityRouter, inTokens, _deadline);
     IERC20 exitToken = IERC20(stopLoss.path[stopLoss.path.length - 1]);
     exitToken.safeTransfer(owner(), exitToken.balanceOf(address(this)));
+  }
+
+  function rebalance(
+    uint256 gasFee,
+    int24 tickLower,
+    int24 tickUpper,
+    uint256 _deadline
+  ) external bill(gasFee, "UniswapV3RestakeRebalance") {
+    uint256 _tokenId = tokenId;
+    require(_tokenId != 0, "Restake::rebalance: token already refunded");
+    Rebalance.Interval memory interval = Rebalance.Interval({
+      tickLower: tickLower,
+      tickUpper: tickUpper,
+      positionManager: positionManager,
+      liquidityRouter: liquidityRouter,
+      tokenId: _tokenId
+    });
+    uint256 newTokenId = interval.run(_deadline);
+    INonfungiblePositionManager(positionManager).safeTransferFrom(address(this), owner(), _tokenId);
+    tokenId = newTokenId;
   }
 }
