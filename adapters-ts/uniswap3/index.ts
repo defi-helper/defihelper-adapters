@@ -1,6 +1,6 @@
 import type ethersType from "ethers";
 import type BigNumber from "bignumber.js";
-import { bignumber as bn, dayjs, ethers, axios } from "../lib";
+import { bignumber as bn, dayjs, ethers, axios, uniswap3 } from "../lib";
 import { bridgeWrapperBuild } from "../utils/coingecko";
 import * as ethereum from "../utils/ethereum/base";
 import * as erc20 from "../utils/ethereum/erc20";
@@ -23,21 +23,21 @@ const envs: Record<
   1: {
     // ethereum
     pm: "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
-    router: "0xE592427A0AEce92De3Edee1F18E0157C05861564",
+    router: "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
     quoter: "0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6",
     graphs: "https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v3",
   },
   5: {
     // goerli
     pm: "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
-    router: "0xE592427A0AEce92De3Edee1F18E0157C05861564",
+    router: "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
     quoter: "0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6",
     graphs: "https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v3",
   },
   10: {
     // optimism
     pm: "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
-    router: "0xE592427A0AEce92De3Edee1F18E0157C05861564",
+    router: "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
     quoter: "0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6",
     graphs:
       "https://api.thegraph.com/subgraphs/name/ianlapham/optimism-post-regenesis",
@@ -45,14 +45,14 @@ const envs: Record<
   42161: {
     // arbitrum
     pm: "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
-    router: "0xE592427A0AEce92De3Edee1F18E0157C05861564",
+    router: "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
     quoter: "0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6",
     graphs: "https://api.thegraph.com/subgraphs/name/ianlapham/arbitrum-dev",
   },
   137: {
     // polygon
     pm: "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
-    router: "0xE592427A0AEce92De3Edee1F18E0157C05861564",
+    router: "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
     quoter: "0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6",
     graphs:
       "https://api.thegraph.com/subgraphs/name/ianlapham/uniswap-v3-polygon",
@@ -370,6 +370,45 @@ module.exports = {
               token0.amountFloat(1).toFixed()
             )
             .then((value) => token1.amountInt(value));
+
+          const position = positions.find(({ id }) => id === 53981);
+          if (position) {
+            const tickSpacing = uniswap3.sdk.TICK_SPACINGS[pool.fee];
+            const poolCurrentTick = uniswap3.sdk.nearestUsableTick(
+              pool.tickCurrent,
+              tickSpacing
+            );
+            const path = [pool.token1, pool.token0];
+            const isSorted = path[0].sortsBefore(path[1]);
+            const sortMult = isSorted ? 1 : -1;
+            const tickMult = 2;
+            const lowerTick =
+              poolCurrentTick - tickSpacing * tickMult * sortMult;
+            const upperTick =
+              poolCurrentTick + tickSpacing * tickMult * sortMult;
+            console.log(
+              uniswap3.sdk
+                .tickToPrice(path[0], path[1], pool.tickCurrent)
+                .toSignificant(5),
+              uniswap3.sdk
+                .tickToPrice(path[0], path[1], lowerTick)
+                .toSignificant(3),
+              uniswap3.sdk
+                .tickToPrice(path[0], path[1], upperTick)
+                .toSignificant(3)
+            );
+
+            /*
+            console.log(
+              await position
+                .toAmount1(token0.amountFloat(1))
+                .then(({ amount1 }) => amount1.toFixed()),
+              await position
+                .toAmount0(token1.amountFloat(1))
+                .then(({ amount0 }) => amount0.toFixed())
+            );
+            */
+          }
 
           return {
             staked: {
@@ -920,6 +959,87 @@ module.exports = {
 
               return {
                 tx: runStopLossTx,
+              };
+            },
+          },
+        },
+        rebalance: {
+          name: "automateRestake-rebalance",
+          methods: {
+            canRebalance: async () => {
+              const tokenId = await automate.contract
+                .tokenId()
+                .then((v: ethersType.BigNumber) => v.toString());
+              if (tokenId === "0") {
+                return new Error("Token already refunded");
+              }
+
+              return true;
+            },
+            rebalance: async () => {
+              const tokenId = await automate.contract
+                .tokenId()
+                .then((v: ethersType.BigNumber) => v.toString());
+              const tickSpacing = uniswap3.sdk.TICK_SPACINGS[pool.fee];
+              const poolCurrentTick = uniswap3.sdk.nearestUsableTick(
+                pool.tickCurrent,
+                pool.tickSpacing
+              );
+              const position = await pm.contract.contract.positions(
+                tokenId.toString()
+              );
+              const tickInterval = Math.floor(
+                (position.tickUpper - position.tickLower) / 2
+              );
+              const middleTick = new bn(poolCurrentTick);
+              const tickDelta = new bn(tickInterval);
+              const lowerTick = uniswap3.sdk.nearestUsableTick(
+                middleTick.minus(tickDelta).toNumber(),
+                tickSpacing
+              );
+              const upperTick = uniswap3.sdk.nearestUsableTick(
+                middleTick.plus(tickDelta).toNumber(),
+                tickSpacing
+              );
+
+              const deadline = dayjs()
+                .add(
+                  await automate.contract
+                    .deadline()
+                    .then((v: ethersType.BigNumber) => v.toString()),
+                  "seconds"
+                )
+                .unix();
+              const gasLimit = await automate.contract.estimateGas
+                .rebalance(
+                  1,
+                  lowerTick.toString(),
+                  upperTick.toString(),
+                  deadline
+                )
+                .then((v) => new bn(v.toString()).multipliedBy(1.1).toFixed(0));
+              const gasPrice = await signer.provider
+                .getGasPrice()
+                .then((v) => new bn(v.toString()).multipliedBy(1.1).toFixed(0));
+              const gasFee = new bn(gasLimit).multipliedBy(gasPrice).toFixed(0);
+
+              await automate.contract.estimateGas.rebalance(
+                gasFee,
+                lowerTick.toString(),
+                upperTick.toString(),
+                deadline
+              );
+              return {
+                tx: await automate.contract.rebalance(
+                  gasFee,
+                  lowerTick.toString(),
+                  upperTick.toString(),
+                  deadline,
+                  {
+                    gasPrice,
+                    gasLimit,
+                  }
+                ),
               };
             },
           },
