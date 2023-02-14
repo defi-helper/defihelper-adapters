@@ -1020,7 +1020,7 @@ module.exports = {
                 .then((v) => new bn(v.toString()).multipliedBy(1.1).toFixed(0));
               const gasPrice = await signer.provider
                 .getGasPrice()
-                .then((v) => v.toString());
+                .then((v) => new bn(v.toString()).multipliedBy(1.1).toFixed(0));
               const gasFee = new bn(gasLimit).multipliedBy(gasPrice).toFixed(0);
 
               await automate.contract.estimateGas.rebalance(
