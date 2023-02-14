@@ -54,6 +54,20 @@ export class Position {
     );
   }
 
+  static positionSDK(
+    pool: uniswap3Type.Pool,
+    liquidity: string | number,
+    tickLower: number,
+    tickUpper: number
+  ) {
+    return new uniswap3.sdk.Position({
+      pool,
+      liquidity,
+      tickLower,
+      tickUpper,
+    });
+  }
+
   public readonly poolSDK = new Promise<uniswap3Type.Pool>((resolve) => {
     Promise.all([this.manager.node.chainId, this.manager.node.multicall])
       .then(([chainId, multicall]) =>
@@ -66,12 +80,12 @@ export class Position {
     (resolve) => {
       this.poolSDK.then((pool) =>
         resolve(
-          new uniswap3.sdk.Position({
+          Position.positionSDK(
             pool,
-            liquidity: this.liquidity,
-            tickLower: this.tickLower,
-            tickUpper: this.tickUpper,
-          })
+            this.liquidity,
+            this.tickLower,
+            this.tickUpper
+          )
         )
       );
     }
@@ -147,6 +161,25 @@ export class Position {
       amount0: token0.amountInt(amount0.toString()),
       amount1: token1.amountInt(amount1.toString()),
     };
+  }
+
+  async toAmount1(amount0: erc20.TokenAmount) {
+    return uniswap3.sdk.Position.fromAmount0({
+      pool: await this.poolSDK,
+      amount0: amount0.toFixed(),
+      tickLower: this.tickLower,
+      tickUpper: this.tickUpper,
+      useFullPrecision: true,
+    });
+  }
+
+  async toAmount0(amount1: erc20.TokenAmount) {
+    return uniswap3.sdk.Position.fromAmount1({
+      pool: await this.poolSDK,
+      amount1: amount1.toFixed(),
+      tickLower: this.tickLower,
+      tickUpper: this.tickUpper,
+    });
   }
 }
 
