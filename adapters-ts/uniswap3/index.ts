@@ -1027,7 +1027,8 @@ module.exports = {
                 gasFee,
                 lowerTick.toString(),
                 upperTick.toString(),
-                deadline
+                deadline,
+                { gasLimit, gasPrice }
               );
               return {
                 tx: await automate.contract.rebalance(
