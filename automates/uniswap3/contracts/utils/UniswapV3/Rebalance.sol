@@ -70,8 +70,8 @@ library Rebalance {
     uint256 amountIn1 = IERC20(token1).balanceOf(address(this));
     if (amountIn1 > 0) {
       swap(interval.liquidityRouter, fee, token1, token0, amountIn1);
-      swap(interval.liquidityRouter, fee, token0, token1, IERC20(token0).balanceOf(address(this)) / 2);
     }
+    swap(interval.liquidityRouter, fee, token0, token1, IERC20(token0).balanceOf(address(this)) / 2);
 
     uint256 balance0 = IERC20(token0).balanceOf(address(this));
     uint256 balance1 = IERC20(token1).balanceOf(address(this));
