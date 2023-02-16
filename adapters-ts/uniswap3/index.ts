@@ -371,45 +371,6 @@ module.exports = {
             )
             .then((value) => token1.amountInt(value));
 
-          const position = positions.find(({ id }) => id === 53981);
-          if (position) {
-            const tickSpacing = uniswap3.sdk.TICK_SPACINGS[pool.fee];
-            const poolCurrentTick = uniswap3.sdk.nearestUsableTick(
-              pool.tickCurrent,
-              tickSpacing
-            );
-            const path = [pool.token1, pool.token0];
-            const isSorted = path[0].sortsBefore(path[1]);
-            const sortMult = isSorted ? 1 : -1;
-            const tickMult = 2;
-            const lowerTick =
-              poolCurrentTick - tickSpacing * tickMult * sortMult;
-            const upperTick =
-              poolCurrentTick + tickSpacing * tickMult * sortMult;
-            console.log(
-              uniswap3.sdk
-                .tickToPrice(path[0], path[1], pool.tickCurrent)
-                .toSignificant(5),
-              uniswap3.sdk
-                .tickToPrice(path[0], path[1], lowerTick)
-                .toSignificant(3),
-              uniswap3.sdk
-                .tickToPrice(path[0], path[1], upperTick)
-                .toSignificant(3)
-            );
-
-            /*
-            console.log(
-              await position
-                .toAmount1(token0.amountFloat(1))
-                .then(({ amount1 }) => amount1.toFixed()),
-              await position
-                .toAmount0(token1.amountFloat(1))
-                .then(({ amount0 }) => amount0.toFixed())
-            );
-            */
-          }
-
           return {
             staked: {
               [token0.address]: {
@@ -981,24 +942,20 @@ module.exports = {
                 .tokenId()
                 .then((v: ethersType.BigNumber) => v.toString());
               const tickSpacing = uniswap3.sdk.TICK_SPACINGS[pool.fee];
-              const poolCurrentTick = uniswap3.sdk.nearestUsableTick(
-                pool.tickCurrent,
-                pool.tickSpacing
+              const position = await pm.contract.contract.positions(tokenId);
+              const tickInterval = uniswap3.sdk.nearestUsableTick(
+                Math.floor((position.tickUpper - position.tickLower) / 2),
+                tickSpacing
               );
-              const position = await pm.contract.contract.positions(
-                tokenId.toString()
+              const middleTick = new bn(
+                uniswap3.sdk.nearestUsableTick(pool.tickCurrent, tickSpacing)
               );
-              const tickInterval = Math.floor(
-                (position.tickUpper - position.tickLower) / 2
-              );
-              const middleTick = new bn(poolCurrentTick);
-              const tickDelta = new bn(tickInterval);
               const lowerTick = uniswap3.sdk.nearestUsableTick(
-                middleTick.minus(tickDelta).toNumber(),
+                middleTick.minus(tickInterval).toNumber(),
                 tickSpacing
               );
               const upperTick = uniswap3.sdk.nearestUsableTick(
-                middleTick.plus(tickDelta).toNumber(),
+                middleTick.plus(tickInterval).toNumber(),
                 tickSpacing
               );
 
@@ -1011,12 +968,7 @@ module.exports = {
                 )
                 .unix();
               const gasLimit = await automate.contract.estimateGas
-                .rebalance(
-                  1,
-                  lowerTick.toString(),
-                  upperTick.toString(),
-                  deadline
-                )
+                .rebalance(1, lowerTick, upperTick, deadline)
                 .then((v) => new bn(v.toString()).multipliedBy(1.1).toFixed(0));
               const gasPrice = await signer.provider
                 .getGasPrice()
@@ -1025,21 +977,18 @@ module.exports = {
 
               await automate.contract.estimateGas.rebalance(
                 gasFee,
-                lowerTick.toString(),
-                upperTick.toString(),
+                lowerTick,
+                upperTick,
                 deadline,
                 { gasLimit, gasPrice }
               );
               return {
                 tx: await automate.contract.rebalance(
                   gasFee,
-                  lowerTick.toString(),
-                  upperTick.toString(),
+                  lowerTick,
+                  upperTick,
                   deadline,
-                  {
-                    gasPrice,
-                    gasLimit,
-                  }
+                  { gasPrice, gasLimit }
                 ),
               };
             },
