@@ -757,27 +757,33 @@ export function stakingPairAutomateAdapter({
         calldata: [gasFee, deadline, swap0, swap1],
       };
     };
-    const run = async () => {
-      const params = await runParams();
-      if (params instanceof Error) return params;
-
-      const { gasPrice, gasLimit, calldata } = params;
-      return automate.run.apply(automate, [
-        ...calldata,
-        {
-          gasPrice,
-          gasLimit,
-        },
-      ]);
-    };
 
     return {
       contract: stakingTokenAddress,
       deposit,
       refund,
       migrate,
-      runParams,
-      run,
+      run: {
+        name: "automateRestake-run",
+        methods: {
+          runParams,
+          run: async () => {
+            const params = await runParams();
+            if (params instanceof Error) return params;
+
+            const { gasPrice, gasLimit, calldata } = params;
+            return {
+              tx: await automate.run.apply(automate, [
+                ...calldata,
+                {
+                  gasPrice,
+                  gasLimit,
+                },
+              ]),
+            };
+          },
+        },
+      },
     };
   };
 }
@@ -1005,27 +1011,31 @@ export function stakingSingleAutomateAdapter({
         calldata: [gasFee, deadline, swap],
       };
     };
-    const run = async () => {
-      const params = await runParams();
-      if (params instanceof Error) return params;
-
-      const { gasPrice, gasLimit, calldata } = params;
-      return automate.run.apply(automate, [
-        ...calldata,
-        {
-          gasPrice,
-          gasLimit,
-        },
-      ]);
-    };
 
     return {
       contract: stakingTokenAddress,
       deposit,
       refund,
       migrate,
-      runParams,
-      run,
+      run: {
+        name: "automateRestake-run",
+        methods: {
+          runParams,
+          run: async () => {
+            const params = await runParams();
+            if (params instanceof Error) return params;
+
+            const { gasPrice, gasLimit, calldata } = params;
+            return automate.run.apply(automate, [
+              ...calldata,
+              {
+                gasPrice,
+                gasLimit,
+              },
+            ]);
+          },
+        },
+      },
     };
   };
 }
