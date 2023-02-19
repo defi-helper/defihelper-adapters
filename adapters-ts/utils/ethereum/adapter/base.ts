@@ -196,12 +196,9 @@ export namespace Automate {
         withdraw: () => Promise<{ tx: ContractTransaction }>;
       } & AdapterActions["deposit"]["methods"];
     };
-  }
-
-  export interface Adapter {
-    (signer: Signer, contractAddress: string): Promise<
-      AdapterActions & {
-        contract: string;
+    run: {
+      name: "automateRestake-run";
+      methods: {
         runParams: () => Promise<
           | {
               gasPrice: string;
@@ -210,9 +207,13 @@ export namespace Automate {
             }
           | Error
         >;
-        run: () => Promise<ContractTransaction | Error>;
-      }
-    >;
+        run: () => Promise<{ tx: ContractTransaction } | Error>;
+      };
+    };
+  }
+
+  export interface Adapter {
+    (signer: Signer, contractAddress: string): Promise<AdapterActions>;
   }
 
   export namespace AutoRestake {
