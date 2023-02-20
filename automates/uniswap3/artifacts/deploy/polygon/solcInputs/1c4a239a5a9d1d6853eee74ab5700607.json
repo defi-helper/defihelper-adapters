@@ -45,6 +45,14 @@
     }
   },
   "settings": {
+    "libraries": {
+      "contracts/utils/DFH/proxy/ERC1167.sol": {
+        "ERC1167": "0x7ecFCbdeb6f195030B9Bf2ECc402f6d5433d116D"
+      },
+      "contracts/utils/UniswapV3/Rebalance.sol": {
+        "Rebalance": "0xC1Ea5c99bA1431f67e1052c9D8471A74911c61c3"
+      }
+    },
     "optimizer": {
       "enabled": true,
       "runs": 1000000
