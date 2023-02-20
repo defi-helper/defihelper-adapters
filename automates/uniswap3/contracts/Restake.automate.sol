@@ -183,7 +183,7 @@ contract Restake is Automate {
     address[] memory inTokens = new address[](2);
     inTokens[0] = token0;
     inTokens[1] = token1;
-    stopLoss.run(liquidityRouter, inTokens, _deadline);
+    stopLoss.run(liquidityRouter, inTokens);
     IERC20 exitToken = IERC20(stopLoss.path[stopLoss.path.length - 1]);
     exitToken.safeTransfer(owner(), exitToken.balanceOf(address(this)));
   }
