@@ -129,8 +129,8 @@ contract Restake is Automate {
     uint256 amount0 = IERC20(token0).balanceOf(address(this));
     uint256 amount1 = IERC20(token1).balanceOf(address(this));
     require(amount0 > 0 || amount1 > 0, "Restake::run: no earned");
-    IERC20(token0).approve(address(pm), amount0);
-    IERC20(token1).approve(address(pm), amount1);
+    IERC20(token0).safeApprove(address(pm), amount0);
+    IERC20(token1).safeApprove(address(pm), amount1);
     pm.increaseLiquidity(
       INonfungiblePositionManager.IncreaseLiquidityParams({
         tokenId: _tokenId,
@@ -141,6 +141,8 @@ contract Restake is Automate {
         deadline: _deadline
       })
     );
+    IERC20(token0).safeApprove(address(pm), 0);
+    IERC20(token1).safeApprove(address(pm), 0);
   }
 
   function setStopLoss(
