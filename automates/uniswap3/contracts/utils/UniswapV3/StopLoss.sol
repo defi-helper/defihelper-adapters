@@ -41,6 +41,7 @@ library StopLoss {
           sqrtPriceLimitX96: 0
         })
       );
+      IERC20(token).safeApprove(liquidityRouter, 0);
     }
 
     address baseToken = order.path[0];
@@ -61,6 +62,7 @@ library StopLoss {
           amountOutMinimum: order.amountOutMin
         })
       );
+      IERC20(baseToken).safeApprove(liquidityRouter, 0);
     }
     require(amountOut <= order.amountOut, "StopLoss::run: invalid output amount");
     emit StopLossOrderCompleted(amountOut);
