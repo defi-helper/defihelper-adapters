@@ -56,6 +56,10 @@ export function Router() {
             component={DFH.LPTokensManagerPage}
           ></Route>
           <Route
+            path="/client/dfh/uni3zap"
+            component={DFH.Uni3LPTokensManagerPage}
+          ></Route>
+          <Route
             path="/client/dfh/automate"
             component={DFH.AutomatePage}
           ></Route>
