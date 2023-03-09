@@ -140,8 +140,8 @@ export class Position {
     ]);
 
     return {
-      amount0: token0.amountFloat(amount0.toFixed()),
-      amount1: token1.amountFloat(amount1.toFixed()),
+      amount0: token0.amountFloat(amount0.toSignificant()),
+      amount1: token1.amountFloat(amount1.toSignificant()),
     };
   }
 
@@ -295,8 +295,8 @@ export const positionView = async (
       price: {
         value: token0Price.toString(),
         USD: token0PriceUSD,
-        lower: positionsSDK.token0PriceLower.toFixed(),
-        upper: positionsSDK.token0PriceUpper.toFixed(),
+        lower: positionsSDK.token0PriceLower.toSignificant(),
+        upper: positionsSDK.token0PriceUpper.toSignificant(),
       },
     },
     token1: {
@@ -311,10 +311,10 @@ export const positionView = async (
           .toString(),
         USD: token1PriceUSD.toString(),
         lower: token1
-          .amountFloat(new bn(1).div(positionsSDK.token0PriceUpper.toFixed()))
+          .amountFloat(new bn(1).div(positionsSDK.token0PriceUpper.toSignificant()))
           .toString(),
         upper: token1
-          .amountFloat(new bn(1).div(positionsSDK.token0PriceLower.toFixed()))
+          .amountFloat(new bn(1).div(positionsSDK.token0PriceLower.toSignificant()))
           .toString(),
       },
     },
