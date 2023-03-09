@@ -1,12 +1,11 @@
 import type ethersType from "ethers";
-import type BigNumber from "bignumber.js";
 import { bignumber as bn, dayjs, ethers, axios, uniswap3 } from "../lib";
 import { bridgeWrapperBuild } from "../utils/coingecko";
 import * as ethereum from "../utils/ethereum/base";
 import * as erc20 from "../utils/ethereum/erc20";
 import * as uniswap from "../utils/ethereum/uniswap";
 import * as dfh from "../utils/dfh";
-import { Position } from "../utils/ethereum/uniswap/v3/positionManager";
+import { Position, positionView } from "../utils/ethereum/uniswap/v3/positionManager";
 import {
   stakingAdapter,
   contractsResolver,
@@ -72,56 +71,6 @@ const getENV = (network: number) => {
     throw new Error(`Network "${network}" not supported`);
   }
   return env;
-};
-
-const positionView = async (
-  position: Position,
-  token0Price: erc20.TokenAmount,
-  token0PriceUSD: BigNumber,
-  token1PriceUSD: BigNumber
-) => {
-  const [positionsSDK, staked, token0, token1] = await Promise.all([
-    position.positionSDK,
-    position.staked(),
-    position.token0,
-    position.token1,
-  ]);
-  return {
-    id: position.id,
-    fee: position.fee / 1000000,
-    token0: {
-      address: token0.address,
-      name: token0.name,
-      symbol: token0.symbol,
-      amount: staked.amount0.toString(),
-      amountUSD: staked.amount0.float.multipliedBy(token0PriceUSD).toString(10),
-      price: {
-        value: token0Price.toString(),
-        USD: token0PriceUSD.toString(10),
-        lower: positionsSDK.token0PriceLower.toSignificant(),
-        upper: positionsSDK.token0PriceUpper.toSignificant(),
-      },
-    },
-    token1: {
-      address: token1.address,
-      name: token1.name,
-      symbol: token1.symbol,
-      amount: staked.amount1.toString(),
-      amountUSD: staked.amount1.float.multipliedBy(token1PriceUSD).toString(10),
-      price: {
-        value: token1
-          .amountFloat(new bn(1).div(token0Price.toString()))
-          .toString(),
-        USD: token1PriceUSD.toString(),
-        lower: token1
-          .amountFloat(new bn(1).div(positionsSDK.token0PriceUpper.toSignificant()))
-          .toString(),
-        upper: token1
-          .amountFloat(new bn(1).div(positionsSDK.token0PriceLower.toSignificant()))
-          .toString(),
-      },
-    },
-  };
 };
 
 interface PoolInfo {
@@ -425,8 +374,8 @@ module.exports = {
                 positionView(
                   position,
                   token0Price,
-                  token0PriceUSD,
-                  token1PriceUSD
+                  token0PriceUSD.toString(),
+                  token1PriceUSD.toString()
                 )
               )
             ),
@@ -639,8 +588,8 @@ module.exports = {
                       positionView(
                         position,
                         token0Price,
-                        token0PriceUSD,
-                        token1PriceUSD
+                        token0PriceUSD.toString(),
+                        token1PriceUSD.toString()
                       )
                     )
                   )
@@ -717,8 +666,8 @@ module.exports = {
                   await pm.contract.contract.positions(tokenId.toString())
                 ),
                 token0Price,
-                token0PriceUSD,
-                token1PriceUSD
+                token0PriceUSD.toString(),
+                token1PriceUSD.toString()
               );
             },
             can: async () => {

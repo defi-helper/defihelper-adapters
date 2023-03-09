@@ -93,6 +93,9 @@ export function Main() {
             <li>
               <Link to="/client/dfh/zap">LP Tokens manager</Link>
             </li>
+            <li>
+              <Link to="/client/dfh/uni3zap">Uni3 LP Tokens manager</Link>
+            </li>
           </ul>
         </div>
       </div>

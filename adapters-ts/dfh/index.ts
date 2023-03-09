@@ -3,7 +3,7 @@ import type {
   ContractTransaction,
   BigNumber as EthersBigNumber,
 } from "ethers";
-import { bignumber as bn, ethers, dayjs, ethersMulticall } from "../lib";
+import { bignumber as bn, ethers, dayjs } from "../lib";
 import { debug, debugo } from "../utils/base";
 import * as ethereum from "../utils/ethereum/base";
 import * as erc20 from "../utils/ethereum/erc20";
@@ -14,6 +14,7 @@ import { abi as StorageABI } from "@defihelper/networks/abi/Storage.json";
 import { abi as LPTokensManagerABI } from "@defihelper/networks/abi/LPTokensManager.json";
 import { abi as SmartTradeRouterABI } from "@defihelper/networks/abi/SmartTradeRouter.json";
 import { abi as SmartTradeSwapHandlerABI } from "@defihelper/networks/abi/SmartTradeSwapHandler.json";
+import uni3 from "./uni3/lpTokenManager";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -921,6 +922,7 @@ module.exports = {
         },
       };
     },
+    uni3,
     smartTrade: {
       router: async (ethSigner: Signer, contractAddress: string) => {
         debugo({
