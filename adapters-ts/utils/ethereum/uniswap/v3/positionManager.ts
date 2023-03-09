@@ -140,8 +140,8 @@ export class Position {
     ]);
 
     return {
-      amount0: token0.amountFloat(amount0.toFixed()),
-      amount1: token1.amountFloat(amount1.toFixed()),
+      amount0: token0.amountFloat(amount0.toSignificant()),
+      amount1: token1.amountFloat(amount1.toSignificant()),
     };
   }
 
