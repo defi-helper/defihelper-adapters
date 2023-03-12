@@ -39,18 +39,18 @@ spec:
             - name: http
               containerPort: 80
               protocol: TCP
-#          livenessProbe:
-#            httpGet:
-#              path: /
-#              port: http
-#            initialDelaySeconds: 15
-#            timeoutSeconds: 1
-#          readinessProbe:
-#            httpGet:
-#              path: /
-#              port: http
-#            initialDelaySeconds: 15
-#            timeoutSeconds: 1
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 15
+            timeoutSeconds: 1
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 15
+            timeoutSeconds: 1
           resources:
             {{- toYaml .Values.images.nginx.resources | nindent 12 }}
         - name: app
@@ -62,18 +62,18 @@ spec:
             - name: http
               containerPort: 8080
               protocol: TCP
-#          livenessProbe:
-#            httpGet:
-#              path: /
-#              port: 8080
-#            initialDelaySeconds: 15
-#            timeoutSeconds: 1
-#          readinessProbe:
-#            httpGet:
-#              path: /
-#              port: 8080
-#            initialDelaySeconds: 15
-#            timeoutSeconds: 1
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 15
+            timeoutSeconds: 1
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 15
+            timeoutSeconds: 1
           volumeMounts:
             - mountPath: /app/configuration
               name: configuration
