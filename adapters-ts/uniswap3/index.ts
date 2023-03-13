@@ -5,7 +5,10 @@ import * as ethereum from "../utils/ethereum/base";
 import * as erc20 from "../utils/ethereum/erc20";
 import * as uniswap from "../utils/ethereum/uniswap";
 import * as dfh from "../utils/dfh";
-import { Position, positionView } from "../utils/ethereum/uniswap/v3/positionManager";
+import {
+  Position,
+  positionView,
+} from "../utils/ethereum/uniswap/v3/positionManager";
 import {
   stakingAdapter,
   contractsResolver,
@@ -870,6 +873,21 @@ module.exports = {
               return {
                 tx: runStopLossTx,
               };
+            },
+            canEmergencyWithdraw: async () => {
+              const stopLoss = await automate.contract.stopLoss();
+              if (stopLoss.amountOut.toString() === "0") {
+                return new Error("Stop loss not enabled");
+              }
+
+              return true;
+            },
+            emergencyWithdraw: async () => {
+              const tx = await automate.contract.emergencyWithdraw(
+                dayjs().add(5, "minutes").unix()
+              );
+
+              return { tx };
             },
           },
         },

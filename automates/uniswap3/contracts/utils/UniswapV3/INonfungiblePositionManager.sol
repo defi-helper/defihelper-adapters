@@ -6,7 +6,9 @@ interface INonfungiblePositionManager {
 
   function ownerOf(uint256 tokenId) external view returns (address);
 
-  function positions(uint256 tokenId)
+  function positions(
+    uint256 tokenId
+  )
     external
     view
     returns (
@@ -38,15 +40,9 @@ interface INonfungiblePositionManager {
     uint256 deadline;
   }
 
-  function mint(MintParams calldata params)
-    external
-    payable
-    returns (
-      uint256 tokenId,
-      uint128 liquidity,
-      uint256 amount0,
-      uint256 amount1
-    );
+  function mint(
+    MintParams calldata params
+  ) external payable returns (uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1);
 
   struct IncreaseLiquidityParams {
     uint256 tokenId;
@@ -57,14 +53,9 @@ interface INonfungiblePositionManager {
     uint256 deadline;
   }
 
-  function increaseLiquidity(IncreaseLiquidityParams calldata params)
-    external
-    payable
-    returns (
-      uint128 liquidity,
-      uint256 amount0,
-      uint256 amount1
-    );
+  function increaseLiquidity(
+    IncreaseLiquidityParams calldata params
+  ) external payable returns (uint128 liquidity, uint256 amount0, uint256 amount1);
 
   struct DecreaseLiquidityParams {
     uint256 tokenId;
@@ -74,10 +65,9 @@ interface INonfungiblePositionManager {
     uint256 deadline;
   }
 
-  function decreaseLiquidity(DecreaseLiquidityParams calldata params)
-    external
-    payable
-    returns (uint256 amount0, uint256 amount1);
+  function decreaseLiquidity(
+    DecreaseLiquidityParams calldata params
+  ) external payable returns (uint256 amount0, uint256 amount1);
 
   struct CollectParams {
     uint256 tokenId;
@@ -92,9 +82,5 @@ interface INonfungiblePositionManager {
 
   function approve(address to, uint256 tokenId) external;
 
-  function safeTransferFrom(
-    address from,
-    address to,
-    uint256 tokenId
-  ) external;
+  function safeTransferFrom(address from, address to, uint256 tokenId) external;
 }

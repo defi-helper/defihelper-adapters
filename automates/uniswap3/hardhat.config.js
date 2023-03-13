@@ -14,9 +14,7 @@ module.exports = {
         mnemonic: process.env.ETH_MNEMONIC || '',
       },
       forking: {
-        //url: 'https://goerli.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161'
-        url: 'https://nameless-icy-night.optimism.quiknode.pro/44959fc074ae21c0ba41605b8fa770acd746f279/'
-        //url: 'https://lively-prettiest-frost.matic.quiknode.pro/8d5c554471b2e3d33125e962d1ce0d58bb83eab0/'
+        url: 'https://goerli.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161'
       }
     },
   },

@@ -65,12 +65,7 @@ contract Restake is Automate {
     deadline = _deadline;
   }
 
-  function onERC721Received(
-    address,
-    address,
-    uint256,
-    bytes calldata
-  ) external pure returns (bytes4) {
+  function onERC721Received(address, address, uint256, bytes calldata) external pure returns (bytes4) {
     return bytes4(keccak256("onERC721Received(address,address,uint256,bytes)"));
   }
 
@@ -145,24 +140,15 @@ contract Restake is Automate {
     IERC20(token1).safeApprove(address(pm), 0);
   }
 
-  function setStopLoss(
-    address[] memory path,
-    uint24 fee,
-    uint256 amountOut,
-    uint256 amountOutMin
-  ) external onlyOwner {
+  function setStopLoss(address[] memory path, uint24 fee, uint256 amountOut, uint256 amountOutMin) external onlyOwner {
     stopLoss = StopLoss.Order({path: path, fee: fee, amountOut: amountOut, amountOutMin: amountOutMin});
   }
 
-  function runStopLoss(uint256 gasFee, uint256 _deadline)
-    external
-    tokenDeposited
-    bill(gasFee, "UniswapV3RestakeStopLoss")
-  {
+  function _runStopLoss(uint256 _deadline) internal returns (uint256 amountOut) {
     uint256 _tokenId = tokenId;
     INonfungiblePositionManager pm = INonfungiblePositionManager(positionManager);
     (, , address token0, address token1, , , , uint128 liquidity, , , , ) = pm.positions(_tokenId);
-    require(liquidity > 0, "Restake::runStopLoss: token already closed");
+    require(liquidity > 0, "Restake::_runStopLoss: token already closed");
 
     pm.decreaseLiquidity(
       INonfungiblePositionManager.DecreaseLiquidityParams({
@@ -185,9 +171,22 @@ contract Restake is Automate {
     address[] memory inTokens = new address[](2);
     inTokens[0] = token0;
     inTokens[1] = token1;
-    stopLoss.run(liquidityRouter, inTokens);
+    amountOut = stopLoss.run(liquidityRouter, inTokens);
     IERC20 exitToken = IERC20(stopLoss.path[stopLoss.path.length - 1]);
-    exitToken.safeTransfer(owner(), exitToken.balanceOf(address(this)));
+    address _owner = owner();
+    exitToken.safeTransfer(_owner, exitToken.balanceOf(address(this)));
+    pm.safeTransferFrom(address(this), _owner, _tokenId);
+  }
+
+  function runStopLoss(
+    uint256 gasFee,
+    uint256 _deadline
+  ) external tokenDeposited bill(gasFee, "UniswapV3RestakeStopLoss") {
+    require(_runStopLoss(_deadline) <= stopLoss.amountOut, "Restake::runStopLoss: invalid output amount");
+  }
+
+  function emergencyWithdraw(uint256 _deadline) external onlyOwner tokenDeposited {
+    _runStopLoss(_deadline);
   }
 
   function rebalance(
