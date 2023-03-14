@@ -5,7 +5,10 @@ import * as ethereum from "../utils/ethereum/base";
 import * as erc20 from "../utils/ethereum/erc20";
 import * as uniswap from "../utils/ethereum/uniswap";
 import * as dfh from "../utils/dfh";
-import { Position, positionView } from "../utils/ethereum/uniswap/v3/positionManager";
+import {
+  Position,
+  positionView,
+} from "../utils/ethereum/uniswap/v3/positionManager";
 import {
   stakingAdapter,
   contractsResolver,
@@ -738,7 +741,12 @@ module.exports = {
                 automate.contract.address,
                 await pm.contract.contract.positions(tokenId)
               );
-              const { amount0, amount1 } = await position.staked();
+              const [staked, earned] = await Promise.all([
+                position.staked(),
+                position.earned(),
+              ]);
+              const amount0 = staked.amount0.plus(earned.amount0);
+              const amount1 = staked.amount0.plus(earned.amount0);
               debugo({
                 _prefix: "restakeStopLossAmountOut",
                 exitToken: exitToken.address,
