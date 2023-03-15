@@ -147,15 +147,17 @@ export class Position {
 
   async earned() {
     const [token0, token1] = await Promise.all([this.token0, this.token1]);
-    const { amount0, amount1 } = await this.manager.contract.callStatic.collect(
-      {
-        tokenId: this.id,
-        recipient: this.owner,
-        amount0Max: MAX_UINT128,
-        amount1Max: MAX_UINT128,
-      },
-      { from: this.owner }
-    );
+    const { amount0, amount1 } = await this.manager.contract
+      .connect(this.manager.node.provider)
+      .callStatic.collect(
+        {
+          tokenId: this.id,
+          recipient: this.owner,
+          amount0Max: MAX_UINT128,
+          amount1Max: MAX_UINT128,
+        },
+        { from: this.owner }
+      );
 
     return {
       amount0: token0.amountInt(amount0.toString()),
@@ -311,10 +313,14 @@ export const positionView = async (
           .toString(),
         USD: token1PriceUSD.toString(),
         lower: token1
-          .amountFloat(new bn(1).div(positionsSDK.token0PriceUpper.toSignificant()))
+          .amountFloat(
+            new bn(1).div(positionsSDK.token0PriceUpper.toSignificant())
+          )
           .toString(),
         upper: token1
-          .amountFloat(new bn(1).div(positionsSDK.token0PriceLower.toSignificant()))
+          .amountFloat(
+            new bn(1).div(positionsSDK.token0PriceLower.toSignificant())
+          )
           .toString(),
       },
     },
