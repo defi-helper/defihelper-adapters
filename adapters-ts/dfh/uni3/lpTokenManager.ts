@@ -71,6 +71,51 @@ export default {
           node: signer,
           account: signerAddress,
         }),
+        interval: async (width: number | string) => {
+          debugo({
+            _prefix: "interval",
+            width,
+          });
+          if (Number.isNaN(Number(width))) {
+            return new Error("Invalid width");
+          }
+
+          const { tickSpacing, tickCurrent, token0, token1 } = pool;
+          const tickLower = uniswap3.sdk.nearestUsableTick(
+            tickCurrent - tickSpacing * Number(width),
+            tickSpacing
+          );
+          const tickUpper = uniswap3.sdk.nearestUsableTick(
+            tickCurrent + tickSpacing * Number(width),
+            tickSpacing
+          );
+          const token0PriceLower = new bn(1.0001)
+            .pow(tickLower)
+            .multipliedBy(`1e${token0.decimals - token1.decimals}`);
+          const token0PriceUpper = new bn(1.0001)
+            .pow(tickUpper)
+            .multipliedBy(`1e${token0.decimals - token1.decimals}`);
+
+          return {
+            tickCurrent,
+            tickLower,
+            tickUpper,
+            token0: {
+              address: token0.address,
+              name: token0.name,
+              decimals: token0.decimals,
+              priceLower: token0PriceLower.toString(10),
+              priceUpper: token0PriceUpper.toString(10),
+            },
+            token1: {
+              address: token1.address,
+              name: token1.name,
+              decimals: token1.decimals,
+              priceLower: new bn(1).div(token0PriceLower).toString(10),
+              priceUpper: new bn(1).div(token0PriceUpper).toString(10),
+            },
+          };
+        },
         isApproved: erc20.useIsApproved({
           node: signer,
           spender: signerAddress,
