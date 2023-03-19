@@ -21,7 +21,7 @@ library StopLoss {
     Order storage order,
     address liquidityRouter,
     address[] memory inTokens
-  ) internal {
+  ) internal returns (uint256 amountOut) {
     require(order.path.length > 1 && order.amountOut > 0, "StopLoss::run: stop loss disabled");
     require(inTokens.length <= 256, "StopLoss::run: too many tokens");
     for (uint8 i = 0; i < inTokens.length; i++) {
@@ -46,7 +46,7 @@ library StopLoss {
 
     address baseToken = order.path[0];
     uint256 baseBalance = IERC20(baseToken).balanceOf(address(this));
-    uint256 amountOut = baseBalance;
+    amountOut = baseBalance;
     if (baseToken != order.path[order.path.length - 1]) {
       require(baseBalance > 0, "StopLoss::run: insufficient balance of base token");
       IERC20(baseToken).safeApprove(liquidityRouter, baseBalance);
@@ -64,7 +64,6 @@ library StopLoss {
       );
       IERC20(baseToken).safeApprove(liquidityRouter, 0);
     }
-    require(amountOut <= order.amountOut, "StopLoss::run: invalid output amount");
     emit StopLossOrderCompleted(amountOut);
   }
 }

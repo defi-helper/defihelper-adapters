@@ -6,5 +6,5 @@ interface IFactory {
     address token0,
     address token1,
     uint24 fee
-  ) external returns (address);
+  ) external view returns (address);
 }

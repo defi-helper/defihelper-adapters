@@ -879,6 +879,21 @@ module.exports = {
                 tx: runStopLossTx,
               };
             },
+            canEmergencyWithdraw: async () => {
+              const stopLoss = await automate.contract.stopLoss();
+              if (stopLoss.amountOut.toString() === "0") {
+                return new Error("Stop loss not enabled");
+              }
+
+              return true;
+            },
+            emergencyWithdraw: async () => {
+              const tx = await automate.contract.emergencyWithdraw(
+                dayjs().add(5, "minutes").unix()
+              );
+
+              return { tx };
+            },
           },
         },
         rebalance: {
