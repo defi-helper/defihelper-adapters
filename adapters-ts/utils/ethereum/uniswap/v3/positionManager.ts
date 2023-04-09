@@ -1,6 +1,6 @@
 import type ethersType from "ethers";
 import uniswap3Type from "@uniswap/v3-sdk";
-import { uniswap3 } from "../../../../lib";
+import { bignumber as bn, uniswap3 } from "../../../../lib";
 import * as ethereum from "../../../ethereum/base";
 import * as erc20 from "../../../ethereum/erc20";
 import positionManagerABI from "./abi/nonfungiblePositionManager.json";
@@ -147,15 +147,17 @@ export class Position {
 
   async earned() {
     const [token0, token1] = await Promise.all([this.token0, this.token1]);
-    const { amount0, amount1 } = await this.manager.contract.callStatic.collect(
-      {
-        tokenId: this.id,
-        recipient: this.owner,
-        amount0Max: MAX_UINT128,
-        amount1Max: MAX_UINT128,
-      },
-      { from: this.owner }
-    );
+    const { amount0, amount1 } = await this.manager.contract
+      .connect(this.manager.node.provider)
+      .callStatic.collect(
+        {
+          tokenId: this.id,
+          recipient: this.owner,
+          amount0Max: MAX_UINT128,
+          amount1Max: MAX_UINT128,
+        },
+        { from: this.owner }
+      );
 
     return {
       amount0: token0.amountInt(amount0.toString()),
@@ -223,6 +225,24 @@ export class PositionManager {
     return tokensId.map((tokenId) => Number(tokenId.toString()));
   }
 
+  async position(owner: string, tokenId: number) {
+    const positionResponse: PositionResponse =
+      await this.contract.contract.positions(tokenId);
+    const pool = await this.factory.contract.getPool(
+      positionResponse.token0,
+      positionResponse.token1,
+      positionResponse.fee.toString()
+    );
+
+    return Position.fromResponse(
+      this.contract,
+      tokenId,
+      pool,
+      owner,
+      positionResponse
+    );
+  }
+
   async positions(owner: string) {
     const [tokensId, multicall] = await Promise.all([
       this.tokensIdList(owner),
@@ -252,3 +272,57 @@ export class PositionManager {
     );
   }
 }
+
+export const positionView = async (
+  position: Position,
+  token0Price: erc20.TokenAmount,
+  token0PriceUSD: string,
+  token1PriceUSD: string
+) => {
+  const [positionsSDK, staked, token0, token1] = await Promise.all([
+    position.positionSDK,
+    position.staked(),
+    position.token0,
+    position.token1,
+  ]);
+  return {
+    id: position.id,
+    fee: position.fee / 1000000,
+    token0: {
+      address: token0.address,
+      name: token0.name,
+      symbol: token0.symbol,
+      amount: staked.amount0.toString(),
+      amountUSD: staked.amount0.float.multipliedBy(token0PriceUSD).toString(10),
+      price: {
+        value: token0Price.toString(),
+        USD: token0PriceUSD,
+        lower: positionsSDK.token0PriceLower.toSignificant(),
+        upper: positionsSDK.token0PriceUpper.toSignificant(),
+      },
+    },
+    token1: {
+      address: token1.address,
+      name: token1.name,
+      symbol: token1.symbol,
+      amount: staked.amount1.toString(),
+      amountUSD: staked.amount1.float.multipliedBy(token1PriceUSD).toString(10),
+      price: {
+        value: token1
+          .amountFloat(new bn(1).div(token0Price.toString()))
+          .toString(),
+        USD: token1PriceUSD.toString(),
+        lower: token1
+          .amountFloat(
+            new bn(1).div(positionsSDK.token0PriceUpper.toSignificant())
+          )
+          .toString(),
+        upper: token1
+          .amountFloat(
+            new bn(1).div(positionsSDK.token0PriceLower.toSignificant())
+          )
+          .toString(),
+      },
+    },
+  };
+};
