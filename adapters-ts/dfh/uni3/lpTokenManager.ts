@@ -27,7 +27,7 @@ export default {
     debugo({
       _prefix: "Adapter uni3 buyLiquidity",
       contractAddress,
-      positinoManager: options.positionManager,
+      positionManager: options.positionManager,
       router: options.router,
       autorouteURL: options.autorouteURL,
       quoter: options.quoter,
