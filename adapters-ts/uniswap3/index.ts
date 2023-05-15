@@ -428,6 +428,10 @@ module.exports = {
           automate: {
             adapters: ["pool"],
             autorestakeAdapter: "Restake",
+            lpTokensManager: {
+              router: env.router,
+              pair: id,
+            }
           },
           link: `https://app.uniswap.org/#/add/${token0.id}/${token1.id}/${feeTier}`,
         }));
