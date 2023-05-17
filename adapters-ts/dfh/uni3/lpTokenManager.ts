@@ -89,12 +89,12 @@ export default {
             tickCurrent + tickSpacing * Number(width),
             tickSpacing
           );
-          const token0PriceLower = new bn(1.0001)
-            .pow(tickLower)
-            .multipliedBy(`1e${token0.decimals - token1.decimals}`);
-          const token0PriceUpper = new bn(1.0001)
-            .pow(tickUpper)
-            .multipliedBy(`1e${token0.decimals - token1.decimals}`);
+          const token0PriceLower = new bn(
+            Math.pow(1.0001, tickLower)
+          ).multipliedBy(`1e${token0.decimals - token1.decimals}`);
+          const token0PriceUpper = new bn(
+            Math.pow(1.0001, tickUpper)
+          ).multipliedBy(`1e${token0.decimals - token1.decimals}`);
 
           return {
             tickCurrent,
@@ -403,7 +403,7 @@ export default {
     }
   ) => {
     debugo({
-      _prefix: "Adapter uni3 buyLiquidity",
+      _prefix: "Adapter uni3 sellLiquidity",
       contractAddress,
       positinoManager: options.positionManager,
       router: options.router,
