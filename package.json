@@ -27,7 +27,7 @@
     "@babel/preset-react": "^7.14.5",
     "@chainlink/contracts": "^0.2.2",
     "@defihelper/ethers-multicall": "^0.3.5",
-    "@defihelper/networks": "1.0.49",
+    "@defihelper/networks": "1.1.1",
     "@defihelper/provider-keeper": "0.1.5-dfh",
     "@ethereum-waffle/mock-contract": "^3.3.0",
     "@nomiclabs/hardhat-ethers": "^2.1.1",
