@@ -56,7 +56,7 @@ export class CoingeckoProvider {
     250: "fantom",
     1285: "moonriver",
     1284: "moonbeam",
-    42161: "arbitrum",
+    42161: "arbitrum-one",
     43114: "avalanche",
   };
 
