@@ -120,12 +120,12 @@ module.exports = {
       blockGasLimit: 6_000_000,
       accounts: [...maybeAccount(process.env.POLYGON_DEPLOYER)],
     },
-    optimistic: {
-      url: process.env.OPTIMISTIC_NODE || 'http://127.0.0.1:8545',
-      chainId: 10,
-      gasPrice: 1_000_000_000,
-      blockGasLimit: 6_000_000,
-      accounts: [...maybeAccount(process.env.OPTIMISTIC_DEPLOYER)],
+    arbitrum: {
+      url: process.env.ARBITRUM_NODE || 'http://127.0.0.1:8545',
+      chainId: 42161,
+      gasPrice: 100_000_000,
+      blockGasLimit: 15_000_000,
+      accounts: [...maybeAccount(process.env.ARBITRUM_DEPLOYER)],
     },
   },
   namedAccounts: {
