@@ -758,7 +758,7 @@ module.exports = {
                 position.earned(),
               ]);
               const amount0 = staked.amount0.plus(earned.amount0);
-              const amount1 = staked.amount0.plus(earned.amount0);
+              const amount1 = staked.amount1.plus(earned.amount1);
               debugo({
                 _prefix: "restakeStopLossAmountOut",
                 exitToken: exitToken.address,
