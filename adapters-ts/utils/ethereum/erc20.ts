@@ -243,7 +243,13 @@ export async function approveAll(
 export const useBalanceOf =
   ({ node, account }: { node: ethereum.Node; account: string }) =>
   async (tokenAddress: string) => {
-    debugo({ _prefix: "balanceOf", tokenAddress });
+    debugo({ _prefix: "balanceOf", account, tokenAddress });
+    if (tokenAddress === "0x0000000000000000000000000000000000000000") {
+      return node.provider
+        .getBalance(account)
+        .then((v) => new bn(v.toString()).div("1e18").toString());
+    }
+
     const token = await ConnectedToken.fromAddress(node, tokenAddress);
     const balance = await token.balanceOf(account);
     debugo({
